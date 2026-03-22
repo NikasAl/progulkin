@@ -69,12 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
           await _moveToPosition(point.latitude, point.longitude);
         }
       },
-      onUserLocationAdded: (userLocation) {
-        return userLocation.copyWith(
-          visible: true,
-          bearing: const MapArrow(),
-        );
-      },
     );
   }
 
@@ -479,45 +473,13 @@ class _HomeScreenState extends State<HomeScreen> {
     ).toList();
     
     final polyline = PolylineMapObject(
-      mapObjectId: MapObjectId('route_${DateTime.now().millisecondsSinceEpoch}'),
+      mapId: MapObjectId('route_${DateTime.now().millisecondsSinceEpoch}'),
       polyline: Polyline(points: polylinePoints),
       strokeColor: Theme.of(context).colorScheme.primary,
       strokeWidth: 5,
     );
     
     _mapObjects.add(polyline);
-    
-    // Добавляем маркер начала
-    if (points.isNotEmpty) {
-      _mapObjects.add(
-        PlacemarkMapObject(
-          mapObjectId: const MapObjectId('start_marker'),
-          point: Point(latitude: points.first.latitude, longitude: points.first.longitude),
-          icon: PlacemarkIcon.single(
-            PlacemarkIconStyle(
-              image: BitmapDescriptor.fromAssetImage('assets/icons/start_marker.png'),
-              scale: 0.5,
-            ),
-          ),
-        ),
-      );
-    }
-    
-    // Добавляем маркер текущей позиции
-    if (points.length > 1) {
-      _mapObjects.add(
-        PlacemarkMapObject(
-          mapObjectId: const MapObjectId('current_marker'),
-          point: Point(latitude: points.last.latitude, longitude: points.last.longitude),
-          icon: PlacemarkIcon.single(
-            PlacemarkIconStyle(
-              image: BitmapDescriptor.fromAssetImage('assets/icons/current_marker.png'),
-              scale: 0.5,
-            ),
-          ),
-        ),
-      );
-    }
     
     setState(() {});
   }

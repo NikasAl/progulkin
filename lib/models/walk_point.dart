@@ -1,5 +1,3 @@
-import 'package:latlong2/latlong.dart';
-
 /// Точка маршрута прогулки
 class WalkPoint {
   final double latitude;

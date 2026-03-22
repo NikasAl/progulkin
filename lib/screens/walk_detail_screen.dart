@@ -32,38 +32,10 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
 
     _mapObjects.add(
       PolylineMapObject(
-        mapObjectId: const MapObjectId('walk_route'),
+        mapId: const MapObjectId('walk_route'),
         polyline: Polyline(points: polylinePoints),
         strokeColor: Theme.of(context).colorScheme.primary,
         strokeWidth: 4,
-      ),
-    );
-
-    // Маркер начала
-    _mapObjects.add(
-      PlacemarkMapObject(
-        mapObjectId: const MapObjectId('start_point'),
-        point: polylinePoints.first,
-        icon: PlacemarkIcon.single(
-          PlacemarkIconStyle(
-            image: BitmapDescriptor.fromAssetImage('assets/icons/start_marker.png'),
-            scale: 0.4,
-          ),
-        ),
-      ),
-    );
-
-    // Маркер конца
-    _mapObjects.add(
-      PlacemarkMapObject(
-        mapObjectId: const MapObjectId('end_point'),
-        point: polylinePoints.last,
-        icon: PlacemarkIcon.single(
-          PlacemarkIconStyle(
-            image: BitmapDescriptor.fromAssetImage('assets/icons/end_marker.png'),
-            scale: 0.4,
-          ),
-        ),
       ),
     );
   }

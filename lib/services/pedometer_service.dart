@@ -99,9 +99,7 @@ class PedometerService {
     _detectedSteps = 0;
     _currentSteps = 0;
 
-    _accelerometerSubscription = accelerometerEventStream(
-      samplingPeriod: const Duration(milliseconds: 50),
-    ).listen((AccelerometerEvent event) {
+    _accelerometerSubscription = accelerometerEvents.listen((AccelerometerEvent event) {
       final now = DateTime.now().millisecondsSinceEpoch;
       
       // Вычисляем магнитуду ускорения
