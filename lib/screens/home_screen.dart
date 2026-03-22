@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yandex_mapkit/yandex_mapkit.dart';
+import '../config/app_config.dart';
 import '../providers/walk_provider.dart';
 import '../providers/pedometer_provider.dart';
 import '../models/walk_point.dart';
@@ -18,9 +19,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   YandexMapController? _mapController;
   final List<MapObject> _mapObjects = [];
-  
-  // API ключ для Яндекс карт (замените на свой)
-  static const String _yandexApiKey = 'YOUR_YANDEX_MAP_API_KEY';
 
   @override
   void initState() {

@@ -40,10 +40,11 @@
             android:name="flutterEmbedding"
             android:value="2" />
             
-        <!-- Яндекс карты API ключ -->
-        <meta-data
-            android:name="com.yandex.mapkit.apikey"
-            android:value="YOUR_YANDEX_MAP_API_KEY"/>
+        <!-- 
+            Яндекс карты API ключ передаётся из Dart кода.
+            Настройте ключ в файле lib/config/app_config.dart
+            (скопируйте из lib/config/app_config.example.dart)
+        -->
             
         <!-- Foreground Service для трекинга -->
         <service

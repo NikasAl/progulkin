@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../config/app_config.dart';
 import '../models/walk_point.dart';
 
 /// Сервис геолокации для трекинга маршрута
@@ -52,7 +53,9 @@ class LocationService {
 
       return _positionToWalkPoint(position);
     } catch (e) {
-      print('Ошибка получения позиции: $e');
+      if (AppConfig.enableLogging) {
+        print('Ошибка получения позиции: $e');
+      }
       return null;
     }
   }
@@ -64,10 +67,10 @@ class LocationService {
       throw Exception('Нет разрешения на геолокацию');
     }
 
-    const LocationSettings locationSettings = LocationSettings(
+    final LocationSettings locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 5, // Обновление каждые 5 метров
-      timeLimit: Duration(seconds: 30),
+      distanceFilter: AppConfig.trackingDistanceFilter,
+      timeLimit: const Duration(seconds: 30),
     );
 
     _positionStreamSubscription = Geolocator.getPositionStream(

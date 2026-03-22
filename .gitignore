@@ -70,6 +70,14 @@ lib/generated_plugin_registrant.dart
 # Coverage
 coverage/
 
+# Config with secrets (copy from app_config.example.dart)
+lib/config/app_config.dart
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
 # Exceptions to above rules.
 !**/ios/**/default.mode1v3
 !**/ios/**/default.mode2v3

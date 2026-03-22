@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:pedometer/pedometer.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import '../config/app_config.dart';
 
 /// Сервис для подсчёта шагов
 class PedometerService {
@@ -29,9 +30,6 @@ class PedometerService {
   double _lastAccelMagnitude = 0;
   int _lastStepTime = 0;
   int _detectedSteps = 0;
-  
-  static const int _minStepIntervalMs = 200; // Минимум 200мс между шагами
-  static const double _stepThreshold = 12.0; // Порог для детекции шага
 
   /// Текущее количество шагов
   int get currentSteps => _currentSteps;
@@ -75,18 +73,22 @@ class PedometerService {
           _currentSteps = stepCount.steps - _initialSteps;
           _stepsController.add(_currentSteps);
           
-          // Примерный расчёт расстояния (средняя длина шага ~0.76м)
-          final distance = _currentSteps * 0.76;
+          // Расчёт расстояния на основе средней длины шага из конфига
+          final distance = _currentSteps * AppConfig.averageStepLength;
           _distanceController.add(distance);
         },
         onError: (error) {
-          print('Ошибка шагомера: $error');
+          if (AppConfig.enableLogging) {
+            print('Ошибка шагомера: $error');
+          }
           // Fallback на акселерометр
           _startAccelerometerCounting();
         },
       );
     } catch (e) {
-      print('Ошибка запуска шагомера: $e');
+      if (AppConfig.enableLogging) {
+        print('Ошибка запуска шагомера: $e');
+      }
       await _startAccelerometerCounting();
     }
   }
@@ -105,15 +107,15 @@ class PedometerService {
       // Вычисляем магнитуду ускорения
       final magnitude = (event.x * event.x + event.y * event.y + event.z * event.z);
       
-      // Детекция шага по пику ускорения
-      if (magnitude > _stepThreshold && 
-          _lastAccelMagnitude <= _stepThreshold &&
-          (now - _lastStepTime) > _minStepIntervalMs) {
+      // Детекция шага по пику ускорения с параметрами из конфига
+      if (magnitude > AppConfig.stepDetectionThreshold && 
+          _lastAccelMagnitude <= AppConfig.stepDetectionThreshold &&
+          (now - _lastStepTime) > AppConfig.minStepIntervalMs) {
         _detectedSteps++;
         _currentSteps = _detectedSteps;
         _stepsController.add(_currentSteps);
         
-        final distance = _currentSteps * 0.76;
+        final distance = _currentSteps * AppConfig.averageStepLength;
         _distanceController.add(distance);
         
         _lastStepTime = now;
