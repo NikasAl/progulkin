@@ -1,0 +1,56 @@
+name: progulkin
+description: Приложение для трекинга прогулок с Яндекс картами и подсчётом шагов.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Яндекс карты
+  yandex_mapkit: ^3.4.0
+
+  # Геолокация
+  geolocator: ^10.1.0
+  location: ^5.0.3
+
+  # Подсчёт шагов
+  pedometer: ^4.0.1
+  sensors_plus: ^3.0.3
+
+  # Состояние
+  provider: ^6.1.1
+
+  # Локальное хранилище
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.1
+  sqflite: ^2.3.0
+
+  # Утилиты
+  intl: ^0.18.1
+  uuid: ^4.1.0
+  permission_handler: ^11.1.0
+
+  # Иконки и UI
+  cupertino_icons: ^1.0.6
+  flutter_native_splash: ^2.3.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icons/
+
+flutter_native_splash:
+  color: "#4CAF50"
+  color_dark: "#2E7D32"
+  android: true
+  ios: true
