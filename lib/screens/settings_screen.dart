@@ -125,10 +125,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (_enableStationaryDetection)
             _buildSliderTile(
               title: 'Радиус неподвижности',
-              subtitle: 'Все точки в этом радиусе считаются неподвижностью',
+              subtitle: 'Смещение меньше этого радиуса за 30 сек = остановка',
               value: _stationaryRadius,
-              min: 5,
-              max: 50,
+              min: 3,
+              max: 30,
               unit: ' м',
               icon: Icons.gps_fixed,
               onChanged: (value) {

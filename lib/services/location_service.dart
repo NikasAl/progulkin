@@ -22,7 +22,6 @@ class LocationService {
   // Переменные для фильтрации
   WalkPoint? _lastValidPoint;
   final List<WalkPoint> _recentPoints = []; // Для медианного фильтра и фильтрации
-  final List<WalkPoint> _stationaryCheckPoints = []; // Отдельный буфер для определения неподвижности
   int _pointsReceived = 0;
   int _pointsAccepted = 0;
 
@@ -33,13 +32,14 @@ class LocationService {
   int smoothingWindowSize = 3; // окно для сглаживания
   
   // Настройки определения неподвижности
-  double stationaryRadiusMeters = 15.0; // радиус для определения неподвижности
-  int stationaryMinPoints = 5; // количество точек для проверки неподвижности
+  double stationaryRadiusMeters = 10.0; // радиус для определения неподвижности
+  int stationaryMinPoints = 15; // количество точек для проверки (15 точек = 30 сек)
   bool enableStationaryDetection = true; // включить определение неподвижности
 
   // Переменные для определения неподвижности
   bool _isStationary = false;
-  WalkPoint? _stationaryCenter;
+  WalkPoint? _stationaryStartPoint; // первая точка группы для проверки
+  List<WalkPoint> _stationaryBuffer = []; // буфер точек кандидатов
 
   /// Обновить настройки фильтрации
   void updateSettings({
@@ -130,11 +130,11 @@ class LocationService {
     // Сброс переменных
     _lastValidPoint = null;
     _recentPoints.clear();
-    _stationaryCheckPoints.clear();
+    _stationaryBuffer.clear();
+    _stationaryStartPoint = null;
     _pointsReceived = 0;
     _pointsAccepted = 0;
     _isStationary = false;
-    _stationaryCenter = null;
 
     print('Начинаем отслеживание GPS...');
     print('Настройки: макс.скорость=$maxWalkingSpeedKmh км/ч, макс.точность=$maxAccuracyMeters м');
@@ -344,61 +344,64 @@ class LocationService {
 
   double _toRadians(double degree) => degree * math.pi / 180;
 
-  /// Проверка неподвижности
+  /// Проверка неподвижности - новый алгоритм
+  /// Отслеживаем смещение от начальной точки за длительный период
+  /// Если за 30+ секунд смещение меньше радиуса - человек стоит
   void _checkStationary(WalkPoint newPoint) {
-    // Добавляем точку в отдельный буфер для проверки неподвижности
-    _stationaryCheckPoints.add(newPoint);
+    // Если нет начальной точки, запоминаем текущую как кандидат
+    if (_stationaryStartPoint == null) {
+      _stationaryStartPoint = newPoint;
+      _stationaryBuffer = [newPoint];
+      _isStationary = false;
+      if (AppConfig.enableLogging) {
+        print('📍 Новая точка отсчёта для проверки неподвижности');
+      }
+      return;
+    }
     
-    // Если точек меньше минимума, считаем движением
-    if (_stationaryCheckPoints.length < stationaryMinPoints) {
+    // Проверяем расстояние от начальной точки
+    final distanceFromStart = _calculateDistance(
+      _stationaryStartPoint!.latitude, 
+      _stationaryStartPoint!.longitude,
+      newPoint.latitude, 
+      newPoint.longitude,
+    );
+    
+    if (AppConfig.enableLogging) {
+      print('📏 Расстояние от начала: ${distanceFromStart.toStringAsFixed(1)}м, буфер: ${_stationaryBuffer.length}');
+    }
+    
+    // Если превысили радиус - движение! Сбрасываем и начинаем сначала
+    if (distanceFromStart > stationaryRadiusMeters) {
+      if (_isStationary) {
+        if (AppConfig.enableLogging) {
+          print('⚡ Вышли из неподвижности (прошли ${distanceFromStart.toStringAsFixed(1)}м)');
+        }
+      }
+      _stationaryStartPoint = newPoint;
+      _stationaryBuffer = [newPoint];
       _isStationary = false;
       return;
     }
     
-    // Оставляем только последние N точек
-    while (_stationaryCheckPoints.length > stationaryMinPoints) {
-      _stationaryCheckPoints.removeAt(0);
-    }
+    // Точка в пределах радиуса - добавляем в буфер
+    _stationaryBuffer.add(newPoint);
     
-    // Вычисляем центр (среднее)
-    double sumLat = 0, sumLon = 0;
-    for (final p in _stationaryCheckPoints) {
-      sumLat += p.latitude;
-      sumLon += p.longitude;
-    }
-    final centerLat = sumLat / _stationaryCheckPoints.length;
-    final centerLon = sumLon / _stationaryCheckPoints.length;
-    
-    // Находим максимальное расстояние от центра
-    double maxDistance = 0;
-    for (final p in _stationaryCheckPoints) {
-      final dist = _calculateDistance(centerLat, centerLon, p.latitude, p.longitude);
-      if (dist > maxDistance) {
-        maxDistance = dist;
+    // Проверяем, достаточно ли точек для вывода о неподвижности
+    if (_stationaryBuffer.length >= stationaryMinPoints) {
+      // Вычисляем время в неподвижности
+      final duration = _stationaryBuffer.last.timestamp
+          .difference(_stationaryBuffer.first.timestamp).inSeconds;
+      
+      if (!_isStationary) {
+        if (AppConfig.enableLogging) {
+          print('⚠ Неподвижность подтверждена ($duration сек, ${_stationaryBuffer.length} точек)');
+        }
+        _isStationary = true;
       }
-    }
-    
-    // Если все точки в пределах радиуса - неподвижность
-    final wasStationary = _isStationary;
-    _isStationary = maxDistance <= stationaryRadiusMeters;
-    
-    if (_isStationary && !wasStationary) {
-      if (AppConfig.enableLogging) {
-        print('⚠ Перешли в неподвижность (радиус: ${maxDistance.toStringAsFixed(1)}м)');
-      }
-      _stationaryCenter = WalkPoint(
-        latitude: centerLat,
-        longitude: centerLon,
-        altitude: newPoint.altitude,
-        speed: 0,
-        accuracy: newPoint.accuracy,
-        timestamp: newPoint.timestamp,
-      );
-    } else if (!_isStationary && wasStationary) {
-      if (AppConfig.enableLogging) {
-        print('⚡ Вышли из неподвижности (радиус: ${maxDistance.toStringAsFixed(1)}м)');
-      }
-      _stationaryCenter = null;
+    } else {
+      // Ещё собираем данные, но пока считаем движением
+      _isStationary = false;
     }
   }
 
@@ -411,11 +414,11 @@ class LocationService {
     _positionStreamSubscription = null;
     _lastValidPoint = null;
     _recentPoints.clear();
-    _stationaryCheckPoints.clear();
+    _stationaryBuffer.clear();
+    _stationaryStartPoint = null;
     _pointsReceived = 0;
     _pointsAccepted = 0;
     _isStationary = false;
-    _stationaryCenter = null;
     print('GPS остановлен. Статистика: принято $_pointsAccepted из $_pointsReceived');
   }
 
