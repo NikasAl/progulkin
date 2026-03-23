@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../models/map_objects/map_objects.dart';
+import '../../models/map_objects/map_objects.dart';
 import 'map_object_storage.dart';
 
 /// Конфигурация P2P

@@ -82,7 +82,7 @@ class MapObjectProvider extends ChangeNotifier {
       _objects = await _storage.getAllObjects();
 
       // Подписываемся на новые объекты от P2P
-      _newObjectSubscription = _p2pService.newObjectStream.listen((object) {
+      _newObjectSubscription = _p2pService.newObjectStream.listen((MapObject object) {
         _onNewObjectReceived(object);
       });
 

@@ -1174,7 +1174,7 @@ class _ObjectDetailsContent extends StatelessWidget {
           if (secret.isOneTime)
             _buildInfoRow(
               context,
-              icon: Icons.one_time,
+              icon: Icons.timer,
               label: 'Одноразовое',
               value: 'Да',
             ),

@@ -121,21 +121,22 @@ class MapObject {
     };
   }
 
-  /// Создание из P2P данных
+  /// Создание из P2P данных - использует фабрику из map_objects.dart
   static MapObject fromSyncJson(Map<String, dynamic> json) {
-    final type = MapObjectType.fromCode(json['type'] as String);
-    
-    switch (type) {
-      case MapObjectType.trashMonster:
-        return TrashMonster.fromSyncJson(json);
-      case MapObjectType.secretMessage:
-        return SecretMessage.fromSyncJson(json);
-      case MapObjectType.creature:
-        return Creature.fromSyncJson(json);
-      default:
-        // Базовый объект для неизвестных типов
-        return MapObject._fromJson(json);
-    }
+    // Фабрика определена в map_objects.dart для избежания циклического импорта
+    return _createMapObjectFromJson(json);
+  }
+  
+  /// Функция создания (устанавливается из map_objects.dart)
+  static MapObject Function(Map<String, dynamic>) _createMapObjectFromJson = _defaultFromJson;
+  
+  static MapObject _defaultFromJson(Map<String, dynamic> json) {
+    return MapObject._fromJson(json);
+  }
+  
+  /// Установить фабрику создания (вызывается из map_objects.dart)
+  static void setObjectFactory(MapObject Function(Map<String, dynamic>) factory) {
+    _createMapObjectFromJson = factory;
   }
 
   /// Базовое создание из JSON

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../models/map_objects/map_objects.dart';
+import '../../models/map_objects/map_objects.dart';
 
 /// Локальное хранилище объектов карты
 class MapObjectStorage {
