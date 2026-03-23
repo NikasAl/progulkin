@@ -550,7 +550,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openSettings(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const SettingsScreen()),
+      MaterialPageRoute(builder: (context) => SettingsScreen()),
     );
   }
 
