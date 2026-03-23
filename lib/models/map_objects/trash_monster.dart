@@ -1,5 +1,37 @@
 import 'map_object.dart';
 
+/// Класс монстра (сложность уборки)
+enum MonsterClass {
+  easy('easy', 1, 'Лёгкий', '🟢', 10),
+  medium('medium', 2, 'Средний', '🟡', 20),
+  hard('hard', 3, 'Сложный', '🟠', 30),
+  veryHard('very_hard', 4, 'Тяжёлый', '🔴', 40),
+  boss('boss', 5, 'Босс', '💀', 50),
+  ;
+
+  final String code;
+  final int level;
+  final String name;
+  final String badge;
+  final int basePoints;
+
+  const MonsterClass(this.code, this.level, this.name, this.badge, this.basePoints);
+
+  static MonsterClass fromLevel(int level) {
+    return MonsterClass.values.firstWhere(
+      (c) => c.level == level,
+      orElse: () => MonsterClass.medium,
+    );
+  }
+
+  static MonsterClass fromCode(String code) {
+    return MonsterClass.values.firstWhere(
+      (c) => c.code == code,
+      orElse: () => MonsterClass.medium,
+    );
+  }
+}
+
 /// Тип мусора
 enum TrashType {
   bottles('bottles', 'Бутылки/банки', '🍺'),
@@ -47,31 +79,6 @@ enum TrashQuantity {
     return TrashQuantity.values.firstWhere(
       (t) => t.code == code,
       orElse: () => TrashQuantity.few,
-    );
-  }
-}
-
-/// Класс монстра (сложность уборки)
-enum MonsterClass {
-  easy('easy', 1, 'Лёгкий', '🟢', 10),
-  medium('medium', 2, 'Средний', '🟡', 20),
-  hard('hard', 3, 'Сложный', '🟠', 30),
-  veryHard('very_hard', 4, 'Тяжёлый', '🔴', 40),
-  boss('boss', 5, 'Босс', '💀', 50),
-  ;
-
-  final String code;
-  final int level;
-  final String name;
-  final String badge;
-  final int basePoints;
-
-  const MonsterClass(this.code, this.level, this.name, this.badge, this.basePoints);
-
-  static MonsterClass fromLevel(int level) {
-    return MonsterClass.values.firstWhere(
-      (c) => c.level == level,
-      orElse: () => MonsterClass.medium,
     );
   }
 }

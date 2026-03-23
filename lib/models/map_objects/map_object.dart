@@ -43,6 +43,24 @@ enum MapObjectStatus {
   }
 }
 
+/// Расширения для MapObjectType
+extension MapObjectTypeExtension on MapObjectType {
+  String get emoji {
+    switch (this) {
+      case MapObjectType.trashMonster:
+        return '👹';
+      case MapObjectType.secretMessage:
+        return '📜';
+      case MapObjectType.creature:
+        return '🦊';
+      case MapObjectType.checkpoint:
+        return '🏁';
+      case MapObjectType.event:
+        return '🎉';
+    }
+  }
+}
+
 /// Базовый класс для всех объектов на карте
 class MapObject {
   final String id;
