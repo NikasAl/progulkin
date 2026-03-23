@@ -22,15 +22,12 @@ class LocationService {
   // Переменные для фильтрации
   WalkPoint? _lastValidPoint;
   final List<WalkPoint> _recentPoints = []; // Для медианного фильтра
-  final List<WalkPoint> _pendingPoints = []; // Буфер для сглаживания
   int _pointsReceived = 0;
   int _pointsAccepted = 0;
-  DateTime? _trackingStartTime;
 
-  // Настройки фильтрации (можно вынести в настройки приложения)
-  double maxWalkingSpeedKmh = 10.0; // км/ч - макс. скорость ходьбы (настраивается)
+  // Настройки фильтрации (настраиваемые)
+  double maxWalkingSpeedKmh = 10.0; // км/ч - макс. скорость ходьбы
   double maxAccuracyMeters = 50.0; // макс. допустимая погрешность
-  int medianFilterSize = 5; // размер окна медианного фильтра
   bool enableSmoothing = true; // включить сглаживание
   int smoothingWindowSize = 3; // окно для сглаживания
 
@@ -43,7 +40,7 @@ class LocationService {
     if (maxSpeed != null) maxWalkingSpeedKmh = maxSpeed;
     if (maxAccuracy != null) maxAccuracyMeters = maxAccuracy;
     if (smoothing != null) enableSmoothing = smoothing;
-    print('Настройки фильтрации: скорость=$maxWalkingSpeedKmh км/ч, точность=$maxAccuracyMeters м');
+    print('Настройки: скорость=$maxWalkingSpeedKmh км/ч, точность=$maxAccuracyMeters м');
   }
 
   /// Проверка разрешений на геолокацию
@@ -96,23 +93,15 @@ class LocationService {
           timeLimit: const Duration(seconds: 20),
         );
       } catch (e) {
-        print('Не удалось получить позицию с лучшей точностью: $e');
-        try {
-          position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.medium,
-            timeLimit: const Duration(seconds: 10),
-          );
-        } catch (e2) {
-          print('Не удалось получить позицию: $e2');
-          return null;
-        }
+        print('Не удалось получить позицию: $e');
+        return null;
       }
 
       final walkPoint = _positionToWalkPoint(position);
-      print('Получена позиция: ${walkPoint.latitude.toStringAsFixed(6)}, ${walkPoint.longitude.toStringAsFixed(6)}, точность: ${walkPoint.accuracy.toStringAsFixed(1)}м');
+      print('Позиция: ${walkPoint.latitude.toStringAsFixed(6)}, ${walkPoint.longitude.toStringAsFixed(6)}, точность: ${walkPoint.accuracy.toStringAsFixed(1)}м');
       return walkPoint;
     } catch (e) {
-      print('Ошибка получения позиции: $e');
+      print('Ошибка: $e');
       return null;
     }
   }
@@ -127,10 +116,8 @@ class LocationService {
     // Сброс переменных
     _lastValidPoint = null;
     _recentPoints.clear();
-    _pendingPoints.clear();
     _pointsReceived = 0;
     _pointsAccepted = 0;
-    _trackingStartTime = DateTime.now();
 
     print('Начинаем отслеживание GPS...');
     print('Настройки: макс.скорость=$maxWalkingSpeedKmh км/ч, макс.точность=$maxAccuracyMeters м');
@@ -148,15 +135,13 @@ class LocationService {
           notificationTitle: 'Прогулкин',
           notificationIcon: AndroidResource(name: 'ic_launcher'),
           notificationChannelName: 'Запись маршрута',
-          notificationPriority: Priority.low,
           setOngoing: true,
         ),
       );
     } else {
-      locationSettings = LocationSettings(
+      locationSettings = const LocationSettings(
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: 0,
-        timeInterval: 2000,
       );
     }
 
@@ -167,7 +152,7 @@ class LocationService {
         _processPosition(position);
       },
       onError: (error) {
-        print('Ошибка отслеживания GPS: $error');
+        print('Ошибка GPS: $error');
       },
     );
   }
@@ -187,21 +172,24 @@ class LocationService {
     // Многоуровневая фильтрация
     final filterResult = _applyFilters(walkPoint);
     
-    if (filterResult.isAccepted) {
+    if (filterResult.accepted && filterResult.point != null) {
       _pointsAccepted++;
       _lastValidPoint = filterResult.point;
       
-      // Добавляем в буфер для медианного фильтра
-      _addToBuffer(_recentPoints, walkPoint, medianFilterSize);
+      // Добавляем в буфер
+      _recentPoints.add(filterResult.point!);
+      if (_recentPoints.length > 10) {
+        _recentPoints.removeAt(0);
+      }
       
-      _positionController.add(filterResult.point);
+      _positionController.add(filterResult.point!);
       
       if (AppConfig.enableLogging) {
-        print('✓ ТОЧКА ПРИНЯТА (принято: $_pointsAccepted из $_pointsReceived)');
+        print('✓ ПРИНЯТА (принято: $_pointsAccepted из $_pointsReceived)');
       }
     } else {
       if (AppConfig.enableLogging) {
-        print('✗ ТОЧКА ОТКЛОНЕНА: ${filterResult.reason}');
+        print('✗ ОТКЛОНЕНА: ${filterResult.reason}');
       }
     }
   }
@@ -210,27 +198,24 @@ class LocationService {
   _FilterResult _applyFilters(WalkPoint point) {
     // 1. Проверка точности
     if (point.accuracy > maxAccuracyMeters) {
-      return _FilterResult(rejected: true, reason: 'Низкая точность ${point.accuracy.toStringAsFixed(1)}м > $maxAccuracyMeters м');
+      return _FilterResult(rejected: true, reason: 'Низкая точность ${point.accuracy.toStringAsFixed(1)}м');
     }
 
-    // 2. Проверка скорости из GPS (если доступна и валидна)
-    if (point.speed > 0) {
-      final speedKmh = point.speed * 3.6;
-      if (speedKmh > maxWalkingSpeedKmh * 1.5) {
-        return _FilterResult(rejected: true, reason: 'Скорость GPS ${speedKmh.toStringAsFixed(1)} км/ч слишком высока');
-      }
+    // 2. Проверка скорости из GPS
+    final speedKmh = point.speed * 3.6;
+    if (speedKmh > maxWalkingSpeedKmh * 1.5) {
+      return _FilterResult(rejected: true, reason: 'Скорость GPS ${speedKmh.toStringAsFixed(1)} км/ч');
     }
 
-    // Если нет предыдущей точки - принимаем с осторожностью
+    // Если нет предыдущей точки
     if (_lastValidPoint == null) {
-      // Для первой точки требуем лучшую точность
       if (point.accuracy <= maxAccuracyMeters / 2) {
         return _FilterResult(accepted: true, point: point);
       }
-      return _FilterResult(rejected: true, reason: 'Первая точка: низкая точность ${point.accuracy.toStringAsFixed(1)}м');
+      return _FilterResult(rejected: true, reason: 'Первая точка: точность ${point.accuracy.toStringAsFixed(1)}м');
     }
 
-    // 3. Проверка расстояния и скорости между точками
+    // 3. Проверка расстояния и скорости
     final distance = _calculateDistance(
       _lastValidPoint!.latitude, _lastValidPoint!.longitude,
       point.latitude, point.longitude,
@@ -243,16 +228,15 @@ class LocationService {
     }
 
     // Расчётная скорость
-    final calculatedSpeed = (distance / timeDiff) * 3.6; // км/ч
+    final calculatedSpeed = (distance / timeDiff) * 3.6;
 
     // 4. Проверка на нереалистичный скачок
-    // При скорости X км/ч за Y сек макс. расстояние = X * Y / 3.6 м
-    final maxJumpMeters = (maxWalkingSpeedKmh * timeDiff / 3.6) * 1.5; // +50% запас
+    final maxJumpMeters = (maxWalkingSpeedKmh * timeDiff / 3.6) * 1.5;
     
     if (distance > maxJumpMeters) {
       return _FilterResult(
         rejected: true, 
-        reason: 'Скачок ${distance.toStringAsFixed(1)}м > макс ${maxJumpMeters.toStringAsFixed(1)}м (скорость ${calculatedSpeed.toStringAsFixed(1)} км/ч)'
+        reason: 'Скачок ${distance.toStringAsFixed(1)}м (ск. ${calculatedSpeed.toStringAsFixed(1)} км/ч)'
       );
     }
 
@@ -264,123 +248,58 @@ class LocationService {
       );
     }
 
-    // 6. Проверка на "возврат" к старой позиции (характерно для GPS выбросов)
+    // 6. Проверка на возврат к старой позиции
     if (_recentPoints.length >= 3) {
-      final returnCheck = _checkReturnToOldPosition(point);
-      if (returnCheck != null) {
-        return _FilterResult(rejected: true, reason: returnCheck);
+      for (int i = 0; i < _recentPoints.length - 2; i++) {
+        final oldPoint = _recentPoints[i];
+        final distanceToOld = _calculateDistance(
+          oldPoint.latitude, oldPoint.longitude,
+          point.latitude, point.longitude,
+        );
+        
+        final timeSinceOld = point.timestamp.difference(oldPoint.timestamp).inSeconds;
+        
+        if (timeSinceOld > 30 && distanceToOld < 10) {
+          final distanceFromLast = _calculateDistance(
+            _lastValidPoint!.latitude, _lastValidPoint!.longitude,
+            point.latitude, point.longitude,
+          );
+          if (distanceFromLast > 50) {
+            return _FilterResult(rejected: true, reason: 'Подозрительный возврат');
+          }
+        }
       }
     }
 
-    // 7. Медианный фильтр для выявления выбросов
-    if (_recentPoints.length >= 3) {
-      final medianCheck = _medianFilterCheck(point);
-      if (medianCheck != null) {
-        return _FilterResult(rejected: true, reason: medianCheck);
-      }
-    }
-
-    // 8. Опциональное сглаживание
+    // 7. Опциональное сглаживание
     WalkPoint finalPoint = point;
     if (enableSmoothing && _recentPoints.length >= smoothingWindowSize) {
-      finalPoint = _smoothPoint(point);
+      final windowPoints = _recentPoints.sublist(
+        _recentPoints.length - smoothingWindowSize + 1
+      )..add(point);
+      
+      double sumLat = 0, sumLon = 0;
+      for (final p in windowPoints) {
+        sumLat += p.latitude;
+        sumLon += p.longitude;
+      }
+      
+      finalPoint = WalkPoint(
+        latitude: sumLat / windowPoints.length,
+        longitude: sumLon / windowPoints.length,
+        altitude: point.altitude,
+        speed: point.speed,
+        accuracy: point.accuracy,
+        timestamp: point.timestamp,
+      );
     }
 
     return _FilterResult(accepted: true, point: finalPoint);
   }
 
-  /// Проверка на возврат к старой позиции (характерно для GPS выбросов)
-  String? _checkReturnToOldPosition(WalkPoint point) {
-    // Проверяем, не возвращаемся ли мы к позиции, где были давно
-    for (int i = 0; i < _recentPoints.length - 2; i++) {
-      final oldPoint = _recentPoints[i];
-      final distanceToOld = _calculateDistance(
-        oldPoint.latitude, oldPoint.longitude,
-        point.latitude, point.longitude,
-      );
-      
-      final timeSinceOld = point.timestamp.difference(oldPoint.timestamp).inSeconds;
-      
-      // Если мы "вернулись" к позиции где были более 30 сек назад
-      // но расстояние от последней точки большое - это выброс
-      if (timeSinceOld > 30 && distanceToOld < 10) {
-        final distanceFromLast = _calculateDistance(
-          _lastValidPoint!.latitude, _lastValidPoint!.longitude,
-          point.latitude, point.longitude,
-        );
-        if (distanceFromLast > 50) {
-          return 'Подозрительный возврат к старой позиции';
-        }
-      }
-    }
-    return null;
-  }
-
-  /// Медианный фильтр для выявления выбросов
-  String? _medianFilterCheck(WalkPoint point) {
-    // Вычисляем медианное расстояние от последних точек
-    final distances = <double>[];
-    for (final recentPoint in _recentPoints) {
-      distances.add(_calculateDistance(
-        recentPoint.latitude, recentPoint.longitude,
-        point.latitude, point.longitude,
-      ));
-    }
-    distances.sort();
-    final medianDistance = distances[distances.length ~/ 2];
-    
-    // Если медианное расстояние очень отличается от расстояния до последней точки
-    final lastDistance = distances.last;
-    if (lastDistance > medianDistance * 3 && medianDistance > 5) {
-      return 'Медианный фильтр: аномальное смещение';
-    }
-    
-    return null;
-  }
-
-  /// Сглаживание точки (скользящее среднее)
-  WalkPoint _smoothPoint(WalkPoint point) {
-    final windowPoints = _recentPoints.sublist(
-      _recentPoints.length - smoothingWindowSize + 1
-    )..add(point);
-    
-    double sumLat = 0, sumLon = 0, sumAlt = 0;
-    double sumSpeed = 0, sumAccuracy = 0;
-    
-    for (final p in windowPoints) {
-      sumLat += p.latitude;
-      sumLon += p.longitude;
-      sumAlt += p.altitude;
-      sumSpeed += p.speed;
-      sumAccuracy += p.accuracy;
-    }
-    
-    final count = windowPoints.length;
-    
-    return WalkPoint(
-      latitude: sumLat / count,
-      longitude: sumLon / count,
-      altitude: sumAlt / count,
-      speed: sumSpeed / count,
-      accuracy: sumAccuracy / count,
-      timestamp: point.timestamp,
-    );
-  }
-
-  /// Добавить точку в буфер с ограничением размера
-  void _addToBuffer(List<WalkPoint> buffer, WalkPoint point, int maxSize) {
-    buffer.add(point);
-    while (buffer.length > maxSize) {
-      buffer.removeAt(0);
-    }
-  }
-
-  /// Расчёт расстояния между двумя точками (формула Гаверсинуса)
-  double _calculateDistance(
-    double lat1, double lon1,
-    double lat2, double lon2,
-  ) {
-    const double earthRadius = 6371000; // в метрах
+  /// Расчёт расстояния между двумя точками
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371000;
     
     final double dLat = _toRadians(lat2 - lat1);
     final double dLon = _toRadians(lon2 - lon1);
@@ -402,11 +321,9 @@ class LocationService {
     _positionStreamSubscription = null;
     _lastValidPoint = null;
     _recentPoints.clear();
-    _pendingPoints.clear();
     _pointsReceived = 0;
     _pointsAccepted = 0;
-    _trackingStartTime = null;
-    print('Отслеживание GPS остановлено');
+    print('GPS остановлен. Статистика: принято $_pointsAccepted из $_pointsReceived');
   }
 
   /// Проверка, активно ли отслеживание
