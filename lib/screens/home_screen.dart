@@ -7,6 +7,7 @@ import '../providers/pedometer_provider.dart';
 import '../models/walk_point.dart';
 import 'history_screen.dart';
 import 'walk_detail_screen.dart';
+import 'settings_screen.dart';
 
 /// Главный экран с картой OpenStreetMap
 class HomeScreen extends StatefulWidget {
