@@ -131,7 +131,7 @@ class MapObject {
   static MapObject Function(Map<String, dynamic>) _createMapObjectFromJson = _defaultFromJson;
   
   static MapObject _defaultFromJson(Map<String, dynamic> json) {
-    return MapObject._fromJson(json);
+    return fromJson(json);
   }
   
   /// Установить фабрику создания (вызывается из map_objects.dart)
@@ -139,8 +139,8 @@ class MapObject {
     _createMapObjectFromJson = factory;
   }
 
-  /// Базовое создание из JSON
-  static MapObject _fromJson(Map<String, dynamic> json) {
+  /// Базовое создание из JSON (публичный метод)
+  static MapObject fromJson(Map<String, dynamic> json) {
     return MapObject(
       id: json['id'] as String,
       type: MapObjectType.fromCode(json['type'] as String),

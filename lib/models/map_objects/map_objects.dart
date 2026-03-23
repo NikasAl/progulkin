@@ -1,6 +1,11 @@
 /// Map Objects System
 /// Расширяемая система объектов на карте
 
+export 'map_object.dart';
+export 'trash_monster.dart';
+export 'secret_message.dart';
+export 'creature.dart';
+
 import 'map_object.dart';
 import 'trash_monster.dart';
 import 'secret_message.dart';
@@ -19,15 +24,10 @@ void _initObjectFactory() {
       case MapObjectType.creature:
         return Creature.fromSyncJson(json);
       default:
-        return MapObject._fromJson(json);
+        return MapObject.fromJson(json);
     }
   });
 }
 
 // Автоматическая инициализация при импорте
 final _ = _initObjectFactory();
-
-export 'map_object.dart';
-export 'trash_monster.dart';
-export 'secret_message.dart';
-export 'creature.dart';
