@@ -26,6 +26,26 @@ enum SecretType {
   }
 }
 
+/// Статус секрета
+enum SecretStatus {
+  unread('unread', 'Не прочитан'),
+  read('read', 'Прочитан'),
+  expired('expired', 'Истёк'),
+  ;
+
+  final String code;
+  final String name;
+
+  const SecretStatus(this.code, this.name);
+
+  static SecretStatus fromCode(String code) {
+    return SecretStatus.values.firstWhere(
+      (s) => s.code == code,
+      orElse: () => SecretStatus.unread,
+    );
+  }
+}
+
 /// Секретное сообщение
 /// Можно прочитать только находясь в определённом месте
 class SecretMessage extends MapObject {
@@ -65,8 +85,7 @@ class SecretMessage extends MapObject {
         readByUsers = readByUsers ?? [],
         super(type: MapObjectType.secretMessage);
 
-  /// Простое "шифрование" (base64 reverse + XOR)
-  /// Для реального приложения нужно использовать crypto_box или AES
+  /// Простое "шифрование" (base64 reverse)
   static String _encrypt(String content) {
     final bytes = utf8.encode(content);
     final reversed = bytes.reversed.toList();
@@ -83,6 +102,12 @@ class SecretMessage extends MapObject {
   /// Хеш содержимого
   static String _hash(String content) {
     return sha256.convert(utf8.encode(content)).toString().substring(0, 16);
+  }
+
+  @override
+  String get shortDescription {
+    final lockIcon = isOneTime ? '🔒' : '📍';
+    return '${secretType.emoji} $title $lockIcon';
   }
 
   /// Расшифровать содержимое (только если на месте!)
@@ -135,7 +160,7 @@ class SecretMessage extends MapObject {
       ownerReputation: ownerReputation,
       secretType: secretType,
       title: title,
-      content: _decrypt(encryptedContent), // Передаём расшифрованный для повторного шифрования
+      content: _decrypt(encryptedContent),
       unlockRadius: unlockRadius,
       isOneTime: isOneTime,
       maxReads: maxReads,
@@ -149,27 +174,18 @@ class SecretMessage extends MapObject {
     );
   }
 
-  @override
-  String get shortDescription {
-    final lockIcon = isOneTime ? '🔒' : '📍';
-    return '${secretType.emoji} $title $lockIcon';
-  }
-
-  @override
-  bool canInteractAt(double lat, double lng, {double radiusMeters = 100}) {
-    final distance = calculateDistance(latitude, longitude, lat, lng);
-    return distance <= unlockRadius;
-  }
-
   /// Расстояние до точки (для UI)
   double distanceTo(double lat, double lng) {
     return calculateDistance(latitude, longitude, lat, lng);
   }
 
+  /// Содержимое для создания (до шифрования)
+  String get originalContent => _decrypt(encryptedContent);
+
   @override
   Map<String, dynamic> toSyncJson() {
     return {
-      ...baseJson(),
+      ...super.toSyncJson(),
       'secretType': secretType.code,
       'title': title,
       'encryptedContent': encryptedContent,
@@ -192,7 +208,7 @@ class SecretMessage extends MapObject {
       ownerReputation: json['ownerReputation'] as int? ?? 0,
       secretType: SecretType.fromCode(json['secretType'] as String),
       title: json['title'] as String,
-      content: _decrypt(json['encryptedContent'] as String), // Расшифровываем для конструктора
+      content: _decrypt(json['encryptedContent'] as String),
       unlockRadius: (json['unlockRadius'] as num?)?.toDouble() ?? 50,
       isOneTime: json['isOneTime'] as bool? ?? false,
       maxReads: json['maxReads'] as int? ?? 0,

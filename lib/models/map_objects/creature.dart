@@ -54,6 +54,13 @@ enum CreatureRarity {
       orElse: () => CreatureRarity.common,
     );
   }
+
+  static CreatureRarity fromCode(String code) {
+    return CreatureRarity.values.firstWhere(
+      (r) => r.code == code,
+      orElse: () => CreatureRarity.common,
+    );
+  }
 }
 
 /// Среда обитания
@@ -121,7 +128,7 @@ class Creature extends MapObject {
     this.caughtBy,
     this.caughtAt,
     DateTime? spawnTime,
-    this.lifetimeMinutes = 60, // 1 час по умолчанию
+    this.lifetimeMinutes = 60,
     super.status,
     super.confirms,
     super.denies,
@@ -196,9 +203,6 @@ class Creature extends MapObject {
     );
   }
 
-  /// Проверка, живо ли существо
-  bool get isAlive => currentHealth > 0 && !isExpired;
-
   @override
   bool get isExpired {
     if (lifetimeMinutes <= 0) return false;
@@ -218,17 +222,6 @@ class Creature extends MapObject {
     final rarityBadge = rarity.badge;
     final wildIcon = isWild ? '🌿' : '💝';
     return '${creatureType.emoji} ${creatureType.name} $rarityBadge $wildIcon';
-  }
-
-  @override
-  bool canInteractAt(double lat, double lng, {double radiusMeters = 50}) {
-    final distance = calculateDistance(latitude, longitude, lat, lng);
-    return distance <= radiusMeters;
-  }
-
-  /// Расстояние до точки
-  double distanceTo(double lat, double lng) {
-    return calculateDistance(latitude, longitude, lat, lng);
   }
 
   /// Поймать существо
@@ -299,10 +292,18 @@ class Creature extends MapObject {
     return rarity.level * 100 + level * 10;
   }
 
+  /// Живо ли существо
+  bool get isAlive => currentHealth > 0 && !isExpired;
+
+  /// Расстояние до точки (для UI)
+  double distanceTo(double lat, double lng) {
+    return calculateDistance(latitude, longitude, lat, lng);
+  }
+
   @override
   Map<String, dynamic> toSyncJson() {
     return {
-      ...baseJson(),
+      ...super.toSyncJson(),
       'creatureType': creatureType.code,
       'rarity': rarity.level,
       'habitat': habitat.code,

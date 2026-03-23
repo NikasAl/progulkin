@@ -120,7 +120,6 @@ class TrashMonster extends MapObject {
     required TrashQuantity quantity,
     String description = '',
   }) {
-    // Расчёт класса на основе типа и количества
     int classLevel = 1;
 
     // Тип мусора влияет на сложность
@@ -139,7 +138,6 @@ class TrashMonster extends MapObject {
       classLevel += 2;
     }
 
-    // Ограничиваем 1-5
     classLevel = classLevel.clamp(1, 5);
 
     return TrashMonster(
@@ -160,13 +158,8 @@ class TrashMonster extends MapObject {
   String get shortDescription {
     final typeStr = '${trashType.emoji} ${trashType.name}';
     final qtyStr = quantity.name;
-    return '$typeStr ($qtyStr) ${monsterClass.badge}';
-  }
-
-  @override
-  bool canInteractAt(double lat, double lng, {double radiusMeters = 100}) {
-    final distance = calculateDistance(latitude, longitude, lat, lng);
-    return distance <= radiusMeters;
+    final cleanStr = isCleaned ? ' ✅' : '';
+    return '$typeStr ($qtyStr) ${monsterClass.badge}$cleanStr';
   }
 
   /// Очки за уборку
@@ -201,7 +194,7 @@ class TrashMonster extends MapObject {
   @override
   Map<String, dynamic> toSyncJson() {
     return {
-      ...baseJson(),
+      ...super.toSyncJson(),
       'trashType': trashType.code,
       'quantity': quantity.code,
       'monsterClass': monsterClass.level,

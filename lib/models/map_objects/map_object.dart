@@ -44,7 +44,7 @@ enum MapObjectStatus {
 }
 
 /// Базовый класс для всех объектов на карте
-abstract class MapObject {
+class MapObject {
   final String id;
   final MapObjectType type;
   final double latitude;
@@ -81,51 +81,10 @@ abstract class MapObject {
   String get syncId => '${type.code}_$id';
 
   /// Geohash для зонной синхронизации
-  String get geohash => _encodeGeohash(latitude, longitude, 6);
+  String get geohash => encodeGeohash(latitude, longitude, 6);
 
   /// Данные для P2P синхронизации
-  Map<String, dynamic> toSyncJson();
-
-  /// Создание из P2P данных
-  factory MapObject.fromSyncJson(Map<String, dynamic> json) {
-    final type = MapObjectType.fromCode(json['type'] as String);
-    switch (type) {
-      case MapObjectType.trashMonster:
-        return TrashMonster.fromSyncJson(json);
-      case MapObjectType.secretMessage:
-        return SecretMessage.fromSyncJson(json);
-      case MapObjectType.creature:
-        return Creature.fromSyncJson(json);
-      default:
-        throw UnimplementedError('Unknown object type: $type');
-    }
-  }
-
-  /// Краткое описание для списка
-  String get shortDescription;
-
-  /// Можно ли взаимодействовать в данной точке
-  bool canInteractAt(double lat, double lng, {double radiusMeters = 100});
-
-  /// Проверка, истёк ли срок действия
-  bool get isExpired {
-    if (expiresAt == null) return false;
-    return DateTime.now().isAfter(expiresAt!);
-  }
-
-  /// Доверенный ли объект (много подтверждений, мало отрицаний)
-  bool get isTrusted => confirms >= 3 && (denies < confirms / 2);
-
-  /// Скрыть объект (слишком много жалоб)
-  bool get shouldBeHidden => denies >= 5 && denies > confirms;
-
-  /// Обновить версию при изменении
-  void incrementVersion() {
-    version++;
-  }
-
-  /// Базовые данные для JSON
-  Map<String, dynamic> baseJson() {
+  Map<String, dynamic> toSyncJson() {
     return {
       'id': id,
       'type': type.code,
@@ -144,8 +103,75 @@ abstract class MapObject {
     };
   }
 
-  /// Простой geohash (до 6 символов = ~1.2км точность)
-  static String _encodeGeohash(double lat, double lng, int precision) {
+  /// Создание из P2P данных
+  static MapObject fromSyncJson(Map<String, dynamic> json) {
+    final type = MapObjectType.fromCode(json['type'] as String);
+    
+    switch (type) {
+      case MapObjectType.trashMonster:
+        return TrashMonster.fromSyncJson(json);
+      case MapObjectType.secretMessage:
+        return SecretMessage.fromSyncJson(json);
+      case MapObjectType.creature:
+        return Creature.fromSyncJson(json);
+      default:
+        // Базовый объект для неизвестных типов
+        return MapObject._fromJson(json);
+    }
+  }
+
+  /// Базовое создание из JSON
+  static MapObject _fromJson(Map<String, dynamic> json) {
+    return MapObject(
+      id: json['id'] as String,
+      type: MapObjectType.fromCode(json['type'] as String),
+      latitude: (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] as num).toDouble(),
+      ownerId: json['ownerId'] as String,
+      ownerName: json['ownerName'] as String? ?? 'Аноним',
+      ownerReputation: json['ownerReputation'] as int? ?? 0,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : null,
+      expiresAt: json['expiresAt'] != null
+          ? DateTime.parse(json['expiresAt'] as String)
+          : null,
+      status: MapObjectStatus.fromCode(json['status'] as String? ?? 'active'),
+      confirms: json['confirms'] as int? ?? 0,
+      denies: json['denies'] as int? ?? 0,
+      views: json['views'] as int? ?? 0,
+      version: json['version'] as int? ?? 1,
+    );
+  }
+
+  /// Краткое описание для списка
+  String get shortDescription => '${type.emoji} ${type.name}';
+
+  /// Можно ли взаимодействовать в данной точке
+  bool canInteractAt(double lat, double lng, {double radiusMeters = 100}) {
+    final distance = calculateDistance(latitude, longitude, lat, lng);
+    return distance <= radiusMeters;
+  }
+
+  /// Проверка, истёк ли срок действия
+  bool get isExpired {
+    if (expiresAt == null) return false;
+    return DateTime.now().isAfter(expiresAt!);
+  }
+
+  /// Доверенный ли объект (много подтверждений, мало отрицаний)
+  bool get isTrusted => confirms >= 3 && (denies < confirms / 2);
+
+  /// Скрыть объект (слишком много жалоб)
+  bool get shouldBeHidden => denies >= 5 && denies > confirms;
+
+  /// Обновить версию при изменении
+  void incrementVersion() {
+    version++;
+  }
+
+  /// Кодирование geohash
+  static String encodeGeohash(double lat, double lng, int precision) {
     const chars = '0123456789bcdefghjkmnpqrstuvwxyz';
     String hash = '';
     int bit = 0;
@@ -185,16 +211,19 @@ abstract class MapObject {
   String toString() => '$type#$id at ($latitude, $longitude)';
 }
 
-/// Расчёт расстояния между точками
+/// Расчёт расстояния между точками (в метрах)
 double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-  const double earthRadius = 6371000;
+  const double earthRadius = 6371000; // метры
+  
   final dLat = _toRadians(lat2 - lat1);
   final dLon = _toRadians(lon2 - lon1);
+  
   final a = 0.5 -
       0.5 * _cos(dLat) +
       0.5 * _cos(_toRadians(lat1)) *
           _cos(_toRadians(lat2)) *
           (1 - _cos(dLon));
+  
   return earthRadius * 2 * _asin(_sqrt(a));
 }
 
