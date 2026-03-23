@@ -19,14 +19,21 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   YandexMapController? _mapController;
   final List<MapObject> _mapObjects = [];
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    _initProviders();
+    // Используем addPostFrameCallback чтобы инициализация произошла после build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initProviders();
+    });
   }
 
   Future<void> _initProviders() async {
+    if (_initialized) return;
+    _initialized = true;
+    
     final walkProvider = context.read<WalkProvider>();
     final pedometerProvider = context.read<PedometerProvider>();
     

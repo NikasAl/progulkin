@@ -23,4 +23,16 @@ plugins {
     id "org.jetbrains.kotlin.android" version "2.1.0" apply false
 }
 
+// Добавляем репозиторий Yandex для MapKit
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url 'https://maven.yandex.net'
+        }
+    }
+}
+
 include ":app"
