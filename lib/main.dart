@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'providers/walk_provider.dart';
 import 'providers/pedometer_provider.dart';
 import 'screens/home_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Инициализация локали для форматирования дат
+  await initializeDateFormatting('ru_RU', null);
   
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
