@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../providers/walk_provider.dart';
 import '../providers/pedometer_provider.dart';
 import '../models/walk_point.dart';
+import '../services/location_service.dart';
 import 'history_screen.dart';
 import 'walk_detail_screen.dart';
 import 'settings_screen.dart';
@@ -19,9 +20,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final MapController _mapController = MapController();
+  final LocationService _locationService = LocationService();
   final List<LatLng> _routePoints = [];
   bool _initialized = false;
-  LatLng _currentPosition = LatLng(55.7558, 37.6173); // Москва по умолчанию
+  LatLng? _currentLocation; // Текущая позиция пользователя
+  LatLng _initialPosition = const LatLng(55.7558, 37.6173); // Москва по умолчанию
   double _currentZoom = 15.0;
 
   @override
@@ -42,10 +45,27 @@ class _HomeScreenState extends State<HomeScreen> {
     await walkProvider.init();
     await pedometerProvider.init();
     
+    // Получаем текущую позицию
+    final position = await _locationService.getCurrentPosition();
+    if (position != null) {
+      setState(() {
+        _currentLocation = LatLng(position.latitude, position.longitude);
+        _initialPosition = _currentLocation!;
+      });
+    }
+    
     // Если есть текущая прогулка, загружаем маршрут
     if (walkProvider.currentWalk?.points.isNotEmpty ?? false) {
       _loadRouteFromWalk(walkProvider.currentWalk!.points);
     }
+    
+    // Подписываемся на обновления позиции во время прогулки
+    _locationService.positionStream.listen((point) {
+      setState(() {
+        _currentLocation = LatLng(point.latitude, point.longitude);
+        _routePoints.add(_currentLocation!);
+      });
+    });
   }
 
   void _loadRouteFromWalk(List<WalkPoint> points) {
@@ -54,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _routePoints.add(LatLng(point.latitude, point.longitude));
     }
     if (_routePoints.isNotEmpty) {
-      _currentPosition = _routePoints.last;
+      _currentLocation = _routePoints.last;
     }
     setState(() {});
   }
@@ -85,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
-        initialCenter: _currentPosition,
+        initialCenter: _initialPosition,
         initialZoom: _currentZoom,
         onMapReady: () {
           // Карта готова
@@ -99,47 +119,90 @@ class _HomeScreenState extends State<HomeScreen> {
           maxZoom: 19,
         ),
         // Слой маршрута
-        PolylineLayer(
-          polylines: [
-            Polyline(
-              points: _routePoints,
-              color: Theme.of(context).colorScheme.primary,
-              strokeWidth: 5,
-            ),
-          ],
-        ),
+        if (_routePoints.length >= 2)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: _routePoints,
+                color: Theme.of(context).colorScheme.primary,
+                strokeWidth: 5,
+              ),
+            ],
+          ),
         // Маркер текущей позиции
-        MarkerLayer(
-          markers: _routePoints.isEmpty ? [] : [
-            Marker(
-              point: _routePoints.last,
-              width: 40,
-              height: 40,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white,
-                    width: 3,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+        if (_currentLocation != null)
+          MarkerLayer(
+            markers: [
+              // Маркер текущего положения (синий круг с пульсацией)
+              Marker(
+                point: _currentLocation!,
+                width: 50,
+                height: 50,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Внешний пульсирующий круг
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    // Средний круг
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.3),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    // Внутренний круг с направлением
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                child: Icon(
-                  Icons.directions_walk,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  size: 20,
-                ),
               ),
-            ),
-          ],
-        ),
+              // Маркер начала маршрута (зелёный)
+              if (_routePoints.isNotEmpty)
+                Marker(
+                  point: _routePoints.first,
+                  width: 30,
+                  height: 30,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -515,12 +578,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Переместить на текущую позицию
   void _moveToCurrentLocation() {
-    final walkProvider = context.read<WalkProvider>();
-    final walk = walkProvider.currentWalk;
-    
-    if (walk?.points.isNotEmpty ?? false) {
-      final point = walk!.points.last;
-      _moveToPosition(point.latitude, point.longitude);
+    if (_currentLocation != null) {
+      _mapController.move(_currentLocation!, 16);
     }
   }
 

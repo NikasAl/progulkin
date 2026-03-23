@@ -1,5 +1,6 @@
 import 'package:uuid/uuid.dart';
 import 'walk_point.dart';
+import 'dart:math' as math;
 
 /// Модель прогулки
 class Walk {
@@ -45,18 +46,19 @@ class Walk {
     return '${seconds}сек';
   }
 
-  /// Общее расстояние в метрах
+  /// Общее расстояние в метрах (сумма расстояний между соседними точками)
   double get totalDistance {
     if (points.length < 2) return 0;
     
     double distance = 0;
     for (int i = 1; i < points.length; i++) {
-      distance += _calculateDistance(
+      final segmentDistance = _haversineDistance(
         points[i - 1].latitude,
         points[i - 1].longitude,
         points[i].latitude,
         points[i].longitude,
       );
+      distance += segmentDistance;
     }
     return distance;
   }
@@ -72,8 +74,11 @@ class Walk {
 
   /// Средняя скорость в км/ч
   double get averageSpeed {
-    if (duration.inSeconds == 0) return 0;
-    return (totalDistance / 1000) / (duration.inSeconds / 3600);
+    final secs = duration.inSeconds;
+    if (secs == 0) return 0;
+    final hours = secs / 3600.0;
+    if (hours == 0) return 0;
+    return (totalDistance / 1000) / hours;
   }
 
   /// Форматированная средняя скорость
@@ -82,26 +87,23 @@ class Walk {
   }
 
   /// Расчёт расстояния между двумя точками (формула Гаверсинуса)
-  double _calculateDistance(
-    double lat1, double lon1,
-    double lat2, double lon2,
-  ) {
+  double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371000; // в метрах
     
-    final double dLat = _toRadians(lat2 - lat1);
-    final double dLon = _toRadians(lon2 - lon1);
+    // Переводим градусы в радианы
+    final double lat1Rad = lat1 * math.pi / 180;
+    final double lat2Rad = lat2 * math.pi / 180;
+    final double deltaLatRad = (lat2 - lat1) * math.pi / 180;
+    final double deltaLonRad = (lon2 - lon1) * math.pi / 180;
+
+    // Формула Гаверсинуса
+    final double a = math.sin(deltaLatRad / 2) * math.sin(deltaLatRad / 2) +
+        math.cos(lat1Rad) * math.cos(lat2Rad) *
+        math.sin(deltaLonRad / 2) * math.sin(deltaLonRad / 2);
     
-    final double a = (dLat / 2).abs() * (dLat / 2).abs() +
-        _toRadians(lat1).abs() * _toRadians(lat2).abs() *
-        (dLon / 2).abs() * (dLon / 2).abs();
-    
-    final double c = 2 * (a.abs() > 0 ? a : 0.0001).abs();
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     
     return earthRadius * c;
-  }
-
-  double _toRadians(double degree) {
-    return degree * 0.017453292519943295;
   }
 
   /// Активна ли прогулка
