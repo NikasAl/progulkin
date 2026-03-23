@@ -33,6 +33,7 @@ dependencies:
   intl: ^0.18.1
   uuid: ^4.1.0
   permission_handler: ^11.1.0
+  crypto: ^3.0.3
 
   # Иконки и UI
   cupertino_icons: ^1.0.6
