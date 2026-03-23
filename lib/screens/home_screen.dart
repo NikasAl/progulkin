@@ -331,8 +331,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         onTap: () => _openHistory(context),
                       ),
                       _buildActionButton(
+                        icon: Icons.settings,
+                        label: 'Настройки',
+                        onTap: () => _openSettings(context),
+                      ),
+                      _buildActionButton(
                         icon: Icons.my_location,
-                        label: 'Местоположение',
+                        label: 'Место',
                         onTap: _moveToCurrentLocation,
                       ),
                     ],
@@ -538,6 +543,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const HistoryScreen()),
+    );
+  }
+
+  /// Открыть настройки
+  void _openSettings(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SettingsScreen()),
     );
   }
 
