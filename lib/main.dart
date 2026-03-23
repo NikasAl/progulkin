@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'providers/walk_provider.dart';
 import 'providers/pedometer_provider.dart';
+import 'providers/map_object_provider.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
@@ -31,6 +32,7 @@ class ProgulkinApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => WalkProvider()),
         ChangeNotifierProvider(create: (_) => PedometerProvider()),
+        ChangeNotifierProvider(create: (_) => MapObjectProvider()),
       ],
       child: MaterialApp(
         title: 'Прогулкин',

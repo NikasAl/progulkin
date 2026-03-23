@@ -4,11 +4,16 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../providers/walk_provider.dart';
 import '../providers/pedometer_provider.dart';
+import '../providers/map_object_provider.dart';
 import '../models/walk_point.dart';
+import '../models/map_objects/map_objects.dart';
 import '../services/location_service.dart';
+import '../services/user_id_service.dart';
+import '../widgets/map_objects_layer.dart';
 import 'history_screen.dart';
 import 'walk_detail_screen.dart';
 import 'settings_screen.dart';
+import 'add_object_screen.dart';
 
 /// Главный экран с картой OpenStreetMap
 class HomeScreen extends StatefulWidget {
@@ -21,11 +26,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final MapController _mapController = MapController();
   final LocationService _locationService = LocationService();
+  final UserIdService _userIdService = UserIdService();
   final List<LatLng> _routePoints = [];
   bool _initialized = false;
+  bool _mapObjectsInitialized = false;
   LatLng? _currentLocation; // Текущая позиция пользователя
   LatLng _initialPosition = const LatLng(55.7558, 37.6173); // Москва по умолчанию
   double _currentZoom = 15.0;
+  UserInfo? _userInfo;
 
   @override
   void initState() {
@@ -44,6 +52,9 @@ class _HomeScreenState extends State<HomeScreen> {
     
     await walkProvider.init();
     await pedometerProvider.init();
+    
+    // Получаем информацию о пользователе
+    _userInfo = await _userIdService.getUserInfo();
     
     // Получаем текущую позицию
     final position = await _locationService.getCurrentPosition();
@@ -65,7 +76,28 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentLocation = LatLng(point.latitude, point.longitude);
         _routePoints.add(_currentLocation!);
       });
+      
+      // Обновляем позицию для MapObjectProvider
+      final mapObjectProvider = context.read<MapObjectProvider>();
+      mapObjectProvider.updateUserPosition(point.latitude, point.longitude);
     });
+  }
+  
+  /// Инициализация объектов карты (вызывается при первом отображении карты)
+  Future<void> _initMapObjects() async {
+    if (_mapObjectsInitialized) return;
+    _mapObjectsInitialized = true;
+    
+    final mapObjectProvider = context.read<MapObjectProvider>();
+    await mapObjectProvider.init();
+    
+    // Обновляем позицию если уже известна
+    if (_currentLocation != null) {
+      mapObjectProvider.updateUserPosition(
+        _currentLocation!.latitude,
+        _currentLocation!.longitude,
+      );
+    }
   }
 
   void _loadRouteFromWalk(List<WalkPoint> points) {
@@ -95,6 +127,17 @@ class _HomeScreenState extends State<HomeScreen> {
           
           // Нижняя панель управления
           _buildBottomControls(),
+          
+          // FAB для добавления объектов
+          Positioned(
+            right: 16,
+            bottom: 180,
+            child: FloatingActionButton(
+              onPressed: _openAddObject,
+              backgroundColor: Theme.of(context).colorScheme.secondary,
+              child: const Icon(Icons.add_location_alt),
+            ),
+          ),
         ],
       ),
     );
@@ -129,6 +172,22 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
+        // Слой объектов карты (мусорные монстры, сообщения, существа)
+        Consumer<MapObjectProvider>(
+          builder: (context, mapObjectProvider, child) {
+            // Инициализируем при первой отрисовке
+            if (!_mapObjectsInitialized) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _initMapObjects();
+              });
+            }
+            return MapObjectsLayer(
+              objects: mapObjectProvider.objects,
+              onObjectTap: (obj) => _showObjectDetails(obj),
+              onObjectLongPress: (obj) => _showObjectOptions(obj),
+            );
+          },
+        ),
         // Маркер текущей позиции
         if (_currentLocation != null)
           MarkerLayer(
@@ -634,5 +693,574 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
+  }
+  
+  /// Показать детали объекта в BottomSheet
+  void _showObjectDetails(MapObject object) {
+    final mapObjectProvider = context.read<MapObjectProvider>();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: _ObjectDetailsContent(
+            object: object,
+            userId: _userInfo?.id ?? '',
+            onConfirm: () async {
+              await mapObjectProvider.confirmObject(object.id);
+              if (context.mounted) Navigator.pop(context);
+            },
+            onDeny: () async {
+              await mapObjectProvider.denyObject(object.id);
+              if (context.mounted) Navigator.pop(context);
+            },
+            onAction: _getObjectAction(object, mapObjectProvider),
+          ),
+        ),
+      ),
+    );
+  }
+  
+  /// Получить действие для объекта
+  Map<String, dynamic>? _getObjectAction(MapObject object, MapObjectProvider provider) {
+    if (object.type == MapObjectType.trashMonster) {
+      final monster = object as TrashMonster;
+      if (!monster.isCleaned && _currentLocation != null) {
+        final distance = calculateDistance(
+          _currentLocation!.latitude,
+          _currentLocation!.longitude,
+          monster.latitude,
+          monster.longitude,
+        );
+        if (distance <= 100) { // В радиусе 100 метров
+          return {
+            'label': 'Убрано!',
+            'icon': Icons.cleaning_services,
+            'action': () async {
+              await provider.cleanTrashMonster(monster.id, _userInfo?.id ?? '');
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Отлично! +${monster.cleaningPoints} очков'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+          };
+        }
+      }
+    }
+    
+    if (object.type == MapObjectType.creature) {
+      final creature = object as Creature;
+      if (creature.isWild && _currentLocation != null) {
+        final distance = calculateDistance(
+          _currentLocation!.latitude,
+          _currentLocation!.longitude,
+          creature.latitude,
+          creature.longitude,
+        );
+        if (distance <= 50) { // В радиусе 50 метров
+          return {
+            'label': 'Поймать!',
+            'icon': Icons.pets,
+            'action': () async {
+              await provider.catchCreature(
+                creature.id,
+                _userInfo?.id ?? '',
+                _userInfo?.name ?? 'Прогульщик',
+              );
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${creature.creatureType.name} пойман!'),
+                    backgroundColor: Colors.purple,
+                  ),
+                );
+              }
+            },
+          };
+        }
+      }
+    }
+    
+    if (object.type == MapObjectType.secretMessage) {
+      final secret = object as SecretMessage;
+      if (_currentLocation != null && !secret.isReadByUser(_userInfo?.id ?? '')) {
+        final distance = calculateDistance(
+          _currentLocation!.latitude,
+          _currentLocation!.longitude,
+          secret.latitude,
+          secret.longitude,
+        );
+        if (distance <= secret.unlockRadius) {
+          return {
+            'label': 'Прочитать',
+            'icon': Icons.lock_open,
+            'action': () async {
+              final content = await provider.readSecretMessage(
+                secret.id,
+                _userInfo?.id ?? '',
+              );
+              if (mounted && content != null) {
+                Navigator.pop(context);
+                _showSecretContent(secret.title, content);
+              }
+            },
+          };
+        }
+      }
+    }
+    
+    return null;
+  }
+  
+  /// Показать содержимое секретного сообщения
+  void _showSecretContent(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('📜 $title'),
+        content: SelectableText(content),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрыть'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Показать опции объекта
+  void _showObjectOptions(MapObject object) {
+    final isOwner = object.ownerId == _userInfo?.id;
+    
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+              title: const Text('Подробности'),
+              onTap: () {
+                Navigator.pop(context);
+                _showObjectDetails(object);
+              },
+            ),
+            if (isOwner)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Удалить объект?'),
+                      content: const Text('Это действие нельзя отменить.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Отмена'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: TextButton.styleFrom(foregroundColor: Colors.red),
+                          child: const Text('Удалить'),
+                        ),
+                      ],
+                    ),
+                  );
+                  
+                  if (confirm == true) {
+                    await context.read<MapObjectProvider>().deleteObject(
+                      object.id,
+                      _userInfo?.id ?? '',
+                    );
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Объект удалён'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.flag, color: Colors.orange),
+              title: const Text('Пожаловаться'),
+              onTap: () async {
+                await context.read<MapObjectProvider>().denyObject(object.id);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Жалоба отправлена')),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// Открыть экран добавления объекта
+  void _openAddObject() {
+    if (_currentLocation == null) {
+      _showError('Определите местоположение сначала');
+      return;
+    }
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddObjectScreen(
+          latitude: _currentLocation!.latitude,
+          longitude: _currentLocation!.longitude,
+          userInfo: _userInfo!,
+        ),
+      ),
+    );
+  }
+}
+
+/// Контент для BottomSheet с деталями объекта
+class _ObjectDetailsContent extends StatelessWidget {
+  final MapObject object;
+  final String userId;
+  final VoidCallback? onConfirm;
+  final VoidCallback? onDeny;
+  final Map<String, dynamic>? onAction;
+  
+  const _ObjectDetailsContent({
+    required this.object,
+    required this.userId,
+    this.onConfirm,
+    this.onDeny,
+    this.onAction,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Заголовок
+          Row(
+            children: [
+              Text(
+                object.type.emoji,
+                style: const TextStyle(fontSize: 40),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getTitle(),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    Text(
+                      object.shortDescription,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Информация
+          _buildInfoSection(context),
+          
+          const SizedBox(height: 16),
+          
+          // Статистика
+          Row(
+            children: [
+              Icon(Icons.person, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 4),
+              Text(
+                object.ownerName,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(width: 16),
+              const Icon(Icons.thumb_up, size: 16, color: Colors.green),
+              const SizedBox(width: 4),
+              Text('${object.confirms}'),
+              const SizedBox(width: 12),
+              const Icon(Icons.thumb_down, size: 16, color: Colors.red),
+              const SizedBox(width: 4),
+              Text('${object.denies}'),
+              const SizedBox(width: 12),
+              Icon(Icons.visibility, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 4),
+              Text('${object.views}'),
+              if (object.isTrusted) ...[
+                const SizedBox(width: 12),
+                const Icon(Icons.verified, size: 16, color: Colors.green),
+              ],
+            ],
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Кнопки
+          Row(
+            children: [
+              if (onConfirm != null)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onConfirm,
+                    icon: const Icon(Icons.thumb_up, size: 18),
+                    label: const Text('Подтвердить'),
+                  ),
+                ),
+              if (onConfirm != null && onDeny != null)
+                const SizedBox(width: 8),
+              if (onDeny != null)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onDeny,
+                    icon: const Icon(Icons.thumb_down, size: 18),
+                    label: const Text('Опровергнуть'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          
+          if (onAction != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onAction!['action'],
+                icon: Icon(onAction!['icon'] ?? Icons.check),
+                label: Text(onAction!['label'] ?? 'Действие'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  String _getTitle() {
+    switch (object.type) {
+      case MapObjectType.trashMonster:
+        final monster = object as TrashMonster;
+        return '${monster.trashType.emoji} ${monster.trashType.name}';
+      case MapObjectType.secretMessage:
+        final secret = object as SecretMessage;
+        return '📜 ${secret.title}';
+      case MapObjectType.creature:
+        final creature = object as Creature;
+        return '${creature.rarity.badge} ${creature.creatureType.name}';
+      default:
+        return object.type.name;
+    }
+  }
+  
+  Widget _buildInfoSection(BuildContext context) {
+    final items = <Widget>[];
+    
+    switch (object.type) {
+      case MapObjectType.trashMonster:
+        final monster = object as TrashMonster;
+        items.addAll([
+          _buildInfoRow(
+            context,
+            icon: Icons.layers,
+            label: 'Класс',
+            value: '${monster.monsterClass.badge} ${monster.monsterClass.name}',
+          ),
+          _buildInfoRow(
+            context,
+            icon: Icons.cleaning_services,
+            label: 'Количество',
+            value: monster.quantity.name,
+          ),
+          _buildInfoRow(
+            context,
+            icon: Icons.star,
+            label: 'Очки за уборку',
+            value: '${monster.cleaningPoints}',
+          ),
+          if (monster.description.isNotEmpty)
+            _buildInfoRow(
+              context,
+              icon: Icons.description,
+              label: 'Описание',
+              value: monster.description,
+            ),
+          if (monster.isCleaned) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Убрано ${monster.cleanedBy == userId ? "вами" : ""}',
+                    style: const TextStyle(color: Colors.green),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ]);
+        break;
+        
+      case MapObjectType.secretMessage:
+        final secret = object as SecretMessage;
+        items.addAll([
+          _buildInfoRow(
+            context,
+            icon: Icons.lock,
+            label: 'Тип',
+            value: secret.secretType.name,
+          ),
+          _buildInfoRow(
+            context,
+            icon: Icons.location_on,
+            label: 'Радиус разблокировки',
+            value: '${secret.unlockRadius.toInt()} м',
+          ),
+          _buildInfoRow(
+            context,
+            icon: Icons.visibility,
+            label: 'Прочитано раз',
+            value: '${secret.currentReads}',
+          ),
+          if (secret.isOneTime)
+            _buildInfoRow(
+              context,
+              icon: Icons.one_time,
+              label: 'Одноразовое',
+              value: 'Да',
+            ),
+        ]);
+        break;
+        
+      case MapObjectType.creature:
+        final creature = object as Creature;
+        items.addAll([
+          _buildInfoRow(
+            context,
+            icon: Icons.auto_awesome,
+            label: 'Редкость',
+            value: '${creature.rarity.badge} ${creature.rarity.name}',
+          ),
+          _buildInfoRow(
+            context,
+            icon: Icons.terrain,
+            label: 'Среда обитания',
+            value: creature.habitat.name,
+          ),
+          _buildInfoRow(
+            context,
+            icon: Icons.favorite,
+            label: 'HP',
+            value: '${creature.currentHealth}/${creature.maxHealth}',
+          ),
+          _buildInfoRow(
+            context,
+            icon: Icons.flash_on,
+            label: 'Атака',
+            value: '${creature.attack}',
+          ),
+          _buildInfoRow(
+            context,
+            icon: Icons.shield,
+            label: 'Защита',
+            value: '${creature.defense}',
+          ),
+          if (!creature.isWild)
+            _buildInfoRow(
+              context,
+              icon: Icons.person,
+              label: 'Владелец',
+              value: creature.ownerName ?? 'Неизвестно',
+            ),
+        ]);
+        break;
+        
+      default:
+        break;
+    }
+    
+    if (items.isEmpty) return const SizedBox.shrink();
+    
+    return Column(children: items);
+  }
+  
+  Widget _buildInfoRow(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.grey[600],
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

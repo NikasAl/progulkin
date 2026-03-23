@@ -9,6 +9,7 @@ enum SecretType {
   story('story', 'История', '📖'),
   wish('wish', 'Пожелание', '💫'),
   tip('tip', 'Совет', '💡'),
+  hint('hint', 'Подсказка', '🔍'),
   memory('memory', 'Воспоминание', '💭'),
   ;
 
@@ -142,6 +143,11 @@ class SecretMessage extends MapObject {
       return false;
     }
     return true;
+  }
+
+  /// Проверить, прочитал ли пользователь
+  bool isReadByUser(String userId) {
+    return readByUsers.contains(userId);
   }
 
   /// Отметить как прочитанное

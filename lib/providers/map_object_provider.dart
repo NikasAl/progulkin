@@ -116,7 +116,7 @@ class MapObjectProvider extends ChangeNotifier {
     }
 
     try {
-      final zone = MapObject._encodeGeohash(_userLat!, _userLng!, 6);
+      final zone = MapObject.encodeGeohash(_userLat!, _userLng!, 6);
 
       final config = P2PConfig(
         signalingServer: signalingServer,
