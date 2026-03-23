@@ -60,7 +60,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return YandexMap(
       mapObjects: _mapObjects,
       mapType: MapType.vector,
-      apiKey: AppConfig.yandexMapApiKey,
       onMapCreated: (controller) async {
         _mapController = controller;
         

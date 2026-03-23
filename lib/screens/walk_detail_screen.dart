@@ -57,7 +57,6 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
               background: widget.walk.points.isNotEmpty
                   ? YandexMap(
                       mapObjects: _mapObjects,
-                      apiKey: AppConfig.yandexMapApiKey,
                       onMapCreated: (controller) async {
                         _mapController = controller;
                         await _fitRouteOnMap();
