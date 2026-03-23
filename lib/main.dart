@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
-import 'config/app_config.dart';
 import 'providers/walk_provider.dart';
 import 'providers/pedometer_provider.dart';
 import 'screens/home_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // API ключ Яндекс карт настраивается в:
-  // Android: android/app/src/main/AndroidManifest.xml
-  // iOS: ios/Runner/Info.plist
-  // См. lib/config/app_config.dart
   
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -35,7 +29,7 @@ class ProgulkinApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PedometerProvider()),
       ],
       child: MaterialApp(
-        title: AppConfig.appName,
+        title: 'Прогулкин',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(

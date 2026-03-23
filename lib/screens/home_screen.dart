@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:yandex_mapkit/yandex_mapkit.dart';
-import '../config/app_config.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../providers/walk_provider.dart';
 import '../providers/pedometer_provider.dart';
 import '../models/walk_point.dart';
 import 'history_screen.dart';
 import 'walk_detail_screen.dart';
 
-/// Главный экран с картой
+/// Главный экран с картой OpenStreetMap
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -17,14 +17,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  YandexMapController? _mapController;
-  final List<MapObject> _mapObjects = [];
+  final MapController _mapController = MapController();
+  final List<LatLng> _routePoints = [];
   bool _initialized = false;
+  LatLng _currentPosition = LatLng(55.7558, 37.6173); // Москва по умолчанию
+  double _currentZoom = 15.0;
 
   @override
   void initState() {
     super.initState();
-    // Используем addPostFrameCallback чтобы инициализация произошла после build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initProviders();
     });
@@ -39,6 +40,22 @@ class _HomeScreenState extends State<HomeScreen> {
     
     await walkProvider.init();
     await pedometerProvider.init();
+    
+    // Если есть текущая прогулка, загружаем маршрут
+    if (walkProvider.currentWalk?.points.isNotEmpty ?? false) {
+      _loadRouteFromWalk(walkProvider.currentWalk!.points);
+    }
+  }
+
+  void _loadRouteFromWalk(List<WalkPoint> points) {
+    _routePoints.clear();
+    for (final point in points) {
+      _routePoints.add(LatLng(point.latitude, point.longitude));
+    }
+    if (_routePoints.isNotEmpty) {
+      _currentPosition = _routePoints.last;
+    }
+    setState(() {});
   }
 
   @override
@@ -46,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Яндекс карта
+          // OpenStreetMap карта
           _buildMap(),
           
           // Верхняя панель со статистикой
@@ -62,24 +79,67 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Карта
+  /// Карта OpenStreetMap
   Widget _buildMap() {
-    return YandexMap(
-      mapObjects: _mapObjects,
-      mapType: MapType.vector,
-      onMapCreated: (controller) async {
-        _mapController = controller;
-        
-        // Ждём инициализации карты
-        await Future.delayed(const Duration(milliseconds: 500));
-        
-        // Наводим на текущую позицию
-        final walkProvider = context.read<WalkProvider>();
-        if (walkProvider.currentWalk?.points.isNotEmpty ?? false) {
-          final point = walkProvider.currentWalk!.points.first;
-          await _moveToPosition(point.latitude, point.longitude);
-        }
-      },
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: _currentPosition,
+        initialZoom: _currentZoom,
+        onMapReady: () {
+          // Карта готова
+        },
+      ),
+      children: [
+        // Слой тайлов OpenStreetMap
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.progulkin',
+          maxZoom: 19,
+        ),
+        // Слой маршрута
+        PolylineLayer(
+          polylines: [
+            Polyline(
+              points: _routePoints,
+              color: Theme.of(context).colorScheme.primary,
+              strokeWidth: 5,
+            ),
+          ],
+        ),
+        // Маркер текущей позиции
+        MarkerLayer(
+          markers: _routePoints.isEmpty ? [] : [
+            Marker(
+              point: _routePoints.last,
+              width: 40,
+              height: 40,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white,
+                    width: 3,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.directions_walk,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -177,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Positioned(
       left: 16,
       right: 16,
-      bottom: 250, // Увеличен отступ для предотвращения перекрытия
+      bottom: 250,
       child: Consumer<PedometerProvider>(
         builder: (context, pedometerProvider, child) {
           return Container(
@@ -262,7 +322,6 @@ class _HomeScreenState extends State<HomeScreen> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Кнопки истории и настроек
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -279,8 +338,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
-                  // Главная кнопка старта/стопа
                   _buildMainButton(walkProvider, pedometerProvider),
                 ],
               );
@@ -324,7 +381,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (isTracking) {
       return Row(
         children: [
-          // Кнопка паузы/продолжить
           Expanded(
             child: ElevatedButton.icon(
               onPressed: () {
@@ -351,7 +407,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          // Кнопка стоп
           Expanded(
             child: ElevatedButton.icon(
               onPressed: () => _stopWalk(walkProvider, pedometerProvider),
@@ -401,11 +456,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (success) {
       await pedometerProvider.startCounting();
       
-      // Получаем текущую позицию и перемещаем карту
       final walk = walkProvider.currentWalk;
       if (walk?.points.isNotEmpty ?? false) {
         final point = walk!.points.first;
-        await _moveToPosition(point.latitude, point.longitude);
+        _moveToPosition(point.latitude, point.longitude);
       }
     } else {
       _showError(walkProvider.error ?? 'Не удалось начать прогулку');
@@ -425,7 +479,6 @@ class _HomeScreenState extends State<HomeScreen> {
       pedometerProvider.reset();
       _clearMapRoute();
       
-      // Показываем результат
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -449,55 +502,34 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Переместить карту на позицию
-  Future<void> _moveToPosition(double lat, double lon) async {
-    if (_mapController == null) return;
-    
-    final point = Point(latitude: lat, longitude: lon);
-    await _mapController!.moveCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: point, zoom: 16),
-      ),
-      animation: const MapAnimation(type: MapAnimationType.smooth),
-    );
+  void _moveToPosition(double lat, double lon) {
+    final position = LatLng(lat, lon);
+    _mapController.move(position, _mapController.camera.zoom);
   }
 
   /// Переместить на текущую позицию
-  Future<void> _moveToCurrentLocation() async {
+  void _moveToCurrentLocation() {
     final walkProvider = context.read<WalkProvider>();
     final walk = walkProvider.currentWalk;
     
     if (walk?.points.isNotEmpty ?? false) {
       final point = walk!.points.last;
-      await _moveToPosition(point.latitude, point.longitude);
+      _moveToPosition(point.latitude, point.longitude);
     }
   }
 
   /// Обновить маршрут на карте
   void _updateMapRoute(List<WalkPoint> points) {
-    if (points.length < 2) return;
-    
-    _mapObjects.clear();
-    
-    // Создаём polyline для маршрута
-    final polylinePoints = points.map((p) => 
-      Point(latitude: p.latitude, longitude: p.longitude)
-    ).toList();
-    
-    final polyline = PolylineMapObject(
-      mapId: MapObjectId('route_${DateTime.now().millisecondsSinceEpoch}'),
-      polyline: Polyline(points: polylinePoints),
-      strokeColor: Theme.of(context).colorScheme.primary,
-      strokeWidth: 5,
-    );
-    
-    _mapObjects.add(polyline);
-    
+    _routePoints.clear();
+    for (final point in points) {
+      _routePoints.add(LatLng(point.latitude, point.longitude));
+    }
     setState(() {});
   }
 
   /// Очистить маршрут на карте
   void _clearMapRoute() {
-    _mapObjects.clear();
+    _routePoints.clear();
     setState(() {});
   }
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:yandex_mapkit/yandex_mapkit.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
-import '../config/app_config.dart';
 import '../models/walk.dart';
 
 /// Экран деталей прогулки
@@ -15,30 +15,19 @@ class WalkDetailScreen extends StatefulWidget {
 }
 
 class _WalkDetailScreenState extends State<WalkDetailScreen> {
-  YandexMapController? _mapController;
-  final List<MapObject> _mapObjects = [];
+  final MapController _mapController = MapController();
+  List<LatLng> _routePoints = [];
 
   @override
   void initState() {
     super.initState();
-    _initMapObjects();
+    _initRoutePoints();
   }
 
-  void _initMapObjects() {
-    if (widget.walk.points.length < 2) return;
-
-    final polylinePoints = widget.walk.points.map((p) => 
-      Point(latitude: p.latitude, longitude: p.longitude)
+  void _initRoutePoints() {
+    _routePoints = widget.walk.points.map((p) => 
+      LatLng(p.latitude, p.longitude)
     ).toList();
-
-    _mapObjects.add(
-      PolylineMapObject(
-        mapId: const MapObjectId('walk_route'),
-        polyline: Polyline(points: polylinePoints),
-        strokeColor: Theme.of(context).colorScheme.primary,
-        strokeWidth: 4,
-      ),
-    );
   }
 
   @override
@@ -55,12 +44,72 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               background: widget.walk.points.isNotEmpty
-                  ? YandexMap(
-                      mapObjects: _mapObjects,
-                      onMapCreated: (controller) async {
-                        _mapController = controller;
-                        await _fitRouteOnMap();
-                      },
+                  ? FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: _routePoints.isNotEmpty 
+                            ? _routePoints.first 
+                            : LatLng(55.7558, 37.6173),
+                        initialZoom: 14,
+                        onMapReady: _fitRouteOnMap,
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.example.progulkin',
+                          maxZoom: 19,
+                        ),
+                        if (_routePoints.length >= 2)
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: _routePoints,
+                                color: Theme.of(context).colorScheme.primary,
+                                strokeWidth: 4,
+                              ),
+                            ],
+                          ),
+                        // Маркер начала
+                        if (_routePoints.isNotEmpty)
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: _routePoints.first,
+                                width: 30,
+                                height: 30,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                  ),
+                                  child: const Icon(
+                                    Icons.play_arrow,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                              Marker(
+                                point: _routePoints.last,
+                                width: 30,
+                                height: 30,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                  ),
+                                  child: const Icon(
+                                    Icons.flag,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
                     )
                   : Container(
                       color: Colors.grey[200],
@@ -354,7 +403,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
               Container(
                 width: 12,
                 height: 12,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.green,
                   shape: BoxShape.circle,
                 ),
@@ -374,7 +423,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
               Container(
                 width: 12,
                 height: 12,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.red,
                   shape: BoxShape.circle,
                 ),
@@ -394,50 +443,29 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
   }
 
   /// Разместить маршрут на карте
-  Future<void> _fitRouteOnMap() async {
-    if (_mapController == null || widget.walk.points.isEmpty) return;
+  void _fitRouteOnMap() {
+    if (_routePoints.isEmpty) return;
 
-    final points = widget.walk.points.map((p) => 
-      Point(latitude: p.latitude, longitude: p.longitude)
-    ).toList();
-
-    if (points.length < 2) {
-      await _mapController!.moveCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: points.first, zoom: 15),
-        ),
-      );
+    if (_routePoints.length < 2) {
+      _mapController.move(_routePoints.first, 15);
       return;
     }
 
-    // Вычисляем границы
-    double minLat = points.first.latitude;
-    double maxLat = points.first.latitude;
-    double minLon = points.first.longitude;
-    double maxLon = points.first.longitude;
+    // Вычисляем центр и зум
+    double minLat = _routePoints.first.latitude;
+    double maxLat = _routePoints.first.latitude;
+    double minLon = _routePoints.first.longitude;
+    double maxLon = _routePoints.first.longitude;
 
-    for (final point in points) {
+    for (final point in _routePoints) {
       if (point.latitude < minLat) minLat = point.latitude;
       if (point.latitude > maxLat) maxLat = point.latitude;
       if (point.longitude < minLon) minLon = point.longitude;
       if (point.longitude > maxLon) maxLon = point.longitude;
     }
 
-    final southWest = Point(latitude: minLat, longitude: minLon);
-    final northEast = Point(latitude: maxLat, longitude: maxLon);
-
-    await _mapController!.moveCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: Point(
-            latitude: (minLat + maxLat) / 2,
-            longitude: (minLon + maxLon) / 2,
-          ),
-          zoom: 12,
-        ),
-      ),
-      animation: const MapAnimation(type: MapAnimationType.smooth),
-    );
+    final center = LatLng((minLat + maxLat) / 2, (minLon + maxLon) / 2);
+    _mapController.move(center, 13);
   }
 }
 

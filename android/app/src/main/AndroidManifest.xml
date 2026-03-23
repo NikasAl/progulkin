@@ -41,12 +41,5 @@
             android:name="flutterEmbedding"
             android:value="2" />
             
-        <!-- Яндекс карты API ключ -->
-        <!-- Получите ключ на https://developer.tech.yandex.ru/ -->
-        <!-- И замените YOUR_YANDEX_MAP_API_KEY на свой ключ -->
-        <meta-data
-            android:name="com.yandex.mapkit.apikey"
-            android:value="YOUR_YANDEX_MAP_API_KEY"/>
-            
     </application>
 </manifest>

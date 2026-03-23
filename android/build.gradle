@@ -15,10 +15,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        // Yandex MapKit repository
-        maven {
-            url 'https://maven.yandex.net'
-        }
     }
 }
 

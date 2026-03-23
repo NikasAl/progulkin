@@ -29,9 +29,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven {
-            url 'https://maven.yandex.net'
-        }
     }
 }
 
