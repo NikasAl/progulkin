@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yandex_mapkit/yandex_mapkit.dart';
 import 'package:intl/intl.dart';
+import '../config/app_config.dart';
 import '../models/walk.dart';
 
 /// Экран деталей прогулки
@@ -56,6 +57,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
               background: widget.walk.points.isNotEmpty
                   ? YandexMap(
                       mapObjects: _mapObjects,
+                      apiKey: AppConfig.yandexMapApiKey,
                       onMapCreated: (controller) async {
                         _mapController = controller;
                         await _fitRouteOnMap();

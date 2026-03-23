@@ -59,8 +59,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildMap() {
     return YandexMap(
       mapObjects: _mapObjects,
+      mapType: MapType.vector,
+      apiKey: AppConfig.yandexMapApiKey,
       onMapCreated: (controller) async {
         _mapController = controller;
+        
+        // Ждём инициализации карты
+        await Future.delayed(const Duration(milliseconds: 500));
         
         // Наводим на текущую позицию
         final walkProvider = context.read<WalkProvider>();
@@ -166,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Positioned(
       left: 16,
       right: 16,
-      bottom: 160,
+      bottom: 250, // Увеличен отступ для предотвращения перекрытия
       child: Consumer<PedometerProvider>(
         builder: (context, pedometerProvider, child) {
           return Container(
