@@ -19,6 +19,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late double _maxAccuracy;
   late bool _enableSmoothing;
   
+  // Настройки неподвижности
+  late bool _enableStationaryDetection;
+  late double _stationaryRadius;
+  
   // Настройки педометра
   late double _pedometerSensitivity;
   late double _stepLength;
@@ -29,6 +33,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _maxSpeed = _locationService.maxWalkingSpeedKmh;
     _maxAccuracy = _locationService.maxAccuracyMeters;
     _enableSmoothing = _locationService.enableSmoothing;
+    _enableStationaryDetection = _locationService.enableStationaryDetection;
+    _stationaryRadius = _locationService.stationaryRadiusMeters;
     _pedometerSensitivity = _pedometerService.sensitivity;
     _stepLength = _pedometerService.averageStepLength;
   }
@@ -82,7 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           
           SwitchListTile(
-            secondary: const Icon(Icons.smooth),
+            secondary: const Icon(Icons.linear_scale),
             title: const Text('Сглаживание маршрута'),
             subtitle: const Text('Усреднение координат для плавности'),
             value: _enableSmoothing,
@@ -93,6 +99,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
               });
             },
           ),
+          
+          const Divider(height: 16),
+          
+          // Секция определения неподвижности
+          _buildSectionHeader('Определение неподвижности'),
+          _buildInfoCard(
+            'Когда вы стоите на месте, GPS даёт разброс координат. '
+            'Эта функция определяет неподвижность и не записывает лишние точки.',
+          ),
+          
+          SwitchListTile(
+            secondary: const Icon(Icons.pause_circle_outline),
+            title: const Text('Определять неподвижность'),
+            subtitle: const Text('Не записывать точки при остановке'),
+            value: _enableStationaryDetection,
+            onChanged: (value) {
+              setState(() {
+                _enableStationaryDetection = value;
+                _locationService.updateSettings(stationaryDetection: value);
+              });
+            },
+          ),
+          
+          if (_enableStationaryDetection)
+            _buildSliderTile(
+              title: 'Радиус неподвижности',
+              subtitle: 'Все точки в этом радиусе считаются неподвижностью',
+              value: _stationaryRadius,
+              min: 5,
+              max: 50,
+              unit: ' м',
+              icon: Icons.gps_fixed,
+              onChanged: (value) {
+                setState(() {
+                  _stationaryRadius = value;
+                  _locationService.updateSettings(stationaryRadius: value);
+                });
+              },
+            ),
           
           const Divider(height: 32),
           

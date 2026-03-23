@@ -21,7 +21,8 @@ class LocationService {
 
   // Переменные для фильтрации
   WalkPoint? _lastValidPoint;
-  final List<WalkPoint> _recentPoints = []; // Для медианного фильтра
+  final List<WalkPoint> _recentPoints = []; // Для медианного фильтра и фильтрации
+  final List<WalkPoint> _stationaryCheckPoints = []; // Отдельный буфер для определения неподвижности
   int _pointsReceived = 0;
   int _pointsAccepted = 0;
 
@@ -30,17 +31,30 @@ class LocationService {
   double maxAccuracyMeters = 50.0; // макс. допустимая погрешность
   bool enableSmoothing = true; // включить сглаживание
   int smoothingWindowSize = 3; // окно для сглаживания
+  
+  // Настройки определения неподвижности
+  double stationaryRadiusMeters = 15.0; // радиус для определения неподвижности
+  int stationaryMinPoints = 5; // количество точек для проверки неподвижности
+  bool enableStationaryDetection = true; // включить определение неподвижности
+
+  // Переменные для определения неподвижности
+  bool _isStationary = false;
+  WalkPoint? _stationaryCenter;
 
   /// Обновить настройки фильтрации
   void updateSettings({
     double? maxSpeed,
     double? maxAccuracy,
     bool? smoothing,
+    double? stationaryRadius,
+    bool? stationaryDetection,
   }) {
     if (maxSpeed != null) maxWalkingSpeedKmh = maxSpeed;
     if (maxAccuracy != null) maxAccuracyMeters = maxAccuracy;
     if (smoothing != null) enableSmoothing = smoothing;
-    print('Настройки: скорость=$maxWalkingSpeedKmh км/ч, точность=$maxAccuracyMeters м');
+    if (stationaryRadius != null) stationaryRadiusMeters = stationaryRadius;
+    if (stationaryDetection != null) enableStationaryDetection = stationaryDetection;
+    print('Настройки: скорость=$maxWalkingSpeedKmh км/ч, точность=$maxAccuracyMeters м, радиус неподвижности=$stationaryRadiusMeters м');
   }
 
   /// Проверка разрешений на геолокацию
@@ -116,8 +130,11 @@ class LocationService {
     // Сброс переменных
     _lastValidPoint = null;
     _recentPoints.clear();
+    _stationaryCheckPoints.clear();
     _pointsReceived = 0;
     _pointsAccepted = 0;
+    _isStationary = false;
+    _stationaryCenter = null;
 
     print('Начинаем отслеживание GPS...');
     print('Настройки: макс.скорость=$maxWalkingSpeedKmh км/ч, макс.точность=$maxAccuracyMeters м');
@@ -167,6 +184,18 @@ class LocationService {
       print('Координаты: ${walkPoint.latitude.toStringAsFixed(6)}, ${walkPoint.longitude.toStringAsFixed(6)}');
       print('Точность: ${walkPoint.accuracy.toStringAsFixed(1)}м');
       print('Скорость GPS: ${(walkPoint.speed * 3.6).toStringAsFixed(1)} км/ч');
+    }
+
+    // Определение неподвижности
+    if (enableStationaryDetection) {
+      _checkStationary(walkPoint);
+      if (_isStationary) {
+        if (AppConfig.enableLogging) {
+          print('⊙ Неподвижность: точка в радиусе ${stationaryRadiusMeters.toStringAsFixed(0)}м');
+        }
+        // Не добавляем точку, но обновляем последнюю валидную
+        return;
+      }
     }
 
     // Многоуровневая фильтрация
@@ -315,14 +344,78 @@ class LocationService {
 
   double _toRadians(double degree) => degree * math.pi / 180;
 
+  /// Проверка неподвижности
+  void _checkStationary(WalkPoint newPoint) {
+    // Добавляем точку в отдельный буфер для проверки неподвижности
+    _stationaryCheckPoints.add(newPoint);
+    
+    // Если точек меньше минимума, считаем движением
+    if (_stationaryCheckPoints.length < stationaryMinPoints) {
+      _isStationary = false;
+      return;
+    }
+    
+    // Оставляем только последние N точек
+    while (_stationaryCheckPoints.length > stationaryMinPoints) {
+      _stationaryCheckPoints.removeAt(0);
+    }
+    
+    // Вычисляем центр (среднее)
+    double sumLat = 0, sumLon = 0;
+    for (final p in _stationaryCheckPoints) {
+      sumLat += p.latitude;
+      sumLon += p.longitude;
+    }
+    final centerLat = sumLat / _stationaryCheckPoints.length;
+    final centerLon = sumLon / _stationaryCheckPoints.length;
+    
+    // Находим максимальное расстояние от центра
+    double maxDistance = 0;
+    for (final p in _stationaryCheckPoints) {
+      final dist = _calculateDistance(centerLat, centerLon, p.latitude, p.longitude);
+      if (dist > maxDistance) {
+        maxDistance = dist;
+      }
+    }
+    
+    // Если все точки в пределах радиуса - неподвижность
+    final wasStationary = _isStationary;
+    _isStationary = maxDistance <= stationaryRadiusMeters;
+    
+    if (_isStationary && !wasStationary) {
+      if (AppConfig.enableLogging) {
+        print('⚠ Перешли в неподвижность (радиус: ${maxDistance.toStringAsFixed(1)}м)');
+      }
+      _stationaryCenter = WalkPoint(
+        latitude: centerLat,
+        longitude: centerLon,
+        altitude: newPoint.altitude,
+        speed: 0,
+        accuracy: newPoint.accuracy,
+        timestamp: newPoint.timestamp,
+      );
+    } else if (!_isStationary && wasStationary) {
+      if (AppConfig.enableLogging) {
+        print('⚡ Вышли из неподвижности (радиус: ${maxDistance.toStringAsFixed(1)}м)');
+      }
+      _stationaryCenter = null;
+    }
+  }
+
+  /// Проверка, неподвижен ли пользователь
+  bool get isStationary => _isStationary;
+
   /// Остановить отслеживание
   void stopTracking() {
     _positionStreamSubscription?.cancel();
     _positionStreamSubscription = null;
     _lastValidPoint = null;
     _recentPoints.clear();
+    _stationaryCheckPoints.clear();
     _pointsReceived = 0;
     _pointsAccepted = 0;
+    _isStationary = false;
+    _stationaryCenter = null;
     print('GPS остановлен. Статистика: принято $_pointsAccepted из $_pointsReceived');
   }
 
