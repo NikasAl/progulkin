@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -508,7 +509,7 @@ class _SpeedChartPainter extends CustomPainter {
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
-    final path = Path();
+    final path = ui.Path();
     final stepX = size.width / (walkPoints.length - 1);
 
     for (int i = 0; i < walkPoints.length; i++) {
@@ -526,7 +527,7 @@ class _SpeedChartPainter extends CustomPainter {
     canvas.drawPath(path, paint);
 
     // Заливка под графиком
-    final fillPath = Path.from(path);
+    final fillPath = ui.Path.from(path);
     fillPath.lineTo(size.width, size.height);
     fillPath.lineTo(0, size.height);
     fillPath.close();
