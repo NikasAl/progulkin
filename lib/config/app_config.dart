@@ -7,7 +7,7 @@ class AppConfig {
   static const bool enableLogging = true;
 
   // Настройки трекинга
-  static const int trackingDistanceFilter = 5; // метров между точками
+  static const int trackingDistanceFilter = 0; // метров между точками (0 = все точки)
   
   // Настройки шагомера
   static const double averageStepLength = 0.75; // средняя длина шага в метрах
