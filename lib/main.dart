@@ -6,9 +6,13 @@ import 'providers/walk_provider.dart';
 import 'providers/pedometer_provider.dart';
 import 'providers/map_object_provider.dart';
 import 'screens/home_screen.dart';
+import 'models/map_objects/map_objects.dart'; // Инициализация фабрики объектов
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Инициализация фабрики объектов карты (обязательно до использования)
+  initMapObjectFactory();
   
   // Инициализация локали для форматирования дат
   await initializeDateFormatting('ru_RU', null);

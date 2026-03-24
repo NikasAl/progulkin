@@ -12,7 +12,8 @@ import 'secret_message.dart';
 import 'creature.dart';
 
 /// Инициализация фабрики для создания объектов по типу
-void _initObjectFactory() {
+/// ВЫЗЫВАТЬ В main.dart ДО ИСПОЛЬЗОВАНИЯ ЛЮБОГО MapObject.fromSyncJson()
+void initMapObjectFactory() {
   MapObject.setObjectFactory((json) {
     final type = MapObjectType.fromCode(json['type'] as String);
     
@@ -29,5 +30,12 @@ void _initObjectFactory() {
   });
 }
 
-// Автоматическая инициализация при импорте
-final _ = _initObjectFactory();
+// Автоматическая инициализация при импорте (резервный вариант)
+// Выполняется при первом импорте этого файла
+void _autoInit() {
+  initMapObjectFactory();
+}
+
+// Игнорируем предупреждение о неиспользуемой переменной
+// ignore: unused_element
+final _autoInitResult = (_autoInit());
