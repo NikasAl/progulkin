@@ -16,6 +16,18 @@ class WalkProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   StreamSubscription<WalkPoint>? _positionSubscription;
+  
+  // Время паузы для корректного отображения duration
+  DateTime? _pauseStartTime;
+  Duration _totalPauseDuration = Duration.zero; // Сумма всех периодов паузы
+  
+  // Геттер для совместимости
+  Duration get _accumulatedPauseDuration {
+    if (_pauseStartTime != null && !_isTracking) {
+      return _totalPauseDuration + DateTime.now().difference(_pauseStartTime!);
+    }
+    return _totalPauseDuration;
+  }
 
   // Геттеры
   Walk? get currentWalk => _currentWalk;
@@ -24,6 +36,45 @@ class WalkProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasActiveWalk => _currentWalk != null && _currentWalk!.isActive;
+  
+  /// Прогулка существует, но на паузе
+  bool get isPaused => _currentWalk != null && !_isTracking;
+  
+  /// Есть текущая прогулка (активная или на паузе)
+  bool get hasCurrentWalk => _currentWalk != null;
+  
+  /// Продолжительность текущей прогулки (с учётом паузы)
+  Duration get currentWalkDuration {
+    if (_currentWalk == null) return Duration.zero;
+    
+    final elapsed = DateTime.now().difference(_currentWalk!.startTime);
+    
+    if (_isTracking) {
+      // Активная прогулка - вычитаем всё время пауз
+      return elapsed - _totalPauseDuration;
+    } else {
+      // На паузе - вычитаем также текущую паузу
+      final currentPause = _pauseStartTime != null 
+          ? DateTime.now().difference(_pauseStartTime!) 
+          : Duration.zero;
+      return elapsed - _totalPauseDuration - currentPause;
+    }
+  }
+  
+  /// Форматированная продолжительность текущей прогулки
+  String get currentWalkFormattedDuration {
+    final d = currentWalkDuration;
+    final hours = d.inHours;
+    final minutes = d.inMinutes.remainder(60);
+    final seconds = d.inSeconds.remainder(60);
+    
+    if (hours > 0) {
+      return '${hours}ч ${minutes}мин';
+    } else if (minutes > 0) {
+      return '${minutes}мин ${seconds}сек';
+    }
+    return '${seconds}сек';
+  }
 
   /// Инициализация
   Future<void> init() async {
@@ -56,6 +107,8 @@ class WalkProvider extends ChangeNotifier {
       // Создаём новую прогулку
       _currentWalk = Walk(startTime: DateTime.now());
       _isTracking = true;
+      _pauseStartTime = null;
+      _totalPauseDuration = Duration.zero; // Сбрасываем время пауз
 
       // Получаем начальную позицию
       final position = await _locationService.getCurrentPosition();
@@ -101,6 +154,8 @@ class WalkProvider extends ChangeNotifier {
       // Добавляем в историю
       _walksHistory.insert(0, _currentWalk!);
       _currentWalk = null;
+      _pauseStartTime = null;
+      _totalPauseDuration = Duration.zero; // Сбрасываем время пауз
 
       notifyListeners();
       return true;
@@ -113,8 +168,8 @@ class WalkProvider extends ChangeNotifier {
 
   /// Приостановить прогулку
   void pauseWalk() {
-    if (_isTracking) {
-      // Не останавливаем GPS полностью, просто перестаём записывать точки
+    if (_isTracking && _currentWalk != null) {
+      _pauseStartTime = DateTime.now(); // Запоминаем когда началась пауза
       _isTracking = false;
       notifyListeners();
     }
@@ -123,6 +178,12 @@ class WalkProvider extends ChangeNotifier {
   /// Продолжить прогулку
   Future<void> resumeWalk() async {
     if (_currentWalk != null && !_isTracking) {
+      // Добавляем время текущей паузы к общему времени пауз
+      if (_pauseStartTime != null) {
+        _totalPauseDuration += DateTime.now().difference(_pauseStartTime!);
+        _pauseStartTime = null;
+      }
+      
       _isTracking = true;
       // Переподписываемся на стрим, если нужно
       if (_positionSubscription == null) {
@@ -144,6 +205,8 @@ class WalkProvider extends ChangeNotifier {
     _locationService.stopTracking();
     _currentWalk = null;
     _isTracking = false;
+    _pauseStartTime = null;
+    _totalPauseDuration = Duration.zero;
     notifyListeners();
   }
 

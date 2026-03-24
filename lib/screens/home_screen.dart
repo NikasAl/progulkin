@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -34,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   LatLng _initialPosition = const LatLng(55.7558, 37.6173); // Москва по умолчанию
   double _currentZoom = 15.0;
   UserInfo? _userInfo;
+  Timer? _updateTimer; // Таймер для обновления времени
 
   @override
   void initState() {
@@ -41,6 +43,20 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initProviders();
     });
+    
+    // Таймер для обновления времени каждую секунду
+    _updateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final walkProvider = context.read<WalkProvider>();
+      if (walkProvider.hasCurrentWalk) {
+        setState(() {});
+      }
+    });
+  }
+  
+  @override
+  void dispose() {
+    _updateTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _initProviders() async {
@@ -299,7 +315,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildStatItem(
                   icon: Icons.timer_outlined,
                   label: 'Время',
-                  value: walk?.formattedDuration ?? '0 сек',
+                  // Используем геттер из провайдера для корректного времени с паузой
+                  value: walkProvider.hasCurrentWalk 
+                      ? walkProvider.currentWalkFormattedDuration 
+                      : '0 сек',
                 ),
                 _buildVerticalDivider(),
                 _buildStatItem(
@@ -504,9 +523,11 @@ class _HomeScreenState extends State<HomeScreen> {
     WalkProvider walkProvider,
     PedometerProvider pedometerProvider,
   ) {
+    // Показываем кнопки паузы/продолжить если есть текущая прогулка (активная или на паузе)
+    final hasWalk = walkProvider.hasCurrentWalk;
     final isTracking = walkProvider.isTracking;
 
-    if (isTracking) {
+    if (hasWalk) {
       return Row(
         children: [
           Expanded(
