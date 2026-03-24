@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/location_service.dart';
 import '../services/pedometer_service.dart';
+import '../services/user_id_service.dart';
 import '../models/walk.dart';
 import '../providers/walk_provider.dart';
+import '../providers/map_object_provider.dart';
 
 /// Экран настроек приложения
 class SettingsScreen extends StatefulWidget {
@@ -16,6 +18,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final LocationService _locationService = LocationService();
   final PedometerService _pedometerService = PedometerService();
+  final UserIdService _userIdService = UserIdService();
   
   // Настройки GPS
   late double _maxSpeed;
@@ -32,6 +35,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   
   // Источник расстояния
   late DistanceSource _distanceSource;
+  
+  // Настройки P2P
+  bool _p2pEnabled = true;
+  String _signalingServer = 'signaling.progulkin.ru';
+  int _signalingPort = 9000;
+  bool _p2pInitialized = false;
 
   @override
   void initState() {
@@ -52,6 +61,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _distanceSource = walkProvider.distanceSource;
         _stepLength = walkProvider.stepLength;
       });
+      
+      // Загружаем настройки P2P
+      _loadP2PSettings();
+    });
+  }
+  
+  Future<void> _loadP2PSettings() async {
+    final mapObjectProvider = context.read<MapObjectProvider>();
+    final userInfo = await _userIdService.getUserInfo();
+    
+    setState(() {
+      _p2pEnabled = mapObjectProvider.p2pEnabled;
+      _p2pInitialized = true;
     });
   }
 
@@ -202,6 +224,120 @@ class _SettingsScreenState extends State<SettingsScreen> {
               context.read<WalkProvider>().saveSettings(stepLength: value);
             },
           ),
+          const Divider(height: 32),
+          
+          // Секция P2P синхронизации
+          _buildSectionHeader('P2P Синхронизация'),
+          _buildInfoCard(
+            'Объекты синхронизируются напрямую между устройствами. '
+            'Сервер только знакомит устройства в одной зоне, '
+            'не храня данные объектов.',
+          ),
+          if (_p2pInitialized) ...[
+            Consumer<MapObjectProvider>(
+              builder: (context, provider, child) {
+                return SwitchListTile(
+                  secondary: Icon(
+                    provider.isP2PRunning ? Icons.sync : Icons.sync_disabled,
+                    color: provider.isP2PRunning ? Colors.green : Colors.grey,
+                  ),
+                  title: const Text('Синхронизация объектов'),
+                  subtitle: Text(
+                    provider.isP2PRunning 
+                        ? 'Активно • ${provider.allObjects.length} объектов'
+                        : 'Отключено',
+                  ),
+                  value: _p2pEnabled,
+                  onChanged: (value) {
+                    provider.setP2PEnabled(value);
+                    setState(() {
+                      _p2pEnabled = value;
+                    });
+                  },
+                );
+              },
+            ),
+            _buildP2PServerSettings(),
+            Consumer<MapObjectProvider>(
+              builder: (context, provider, child) {
+                if (!provider.isP2PRunning && _p2pEnabled) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: OutlinedButton.icon(
+                      onPressed: () => _startP2P(provider),
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('Запустить синхронизацию'),
+                    ),
+                  );
+                }
+                if (provider.isP2PRunning) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => provider.forceSync(),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Синхронизировать'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => provider.stopP2P(),
+                            icon: const Icon(Icons.stop),
+                            label: const Text('Остановить'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+            // Статистика P2P
+            Consumer<MapObjectProvider>(
+              builder: (context, provider, child) {
+                final stats = provider.stats;
+                return Card(
+                  margin: const EdgeInsets.only(top: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildStatItem('👹', stats['trashMonsters'] ?? 0, 'Монстров'),
+                            _buildStatItem('📜', stats['secrets'] ?? 0, 'Секретов'),
+                            _buildStatItem('🦊', stats['creatures'] ?? 0, 'Существ'),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              size: 16,
+                              color: Colors.green[600],
+                            ),
+                            const SizedBox(width: 4),
+                            Text('${stats['cleaned'] ?? 0} убрано'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
           const Divider(height: 32),
           
           // Советы
@@ -498,5 +634,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (value < 1.3) return 'Нормальная';
     if (value < 1.7) return 'Повышенная';
     return 'Высокая';
+  }
+  
+  Widget _buildP2PServerSettings() {
+    return ExpansionTile(
+      leading: const Icon(Icons.dns_outlined),
+      title: const Text('Настройки сервера'),
+      subtitle: Text('$_signalingServer:$_signalingPort'),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            children: [
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Адрес сервера',
+                  hintText: 'signaling.progulkin.ru',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                controller: TextEditingController(text: _signalingServer),
+                onChanged: (value) {
+                  _signalingServer = value;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Порт',
+                  hintText: '9000',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                controller: TextEditingController(text: _signalingPort.toString()),
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  _signalingPort = int.tryParse(value) ?? 9000;
+                },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Используйте публичный сервер или запустите свой: dart run bin/signaling_server.dart',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Future<void> _startP2P(MapObjectProvider provider) async {
+    final userInfo = await _userIdService.getUserInfo();
+    
+    await provider.startP2P(
+      signalingServer: _signalingServer,
+      signalingPort: _signalingPort,
+      deviceId: userInfo.id,
+    );
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            provider.isP2PRunning 
+                ? 'Синхронизация запущена!' 
+                : 'Ошибка запуска: ${provider.error ?? "Неизвестная ошибка"}',
+          ),
+          backgroundColor: provider.isP2PRunning ? Colors.green : Colors.red,
+        ),
+      );
+    }
+  }
+  
+  Widget _buildStatItem(String emoji, int count, String label) {
+    return Column(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 24)),
+        const SizedBox(height: 4),
+        Text(
+          '$count',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
   }
 }

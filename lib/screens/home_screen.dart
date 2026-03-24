@@ -12,6 +12,8 @@ import '../services/location_service.dart';
 import '../services/user_id_service.dart';
 import '../services/tile_cache_service.dart';
 import '../widgets/map_objects_layer.dart';
+import '../widgets/object_filters_widget.dart';
+import '../widgets/nearby_objects_notifier.dart';
 import 'history_screen.dart';
 import 'walk_detail_screen.dart';
 import 'settings_screen.dart';
@@ -35,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _initialized = false;
   bool _mapObjectsInitialized = false;
   bool _tileCacheInitialized = false;
+  bool _showFilters = false; // Показать панель фильтров
   LatLng? _currentLocation; // Текущая позиция пользователя
   LatLng _initialPosition = const LatLng(55.7558, 37.6173); // Москва по умолчанию
   double _currentZoom = 15.0;
@@ -139,6 +142,23 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {});
   }
 
+  /// Получить количество активных фильтров
+  int _getActiveFiltersCount() {
+    final provider = context.read<MapObjectProvider>();
+    int count = 0;
+    
+    // Считаем отключенные типы как активные фильтры
+    if (!provider.enabledTypes.contains(MapObjectType.trashMonster)) count++;
+    if (!provider.enabledTypes.contains(MapObjectType.secretMessage)) count++;
+    if (!provider.enabledTypes.contains(MapObjectType.creature)) count++;
+    
+    // Дополнительные фильтры
+    if (provider.showCleaned) count++;
+    if (provider.minReputation > 0) count++;
+    
+    return count;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -166,6 +186,38 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Icon(Icons.add_location_alt),
             ),
           ),
+          
+          // Кнопка фильтров
+          Positioned(
+            right: 16,
+            bottom: 250,
+            child: FilterToggleButton(
+              onTap: () => setState(() => _showFilters = !_showFilters),
+              activeFilters: _getActiveFiltersCount(),
+            ),
+          ),
+          
+          // Панель фильтров
+          if (_showFilters)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 320,
+              child: const ObjectFiltersWidget(),
+            ),
+          
+          // Уведомление о близлежащих объектах
+          if (_currentLocation != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              top: 130,
+              child: NearbyObjectsNotifier(
+                currentLat: _currentLocation!.latitude,
+                currentLng: _currentLocation!.longitude,
+                alertRadius: 100,
+              ),
+            ),
         ],
       ),
     );

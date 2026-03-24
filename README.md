@@ -195,39 +195,50 @@ dart run bin/signaling_server.dart --port 9000
 ```
 lib/
 ├── config/
-│   └── app_config.dart           # Конфигурация приложения
-├── main.dart                     # Точка входа
+│   └── app_config.dart              # Конфигурация приложения
+├── main.dart                        # Точка входа
 ├── models/
-│   ├── walk.dart                 # Модель прогулки
-│   ├── walk_point.dart           # Модель точки маршрута
-│   └── map_objects/              # Объекты карты
-│       ├── map_object.dart       # Базовый класс
-│       ├── trash_monster.dart    # Мусорный монстр
-│       ├── secret_message.dart   # Секретное сообщение
-│       └── creature.dart         # Существо
+│   ├── walk.dart                    # Модель прогулки
+│   ├── walk_point.dart              # Модель точки маршрута
+│   ├── distance_source.dart         # Источник расстояния (GPS/шагомер)
+│   └── map_objects/                 # Объекты карты
+│       ├── map_object.dart          # Базовый класс
+│       ├── map_objects.dart         # Экспорт всех моделей
+│       ├── trash_monster.dart       # Мусорный монстр
+│       ├── secret_message.dart      # Секретное сообщение
+│       └── creature.dart            # Существо
 ├── services/
-│   ├── location_service.dart     # Сервис геолокации
-│   ├── pedometer_service.dart    # Сервис шагомера
-│   ├── storage_service.dart      # Сервис хранения данных
-│   └── p2p/                      # P2P синхронизация
-│       ├── p2p_service.dart      # P2P сервис
-│       └── map_object_storage.dart # Хранилище объектов
+│   ├── location_service.dart        # Сервис геолокации
+│   ├── pedometer_service.dart       # Сервис шагомера
+│   ├── storage_service.dart         # Сервис хранения прогулок
+│   ├── tile_cache_service.dart      # Кэширование карт офлайн
+│   ├── user_id_service.dart         # Генерация ID пользователя
+│   └── p2p/                         # P2P синхронизация
+│       ├── p2p.dart                 # Экспорт P2P модулей
+│       ├── p2p_service.dart         # P2P сервис
+│       └── map_object_storage.dart  # SQLite хранилище объектов
 ├── providers/
-│   ├── walk_provider.dart        # Управление прогулками
-│   └── pedometer_provider.dart   # Управление шагомером
+│   ├── walk_provider.dart           # Управление прогулками
+│   ├── pedometer_provider.dart      # Управление шагомером
+│   └── map_object_provider.dart     # Управление объектами карты
 ├── screens/
-│   ├── home_screen.dart          # Главный экран с картой
-│   ├── history_screen.dart       # История прогулок
-│   ├── walk_detail_screen.dart   # Детали прогулки
-│   └── settings_screen.dart      # Настройки
+│   ├── home_screen.dart             # Главный экран с картой
+│   ├── history_screen.dart          # История прогулок
+│   ├── walk_detail_screen.dart      # Детали прогулки
+│   ├── settings_screen.dart         # Настройки
+│   ├── add_object_screen.dart       # Создание объекта
+│   └── route_planning_screen.dart   # Планирование и кэш карт
 └── widgets/
-    └── stats_widget.dart         # Виджеты статистики
+    ├── stats_widget.dart            # Виджеты статистики
+    ├── map_objects_layer.dart       # Слой объектов на карте
+    ├── object_filters_widget.dart   # Фильтры объектов
+    └── nearby_objects_notifier.dart # Уведомления о близких объектах
 
 bin/
-└── signaling_server.dart         # Signaling сервер для P2P
+└── signaling_server.dart            # Signaling сервер для P2P
 
 docs/
-└── MAP_OBJECTS_CONCEPT.md        # Концепция и дорожная карта
+└── MAP_OBJECTS_CONCEPT.md           # Концепция и дорожная карта
 ```
 
 ## Установка
@@ -326,22 +337,40 @@ dart run bin/signaling_server.dart --port 9000
 - [x] Модели данных
 - [x] P2P сервис
 - [x] Локальное хранилище
-- [ ] UI карты объектов
+- [x] UI карты объектов
+- [x] UI создания объекта
+- [x] UI просмотра объекта
 
-### ⏳ Фаза 2: Интеграция
-- [ ] Provider для объектов
-- [ ] Фильтры на карте
-- [ ] Уведомления о рядом
+### ✅ Фаза 2: Интеграция
+- [x] Provider для объектов
+- [x] Фильтры на карте
+- [x] Уведомления о рядом
+- [x] Настройки P2P
 
-### ⏳ Фаза 3-5: Игровые механики
-- [ ] Мусорные монстры (полная механика)
-- [ ] Секретные сообщения
-- [ ] Существа русской мифологии
+### ✅ Фаза 3: Мусорные монстры
+- [x] Создание монстра (тип, количество, описание)
+- [x] Автоматический расчёт класса и очков
+- [x] Отметка уборки (требуется прогулка + близость)
+- [x] Отображение на карте с цветом по классу
+- [x] Детали с информацией о классе и очках
 
-### ⏳ Фаза 6-7: Социальные функции
+### ✅ Фаза 4: Секретные сообщения
+- [x] Создание секрета (тип, заголовок, содержимое)
+- [x] Радиус разблокировки (10-200м)
+- [x] Одноразовые секреты
+- [x] Шифрование содержимого
+- [x] Чтение только на месте (требуется прогулка + близость)
+
+### ⏳ Фаза 5: Существа
+- [ ] Спавн существ по среде обитания
+- [ ] Поимка существ
+- [ ] Коллекция
+- [ ] РПГ-элементы
+
+### ⏳ Фаза 6: Социальные функции
 - [ ] Профиль и достижения
-- [ ] Рейтинги
-- [ ] Новые типы объектов
+- [ ] Рейтинги уборщиков
+- [ ] История уборок в районе
 
 Подробнее: [docs/MAP_OBJECTS_CONCEPT.md](docs/MAP_OBJECTS_CONCEPT.md)
 
