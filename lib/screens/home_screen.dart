@@ -10,11 +10,13 @@ import '../models/walk_point.dart';
 import '../models/map_objects/map_objects.dart';
 import '../services/location_service.dart';
 import '../services/user_id_service.dart';
+import '../services/tile_cache_service.dart';
 import '../widgets/map_objects_layer.dart';
 import 'history_screen.dart';
 import 'walk_detail_screen.dart';
 import 'settings_screen.dart';
 import 'add_object_screen.dart';
+import 'route_planning_screen.dart';
 
 /// Главный экран с картой OpenStreetMap
 class HomeScreen extends StatefulWidget {
@@ -28,9 +30,11 @@ class _HomeScreenState extends State<HomeScreen> {
   final MapController _mapController = MapController();
   final LocationService _locationService = LocationService();
   final UserIdService _userIdService = UserIdService();
+  final TileCacheService _tileCacheService = TileCacheService();
   final List<LatLng> _routePoints = [];
   bool _initialized = false;
   bool _mapObjectsInitialized = false;
+  bool _tileCacheInitialized = false;
   LatLng? _currentLocation; // Текущая позиция пользователя
   LatLng _initialPosition = const LatLng(55.7558, 37.6173); // Москва по умолчанию
   double _currentZoom = 15.0;
@@ -68,6 +72,14 @@ class _HomeScreenState extends State<HomeScreen> {
     
     await walkProvider.init();
     await pedometerProvider.init();
+    
+    // Инициализируем кэш тайлов
+    try {
+      await _tileCacheService.init();
+      _tileCacheInitialized = true;
+    } catch (e) {
+      debugPrint('Ошибка инициализации кэша тайлов: $e');
+    }
     
     // Получаем информацию о пользователе
     _userInfo = await _userIdService.getUserInfo();
@@ -171,11 +183,15 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       children: [
-        // Слой тайлов OpenStreetMap
+        // Слой тайлов OpenStreetMap с поддержкой кэша
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.example.progulkin',
           maxZoom: 19,
+          // Используем кэшированные тайлы если доступны
+          tileProvider: _tileCacheInitialized 
+              ? _tileCacheService.getTileProvider()
+              : null,
         ),
         // Слой маршрута
         if (_routePoints.length >= 2)
@@ -473,6 +489,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         onTap: () => _openHistory(context),
                       ),
                       _buildActionButton(
+                        icon: Icons.download_map,
+                        label: 'Кэш карт',
+                        onTap: _openRoutePlanning,
+                      ),
+                      _buildActionButton(
                         icon: Icons.settings,
                         label: 'Настройки',
                         onTap: () => _openSettings(context),
@@ -691,6 +712,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => SettingsScreen()),
+    );
+  }
+  
+  /// Открыть экран планирования маршрута (кэширование карт)
+  void _openRoutePlanning() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const RoutePlanningScreen()),
     );
   }
 
