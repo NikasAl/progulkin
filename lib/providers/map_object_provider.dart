@@ -288,11 +288,22 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Прочитать секретное сообщение
   Future<String?> readSecretMessage(String objectId, String userId) async {
+    debugPrint('📖 readSecretMessage: objectId=$objectId, userId=$userId');
     final obj = await _storage.getObject(objectId);
-    if (obj == null || obj is! SecretMessage) return null;
-    if (_userLat == null || _userLng == null) return null;
+    debugPrint('📖 Объект из БД: ${obj?.runtimeType}, is SecretMessage: ${obj is SecretMessage}');
+    if (obj == null || obj is! SecretMessage) {
+      debugPrint('❌ Объект не найден или не SecretMessage');
+      return null;
+    }
+    
+    debugPrint('📖 userLat=$_userLat, userLng=$_userLng');
+    if (_userLat == null || _userLng == null) {
+      debugPrint('❌ Нет координат пользователя в провайдере');
+      return null;
+    }
 
     final content = obj.decryptContent(userId, _userLat!, _userLng!);
+    debugPrint('📖 decryptContent result: ${content != null ? "успешно" : "null"}');
     if (content != null) {
       final updated = obj.markAsRead(userId);
       await _storage.updateObject(updated);

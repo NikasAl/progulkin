@@ -762,6 +762,8 @@ class _HomeScreenState extends State<HomeScreen> {
   
   /// Получить действие для объекта
   Map<String, dynamic>? _getObjectAction(MapObject object, MapObjectProvider provider) {
+    debugPrint('🔍 _getObjectAction: type=${object.type}, currentLocation=$_currentLocation, userId=${_userInfo?.id}');
+    
     if (object.type == MapObjectType.trashMonster) {
       final monster = object as TrashMonster;
       if (!monster.isCleaned && _currentLocation != null) {
@@ -771,6 +773,7 @@ class _HomeScreenState extends State<HomeScreen> {
           monster.latitude,
           monster.longitude,
         );
+        debugPrint('🔍 TrashMonster: distance=$distance, radius=100');
         if (distance <= 100) { // В радиусе 100 метров
           return {
             'label': 'Убрано!',
@@ -801,6 +804,7 @@ class _HomeScreenState extends State<HomeScreen> {
           creature.latitude,
           creature.longitude,
         );
+        debugPrint('🔍 Creature: distance=$distance, radius=50');
         if (distance <= 50) { // В радиусе 50 метров
           return {
             'label': 'Поймать!',
@@ -828,25 +832,35 @@ class _HomeScreenState extends State<HomeScreen> {
     
     if (object.type == MapObjectType.secretMessage) {
       final secret = object as SecretMessage;
-      if (_currentLocation != null && !secret.isReadByUser(_userInfo?.id ?? '')) {
+      final userId = _userInfo?.id ?? '';
+      final isRead = secret.isReadByUser(userId);
+      debugPrint('🔍 SecretMessage: userId=$userId, isRead=$isRead, unlockRadius=${secret.unlockRadius}');
+      
+      if (_currentLocation != null && !isRead) {
         final distance = calculateDistance(
           _currentLocation!.latitude,
           _currentLocation!.longitude,
           secret.latitude,
           secret.longitude,
         );
+        debugPrint('🔍 SecretMessage distance: $distance <= ${secret.unlockRadius} ?');
         if (distance <= secret.unlockRadius) {
+          debugPrint('✅ SecretMessage: возвращаем действие "Прочитать"');
           return {
             'label': 'Прочитать',
             'icon': Icons.lock_open,
             'action': () async {
+              debugPrint('📖 Нажата кнопка Прочитать для ${secret.id}');
               final content = await provider.readSecretMessage(
                 secret.id,
-                _userInfo?.id ?? '',
+                userId,
               );
+              debugPrint('📖 Результат readSecretMessage: $content');
               if (mounted && content != null) {
                 Navigator.pop(context);
                 _showSecretContent(secret.title, content);
+              } else {
+                debugPrint('❌ Не показываем контент: mounted=$mounted, content=$content');
               }
             },
           };
@@ -854,6 +868,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
     
+    debugPrint('⚠️ _getObjectAction: возвращаем null');
     return null;
   }
   
@@ -992,6 +1007,7 @@ class _ObjectDetailsContent extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
+    debugPrint('🎯 _ObjectDetailsContent build: onAction=$onAction');
     // Форматируем расстояние
     String distanceText = 'Неизвестно';
     if (distance != null) {
