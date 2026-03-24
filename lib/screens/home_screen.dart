@@ -699,6 +699,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showObjectDetails(MapObject object) {
     final mapObjectProvider = context.read<MapObjectProvider>();
     
+    // Вычисляем расстояние до объекта
+    double? distance;
+    if (_currentLocation != null) {
+      distance = calculateDistance(
+        _currentLocation!.latitude,
+        _currentLocation!.longitude,
+        object.latitude,
+        object.longitude,
+      );
+    }
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -715,13 +726,32 @@ class _HomeScreenState extends State<HomeScreen> {
           child: _ObjectDetailsContent(
             object: object,
             userId: _userInfo?.id ?? '',
+            distance: distance,
             onConfirm: () async {
+              debugPrint('🔔 Подтверждение объекта: ${object.id}');
               await mapObjectProvider.confirmObject(object.id);
-              if (context.mounted) Navigator.pop(context);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Подтверждено! Спасибо за помощь.'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
             },
             onDeny: () async {
+              debugPrint('🔔 Отрицание объекта: ${object.id}');
               await mapObjectProvider.denyObject(object.id);
-              if (context.mounted) Navigator.pop(context);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Жалоба отправлена.'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
             },
             onAction: _getObjectAction(object, mapObjectProvider),
           ),
@@ -946,6 +976,7 @@ class _HomeScreenState extends State<HomeScreen> {
 class _ObjectDetailsContent extends StatelessWidget {
   final MapObject object;
   final String userId;
+  final double? distance;
   final VoidCallback? onConfirm;
   final VoidCallback? onDeny;
   final Map<String, dynamic>? onAction;
@@ -953,6 +984,7 @@ class _ObjectDetailsContent extends StatelessWidget {
   const _ObjectDetailsContent({
     required this.object,
     required this.userId,
+    this.distance,
     this.onConfirm,
     this.onDeny,
     this.onAction,
@@ -960,6 +992,16 @@ class _ObjectDetailsContent extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
+    // Форматируем расстояние
+    String distanceText = 'Неизвестно';
+    if (distance != null) {
+      if (distance! < 1000) {
+        distanceText = '${distance!.toInt()} м';
+      } else {
+        distanceText = '${(distance! / 1000).toStringAsFixed(1)} км';
+      }
+    }
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
