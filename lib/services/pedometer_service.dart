@@ -1,11 +1,53 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math' as math;
 import 'package:pedometer/pedometer.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import '../config/app_config.dart';
 
+/// Буфер для хранения последних N значений с возможностью получения статистики
+class _CircularBuffer<T extends num> {
+  final Queue<T> _buffer = Queue<T>();
+  final int maxSize;
+  
+  _CircularBuffer(this.maxSize);
+  
+  void add(T value) {
+    _buffer.addLast(value);
+    if (_buffer.length > maxSize) {
+      _buffer.removeFirst();
+    }
+  }
+  
+  List<T> get values => _buffer.toList();
+  
+  T get max => _buffer.reduce((a, b) => a > b ? a : b);
+  T get min => _buffer.reduce((a, b) => a < b ? a : b);
+  
+  T get last => _buffer.last;
+  T? get preLast => _buffer.length >= 2 ? _buffer.elementAt(_buffer.length - 2) : null;
+  
+  bool get isMaxVal {
+    if (_buffer.isEmpty) return false;
+    final lastVal = _buffer.last;
+    for (final val in _buffer) {
+      if (val > lastVal) return false;
+    }
+    return true;
+  }
+  
+  double get avg => _buffer.isEmpty ? 0 : _buffer.reduce((a, b) => a + b) as double / _buffer.length;
+  
+  void clear() => _buffer.clear();
+  
+  int get length => _buffer.length;
+  bool get isEmpty => _buffer.isEmpty;
+  bool get isNotEmpty => _buffer.isNotEmpty;
+}
+
 /// Сервис для подсчёта шагов с адаптивной чувствительностью
+/// Реализация основана на алгоритме, проверенном на устройствах с датчиком ускорения
 class PedometerService {
   static final PedometerService _instance = PedometerService._internal();
   factory PedometerService() => _instance;
@@ -27,25 +69,39 @@ class PedometerService {
   int _initialSteps = 0;
   bool _isCounting = false;
   
-  // Адаптивные параметры для детекции шагов
-  double _sensitivity = 1.0; // Коэффициент чувствительности (0.5 - 2.0)
-  double _baseThreshold = 25.0; // Базовый порог
-  int _minStepIntervalMs = 250;
+  // Параметры для расчёта расстояния
   double _averageStepLength = 0.75; // метров
   
-  // Для адаптивной калибровки
-  final List<double> _recentMagnitudes = [];
-  double _dynamicThreshold = 25.0;
-  int _calibrationSteps = 0;
+  // ========== Параметры алгоритма детекции шагов (из проверенного Java-кода) ==========
   
-  // Для детекции шагов
-  double _lastAccelMagnitude = 0;
-  int _lastStepTime = 0;
+  // Фильтр сглаживания (convBuffer в Java)
+  final _CircularBuffer<double> _convBuffer = _CircularBuffer(5);
+  
+  // Буферы для поиска пиков (accBuffer, timeBuffer в Java)
+  final _CircularBuffer<double> _accBuffer = _CircularBuffer(20);
+  final _CircularBuffer<double> _timeBuffer = _CircularBuffer(20);
+  
+  // Время предыдущего шага (для проверки интервала)
+  double _stepTimePred = 0;
+  
+  // Флаг что идёт серия шагов
+  bool _isStepSeries = false;
+  
+  // Время начала для нормализации
+  double _startTime = 0;
+  bool _isJustStarted = true;
+  
+  // Счётчик детектированных шагов
   int _detectedSteps = 0;
   
-  // Для фильтрации шума
-  final List<double> _magnitudeBuffer = [];
-  static const int _bufferSize = 5;
+  // Настройки чувствительности (можно менять)
+  double _sensitivity = 1.0; // 0.5 - 2.0, влияет на мин. амплитуду
+  
+  // Мин/макс интервал между шагами в секундах
+  double _minStepInterval = 0.4; // сек
+  double _maxStepInterval = 1.8; // сек
+  
+  // ========== Конец параметров алгоритма ==========
 
   /// Текущее количество шагов
   int get currentSteps => _currentSteps;
@@ -60,26 +116,22 @@ class PedometerService {
   double get averageStepLength => _averageStepLength;
 
   /// Установить параметры чувствительности
+  /// value: 0.5 - минимум (для слабых шагов), 2.0 - максимум (для сильных шагов)
   void setSensitivity(double value) {
     _sensitivity = value.clamp(0.5, 2.0);
-    _updateDynamicThreshold();
-    print('Чувствительность: $_sensitivity, порог: $_dynamicThreshold');
+    // Чем выше чувствительность, тем короче может быть интервал
+    _minStepInterval = 0.4 / _sensitivity;
+    if (AppConfig.enableLogging) {
+      print('Pedometer: чувствительность=$_sensitivity, мин.интервал=${_minStepInterval.toStringAsFixed(2)} сек');
+    }
   }
   
   /// Установить среднюю длину шага
   void setAverageStepLength(double meters) {
     _averageStepLength = meters.clamp(0.5, 1.0);
-    print('Средняя длина шага: $_averageStepLength м');
-  }
-  
-  /// Установить минимальный интервал между шагами
-  void setMinStepInterval(int ms) {
-    _minStepIntervalMs = ms.clamp(150, 500);
-  }
-  
-  /// Обновить динамический порог на основе чувствительности
-  void _updateDynamicThreshold() {
-    _dynamicThreshold = _baseThreshold / _sensitivity;
+    if (AppConfig.enableLogging) {
+      print('Pedometer: средняя длина шага=$_averageStepLength м');
+    }
   }
 
   /// Проверка разрешений
@@ -120,94 +172,126 @@ class PedometerService {
         },
         onError: (error) {
           if (AppConfig.enableLogging) {
-            print('Ошибка шагомера: $error');
+            print('Pedometer: ошибка системного шагомера: $error, переключаемся на акселерометр');
           }
           _startAccelerometerCounting();
         },
       );
     } catch (e) {
       if (AppConfig.enableLogging) {
-        print('Ошибка запуска шагомера: $e');
+        print('Pedometer: ошибка запуска шагомера: $e, переключаемся на акселерометр');
       }
       await _startAccelerometerCounting();
     }
   }
 
-  /// Запуск подсчёта через акселерометр с адаптивной чувствительностью
+  /// Запуск подсчёта через акселерометр
+  /// Алгоритм основан на проверенном Java-коде для устройств с датчиком ускорения
   Future<void> _startAccelerometerCounting() async {
     _isCounting = true;
     _detectedSteps = 0;
     _currentSteps = 0;
-    _recentMagnitudes.clear();
-    _magnitudeBuffer.clear();
-    _calibrationSteps = 0;
-    _updateDynamicThreshold();
+    _isJustStarted = true;
+    _stepTimePred = 0;
+    _isStepSeries = false;
+    _convBuffer.clear();
+    _accBuffer.clear();
+    _timeBuffer.clear();
+
+    if (AppConfig.enableLogging) {
+      print('Pedometer: запуск подсчёта через акселерометр (алгоритм на основе пиков)');
+    }
 
     _accelerometerSubscription = accelerometerEvents.listen((AccelerometerEvent event) {
-      final now = DateTime.now().millisecondsSinceEpoch;
-      
-      // Вычисляем магнитуду ускорения (без гравитации ~9.8)
-      final magnitude = _calculateMagnitude(event.x, event.y, event.z);
-      
-      // Сглаживание сигнала (скользящее среднее)
-      _magnitudeBuffer.add(magnitude);
-      if (_magnitudeBuffer.length > _bufferSize) {
-        _magnitudeBuffer.removeAt(0);
-      }
-      final smoothedMagnitude = _magnitudeBuffer.isEmpty 
-          ? magnitude 
-          : _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length;
-      
-      // Адаптивная калибровка порога
-      _adaptThreshold(smoothedMagnitude);
-      
-      // Детекция шага по пику ускорения
-      if (smoothedMagnitude > _dynamicThreshold && 
-          _lastAccelMagnitude <= _dynamicThreshold &&
-          (now - _lastStepTime) > _minStepIntervalMs) {
-        
-        _detectedSteps++;
-        _currentSteps = _detectedSteps;
-        _stepsController.add(_currentSteps);
-        
-        final distance = _currentSteps * _averageStepLength;
-        _distanceController.add(distance);
-        
-        _lastStepTime = now;
-        
-        // Сохраняем магнитуду для адаптации
-        _recentMagnitudes.add(smoothedMagnitude);
-        if (_recentMagnitudes.length > 20) {
-          _recentMagnitudes.removeAt(0);
-        }
-      }
-      
-      _lastAccelMagnitude = smoothedMagnitude;
+      _processAccelerometerData(event);
     });
   }
   
-  /// Вычисление магнитуды ускорения
-  double _calculateMagnitude(double x, double y, double z) {
-    // Вычитаем гравитацию (~9.8 м/с²) и берём абсолютное значение
-    final gravity = 9.8;
-    final totalAccel = math.sqrt(x * x + y * y + z * z);
-    return (totalAccel - gravity).abs();
-  }
-  
-  /// Адаптивная калибровка порога
-  void _adaptThreshold(double currentMagnitude) {
-    _calibrationSteps++;
+  /// Обработка данных акселерометра (основной алгоритм из Java-кода)
+  void _processAccelerometerData(AccelerometerEvent event) {
+    // Получаем время в секундах
+    final time = DateTime.now().millisecondsSinceEpoch / 1000.0;
     
-    // Каждые 50 измерений обновляем порог
-    if (_calibrationSteps % 50 == 0 && _recentMagnitudes.isNotEmpty) {
-      // Вычисляем среднее и стандартное отклонение
-      final avg = _recentMagnitudes.reduce((a, b) => a + b) / _recentMagnitudes.length;
+    // Инициализация времени старта
+    if (_isJustStarted) {
+      _startTime = time;
+      _isJustStarted = false;
+    }
+    final normalizedTime = time - _startTime;
+    
+    // === Шаг 1: Находим лучшую ось (максимум из трёх) ===
+    // Это ключевое отличие от вычисления магнитуды!
+    final xy = event.x.abs();
+    final xz = event.y.abs();
+    final zy = event.z.abs();
+    double acc = math.max(math.max(xy, xz), zy);
+    
+    // === Шаг 2: Сглаживание через свёртку (скользящее среднее) ===
+    _convBuffer.add(acc);
+    acc = _convBuffer.avg;
+    
+    // === Шаг 3: Добавляем в буферы ===
+    _accBuffer.add(acc);
+    _timeBuffer.add(normalizedTime);
+    
+    // Ждём заполнения буфера
+    if (_accBuffer.length < 10) return;
+    
+    // === Шаг 4: Находим min/max и адаптивный порог ===
+    final accBufMax = _accBuffer.max;
+    final accBufMin = _accBuffer.min;
+    final amplitude = accBufMax - accBufMin;
+    
+    // Проверка минимальной амплитуды (подстройка чувствительности)
+    // Чем выше sensitivity, тем меньшую амплитуду пропускаем
+    final minAmplitude = 1.0 / _sensitivity;
+    if (amplitude < minAmplitude) {
+      return; // Слишком мало движения
+    }
+    
+    // Адаптивный порог = среднее между min и max
+    final levelFindSteps = (accBufMax + accBufMin) / 2;
+    
+    // === Шаг 5: Поиск локального максимума ===
+    if (_accBuffer.isMaxVal && 
+        _accBuffer.preLast != null && 
+        _accBuffer.preLast! > levelFindSteps) {
       
-      // Адаптируем порог на основе средней активности
-      if (avg > 0) {
-        // Порог = среднее * 0.7, но не меньше базового / 2
-        final adaptedThreshold = math.max(avg * 0.7, _baseThreshold / _sensitivity / 2);
-        _dynamicThreshold = adaptedThreshold;
+      // Время кандидата на шаг (предпоследний элемент)
+      final stepTimeCandidate = _timeBuffer.preLast ?? normalizedTime;
+      final dt = stepTimeCandidate - _stepTimePred;
+      
+      // === Шаг 6: Проверка временного интервала ===
+      
+      // Если прошлый шаг был давно, начинаем новую серию
+      if (stepTimeCandidate - _stepTimePred > 2.0) {
+        _stepTimePred = stepTimeCandidate;
+        _isStepSeries = false;
+        if (AppConfig.enableLogging) {
+          print('Pedometer: новая серия шагов началась');
+        }
+      }
+      
+      // Проверяем интервал между шагами (0.4 - 1.8 сек, с учётом чувствительности)
+      final minInterval = _minStepInterval;
+      final maxInterval = _maxStepInterval;
+      
+      if (dt > minInterval && dt <= maxInterval) {
+        // Если уже идёт серия шагов - засчитываем шаг
+        if (_isStepSeries) {
+          _detectedSteps++;
+          _currentSteps = _detectedSteps;
+          _stepsController.add(_currentSteps);
+          
+          final distance = _currentSteps * _averageStepLength;
+          _distanceController.add(distance);
+          
+          if (AppConfig.enableLogging) {
+            print('Pedometer: ШАГ #$_detectedSteps, dt=${dt.toStringAsFixed(2)} сек, амплитуда=${amplitude.toStringAsFixed(2)}');
+          }
+        }
+        _isStepSeries = true;
+        _stepTimePred = stepTimeCandidate;
       }
     }
   }
@@ -226,9 +310,12 @@ class PedometerService {
     _currentSteps = 0;
     _initialSteps = 0;
     _detectedSteps = 0;
-    _recentMagnitudes.clear();
-    _magnitudeBuffer.clear();
-    _calibrationSteps = 0;
+    _isJustStarted = true;
+    _stepTimePred = 0;
+    _isStepSeries = false;
+    _convBuffer.clear();
+    _accBuffer.clear();
+    _timeBuffer.clear();
     _stepsController.add(0);
   }
 
