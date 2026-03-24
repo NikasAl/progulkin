@@ -308,6 +308,78 @@ class PedometerService {
     _isCounting = false;
   }
 
+  /// Приостановить подсчёт (без сброса счётчика)
+  void pauseCounting() {
+    // Просто останавливаем, сохраняя текущее значение
+    _stepCountSubscription?.cancel();
+    _stepCountSubscription = null;
+    _accelerometerSubscription?.cancel();
+    _accelerometerSubscription = null;
+    _isCounting = false;
+  }
+
+  /// Продолжить подсчёт (без сброса счётчика)
+  Future<void> resumeCounting() async {
+    if (_isCounting) return; // Уже работает
+    
+    final hasPermission = await checkPermission();
+    if (!hasPermission) {
+      _resumeAccelerometerCounting();
+      return;
+    }
+
+    _isCounting = true;
+    // ВАЖНО: НЕ сбрасываем _currentSteps, _initialSteps, _detectedSteps!
+
+    try {
+      _stepCountSubscription = Pedometer.stepCountStream.listen(
+        (StepCount stepCount) {
+          // При возобновлении нужно вычислить смещение
+          if (_initialSteps == 0) {
+            _initialSteps = stepCount.steps - _currentSteps;
+          }
+          _currentSteps = stepCount.steps - _initialSteps;
+          _stepsController.add(_currentSteps);
+          
+          final distance = _currentSteps * _averageStepLength;
+          _distanceController.add(distance);
+        },
+        onError: (error) {
+          if (AppConfig.enableLogging) {
+            print('Pedometer: ошибка системного шагомера при возобновлении: $error');
+          }
+          _resumeAccelerometerCounting();
+        },
+      );
+    } catch (e) {
+      if (AppConfig.enableLogging) {
+        print('Pedometer: ошибка возобновления шагомера: $e');
+      }
+      _resumeAccelerometerCounting();
+    }
+  }
+
+  /// Возобновить подсчёт через акселерометр (без сброса)
+  Future<void> _resumeAccelerometerCounting() async {
+    _isCounting = true;
+    // ВАЖНО: НЕ сбрасываем _detectedSteps, _currentSteps, _isJustStarted!
+    // Только очищаем буферы для новой серии детекции
+    _convBuffer.clear();
+    _accBuffer.clear();
+    _timeBuffer.clear();
+    _isStepSeries = false;
+    _stepTimePred = 0;
+    _isJustStarted = true;
+
+    if (AppConfig.enableLogging) {
+      print('Pedometer: возобновление подсчёта через акселерометр (шагов=$_detectedSteps)');
+    }
+
+    _accelerometerSubscription = accelerometerEvents.listen((AccelerometerEvent event) {
+      _processAccelerometerData(event);
+    });
+  }
+
   /// Сбросить счётчик
   void reset() {
     _currentSteps = 0;

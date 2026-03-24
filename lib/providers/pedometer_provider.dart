@@ -58,6 +58,25 @@ class PedometerProvider extends ChangeNotifier {
     }
   }
 
+  /// Приостановить подсчёт (без сброса счётчика)
+  void pauseCounting() {
+    _pedometerService.pauseCounting();
+    _isCounting = false;
+    notifyListeners();
+  }
+
+  /// Продолжить подсчёт (без сброса счётчика)
+  Future<void> resumeCounting() async {
+    try {
+      await _pedometerService.resumeCounting();
+      _isCounting = true;
+      notifyListeners();
+    } catch (e) {
+      _error = 'Ошибка возобновления шагомера: $e';
+      notifyListeners();
+    }
+  }
+
   /// Остановить подсчёт
   void stopCounting() {
     _pedometerService.stopCounting();

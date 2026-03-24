@@ -535,10 +535,10 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 if (walkProvider.isTracking) {
                   walkProvider.pauseWalk();
-                  pedometerProvider.stopCounting();
+                  pedometerProvider.pauseCounting();
                 } else {
                   walkProvider.resumeWalk();
-                  pedometerProvider.startCounting();
+                  pedometerProvider.resumeCounting();
                 }
               },
               icon: Icon(
