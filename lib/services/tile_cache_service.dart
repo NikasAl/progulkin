@@ -67,11 +67,12 @@ class TileCacheService {
     
     try {
       final store = FMTCStore(_storeName);
-      final stats = await store.stats.downloadStats();
+      final stats = await store.stats.all;
       
+      // size в KiB, конвертируем в bytes
       return CacheStats(
-        tileCount: stats.cachedTiles,
-        sizeBytes: stats.cachedSize,
+        tileCount: stats.length,
+        sizeBytes: (stats.size * 1024).toInt(),
       );
     } catch (e) {
       debugPrint('TileCacheService: Ошибка получения статистики: $e');
@@ -162,26 +163,27 @@ class TileCacheService {
           ),
         );
         
-        // Оценка количества тайлов
-        _totalTiles += downloadable.totalTilesAndSize.totalTiles;
+        // Получаем количество тайлов для этого региона
+        final tileCount = await store.download.check(downloadable);
+        _totalTiles += tileCount;
         
         // Запускаем загрузку
         try {
           final download = store.download.startForeground(
-            downloadable,
+            region: downloadable,
             parallelThreads: 4,
             skipExistingTiles: true,
           );
           
           await for (final progress in download) {
-            _downloadedTiles = progress.downloadedTiles.toInt();
-            _downloadProgress = progress.downloadProgress;
+            _downloadedTiles = progress.cachedTiles;
+            _downloadProgress = progress.percentageProgress / 100.0;
             
             onProgress?.call(_downloadProgress, _downloadedTiles, _totalTiles);
             
             if (progress.isComplete) {
-              totalDownloaded += progress.downloadedTiles.toInt();
-              debugPrint('TileCacheService: Zoom $zoom завершён, загружено ${progress.downloadedTiles} тайлов');
+              totalDownloaded += progress.cachedTiles;
+              debugPrint('TileCacheService: Zoom $zoom завершён, загружено ${progress.cachedTiles} тайлов');
             }
           }
         } catch (e) {
@@ -243,22 +245,22 @@ class TileCacheService {
           ),
         );
         
-        _totalTiles += downloadable.totalTilesAndSize.totalTiles;
+        _totalTiles += await store.download.check(downloadable);
         
         try {
           final download = store.download.startForeground(
-            downloadable,
+            region: downloadable,
             parallelThreads: 4,
             skipExistingTiles: true,
           );
           
           await for (final progress in download) {
-            _downloadedTiles = progress.downloadedTiles.toInt();
-            _downloadProgress = progress.downloadProgress;
+            _downloadedTiles = progress.cachedTiles;
+            _downloadProgress = progress.percentageProgress / 100.0;
             onProgress?.call(_downloadProgress, _downloadedTiles, _totalTiles);
             
             if (progress.isComplete) {
-              totalDownloaded += progress.downloadedTiles.toInt();
+              totalDownloaded += progress.cachedTiles;
             }
           }
         } catch (e) {
