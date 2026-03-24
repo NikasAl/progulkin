@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:math' as math;
 import 'package:pedometer/pedometer.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -7,26 +6,26 @@ import 'package:sensors_plus/sensors_plus.dart';
 import '../config/app_config.dart';
 
 /// Буфер для хранения последних N значений с возможностью получения статистики
-class _CircularBuffer<T extends num> {
-  final Queue<T> _buffer = Queue<T>();
+class _CircularBuffer {
+  final List<double> _buffer = [];
   final int maxSize;
   
   _CircularBuffer(this.maxSize);
   
-  void add(T value) {
-    _buffer.addLast(value);
+  void add(double value) {
+    _buffer.add(value);
     if (_buffer.length > maxSize) {
-      _buffer.removeFirst();
+      _buffer.removeAt(0);
     }
   }
   
-  List<T> get values => _buffer.toList();
+  List<double> get values => List.unmodifiable(_buffer);
   
-  T get max => _buffer.reduce((a, b) => a > b ? a : b);
-  T get min => _buffer.reduce((a, b) => a < b ? a : b);
+  double get max => _buffer.reduce((a, b) => a > b ? a : b);
+  double get min => _buffer.reduce((a, b) => a < b ? a : b);
   
-  T get last => _buffer.last;
-  T? get preLast => _buffer.length >= 2 ? _buffer.elementAt(_buffer.length - 2) : null;
+  double get last => _buffer.last;
+  double? get preLast => _buffer.length >= 2 ? _buffer[_buffer.length - 2] : null;
   
   bool get isMaxVal {
     if (_buffer.isEmpty) return false;
@@ -40,7 +39,7 @@ class _CircularBuffer<T extends num> {
   double get avg {
     if (_buffer.isEmpty) return 0;
     final sum = _buffer.reduce((a, b) => a + b);
-    return sum.toDouble() / _buffer.length;
+    return sum / _buffer.length;
   }
   
   void clear() => _buffer.clear();
