@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/walk.dart';
 import '../models/walk_point.dart';
 import '../services/location_service.dart';
 import '../services/storage_service.dart';
+import '../services/pedometer_service.dart';
 
 /// Провайдер для управления прогулками
 class WalkProvider extends ChangeNotifier {
   final LocationService _locationService = LocationService();
   final StorageService _storageService = StorageService();
+  final PedometerService _pedometerService = PedometerService();
 
   Walk? _currentWalk;
   List<Walk> _walksHistory = [];
@@ -20,6 +23,10 @@ class WalkProvider extends ChangeNotifier {
   // Время паузы для корректного отображения duration
   DateTime? _pauseStartTime;
   Duration _totalPauseDuration = Duration.zero; // Сумма всех периодов паузы
+  
+  // Настройки источника расстояния
+  DistanceSource _distanceSource = DistanceSource.pedometer;
+  double _stepLength = 0.75;
   
   // Геттер для совместимости
   Duration get _accumulatedPauseDuration {
@@ -36,6 +43,8 @@ class WalkProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasActiveWalk => _currentWalk != null && _currentWalk!.isActive;
+  DistanceSource get distanceSource => _distanceSource;
+  double get stepLength => _stepLength;
   
   /// Прогулка существует, но на паузе
   bool get isPaused => _currentWalk != null && !_isTracking;
@@ -84,12 +93,48 @@ class WalkProvider extends ChangeNotifier {
     try {
       await _storageService.init();
       _walksHistory = await _storageService.getAllWalks();
+      
+      // Загружаем настройки
+      await _loadSettings();
+      
       _error = null;
     } catch (e) {
       _error = 'Ошибка загрузки данных: $e';
     }
 
     _isLoading = false;
+    notifyListeners();
+  }
+  
+  /// Загрузка настроек
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final sourceIndex = prefs.getInt('distanceSource') ?? 1; // Default: pedometer
+    _distanceSource = DistanceSource.values[sourceIndex.clamp(0, 2)];
+    _stepLength = prefs.getDouble('stepLength') ?? 0.75;
+    
+    // Применяем к педометру
+    _pedometerService.setAverageStepLength(_stepLength);
+  }
+  
+  /// Сохранение настроек
+  Future<void> saveSettings({
+    DistanceSource? distanceSource,
+    double? stepLength,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    if (distanceSource != null) {
+      _distanceSource = distanceSource;
+      await prefs.setInt('distanceSource', distanceSource.index);
+    }
+    
+    if (stepLength != null) {
+      _stepLength = stepLength;
+      await prefs.setDouble('stepLength', stepLength);
+      _pedometerService.setAverageStepLength(stepLength);
+    }
+    
     notifyListeners();
   }
 
@@ -104,8 +149,12 @@ class WalkProvider extends ChangeNotifier {
         return false;
       }
 
-      // Создаём новую прогулку
-      _currentWalk = Walk(startTime: DateTime.now());
+      // Создаём новую прогулку с текущими настройками
+      _currentWalk = Walk(
+        startTime: DateTime.now(),
+        distanceSource: _distanceSource,
+        stepLength: _stepLength,
+      );
       _isTracking = true;
       _pauseStartTime = null;
       _totalPauseDuration = Duration.zero; // Сбрасываем время пауз

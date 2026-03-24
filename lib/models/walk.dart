@@ -2,6 +2,13 @@ import 'package:uuid/uuid.dart';
 import 'walk_point.dart';
 import 'dart:math' as math;
 
+/// Источник расстояния
+enum DistanceSource {
+  gps,
+  pedometer,
+  average,
+}
+
 /// Модель прогулки
 class Walk {
   final String id;
@@ -11,6 +18,12 @@ class Walk {
   int steps;
   String? name;
   String? notes;
+  
+  /// Источник расстояния (приоритет педометра)
+  final DistanceSource distanceSource;
+  
+  /// Длина шага в метрах (для расчёта расстояния)
+  final double stepLength;
 
   Walk({
     String? id,
@@ -20,6 +33,8 @@ class Walk {
     this.steps = 0,
     this.name,
     this.notes,
+    this.distanceSource = DistanceSource.pedometer,
+    this.stepLength = 0.75,
   })  : id = id ?? const Uuid().v4(),
         points = points ?? [];
 
@@ -46,8 +61,30 @@ class Walk {
     return '${seconds}сек';
   }
 
-  /// Общее расстояние в метрах (сумма расстояний между соседними точками)
+  /// Общее расстояние в метрах
+  /// Приоритет педометра: используем шаги * длину шага
   double get totalDistance {
+    // Если есть шаги и источник не GPS - используем педометр
+    if (steps > 0 && distanceSource != DistanceSource.gps) {
+      if (distanceSource == DistanceSource.pedometer) {
+        // Только pedometer
+        return steps * stepLength;
+      } else {
+        // Average: среднее между GPS и pedometer
+        final gpsDist = _calculateGpsDistance();
+        final pedometerDist = steps * stepLength;
+        return (gpsDist + pedometerDist) / 2;
+      }
+    }
+    // Otherwise GPS
+    return _calculateGpsDistance();
+  }
+  
+  /// Расстояние по GPS
+  double get gpsDistance => _calculateGpsDistance();
+  
+  /// Внутренний метод расчёта GPS расстояния
+  double _calculateGpsDistance() {
     if (points.length < 2) return 0;
     
     double distance = 0;
@@ -62,6 +99,9 @@ class Walk {
     }
     return distance;
   }
+
+  /// Расстояние по шагомеру
+  double get pedometerDistance => steps * stepLength;
 
   /// Форматированное расстояние
   String get formattedDistance {
@@ -84,6 +124,18 @@ class Walk {
   /// Форматированная средняя скорость
   String get formattedSpeed {
     return '${averageSpeed.toStringAsFixed(1)} км/ч';
+  }
+
+  /// Источник расстояния (для отображения)
+  String get distanceSourceLabel {
+    switch (distanceSource) {
+      case DistanceSource.gps:
+        return 'GPS';
+      case DistanceSource.pedometer:
+        return 'Шагомер';
+      case DistanceSource.average:
+        return 'Среднее';
+    }
   }
 
   /// Расчёт расстояния между двумя точками (формула Гаверсинуса)
@@ -119,6 +171,8 @@ class Walk {
       'steps': steps,
       'name': name,
       'notes': notes,
+      'distanceSource': distanceSource.index,
+      'stepLength': stepLength,
     };
   }
 
@@ -136,6 +190,8 @@ class Walk {
       steps: map['steps'] as int? ?? 0,
       name: map['name'] as String?,
       notes: map['notes'] as String?,
+      distanceSource: DistanceSource.values[map['distanceSource'] as int? ?? 1],
+      stepLength: (map['stepLength'] as num?)?.toDouble() ?? 0.75,
     );
   }
 
@@ -148,6 +204,8 @@ class Walk {
     int? steps,
     String? name,
     String? notes,
+    DistanceSource? distanceSource,
+    double? stepLength,
   }) {
     return Walk(
       id: id ?? this.id,
@@ -157,11 +215,13 @@ class Walk {
       steps: steps ?? this.steps,
       name: name ?? this.name,
       notes: notes ?? this.notes,
+      distanceSource: distanceSource ?? this.distanceSource,
+      stepLength: stepLength ?? this.stepLength,
     );
   }
 
   @override
   String toString() {
-    return 'Walk(id: $id, startTime: $startTime, distance: $formattedDistance, steps: $steps)';
+    return 'Walk(id: $id, startTime: $startTime, distance: $formattedDistance, steps: $steps, source: $distanceSourceLabel)';
   }
 }
