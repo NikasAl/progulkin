@@ -37,7 +37,11 @@ class _CircularBuffer<T extends num> {
     return true;
   }
   
-  double get avg => _buffer.isEmpty ? 0 : _buffer.reduce((a, b) => a + b) as double / _buffer.length;
+  double get avg {
+    if (_buffer.isEmpty) return 0;
+    final sum = _buffer.reduce((a, b) => a + b);
+    return sum.toDouble() / _buffer.length;
+  }
   
   void clear() => _buffer.clear();
   
