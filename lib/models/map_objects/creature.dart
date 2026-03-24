@@ -330,7 +330,7 @@ class Creature extends MapObject {
       ownerId: json['ownerId'] as String,
       ownerName: json['ownerName'] as String? ?? 'Природа',
       ownerReputation: json['ownerReputation'] as int? ?? 0,
-      creatureType: CreatureType.fromCode(json['creatureType'] as String),
+      creatureType: CreatureType.fromCode(json['creatureType'] as String? ?? 'domovoy'),
       rarity: CreatureRarity.fromLevel(json['rarity'] as int? ?? 1),
       habitat: CreatureHabitat.fromCode(json['habitat'] as String? ?? 'anywhere'),
       name: json['name'] as String? ?? '',
