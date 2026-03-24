@@ -18,10 +18,10 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   final LocationService _locationService = LocationService();
   
   final List<LatLng> _waypoints = [];
-  LatLng _initialPosition = const LatLng(55.7558, 37.6173); // Москва
+  LatLng? _currentPosition; // Текущая позиция (null пока не получена)
   double _currentZoom = 14.0;
   
-  bool _isLoading = false;
+  bool _isLoading = true;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
   int _downloadedTiles = 0;
@@ -40,8 +40,6 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   }
   
   Future<void> _initScreen() async {
-    setState(() => _isLoading = true);
-    
     try {
       // Инициализируем сервис кэширования
       await _tileCacheService.init();
@@ -49,24 +47,20 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
       // Получаем текущую позицию
       final position = await _locationService.getCurrentPosition();
       if (position != null) {
-        setState(() {
-          _initialPosition = LatLng(position.latitude, position.longitude);
-        });
+        _currentPosition = LatLng(position.latitude, position.longitude);
       }
       
       // Загружаем статистику кэша
       final stats = await _tileCacheService.getCacheStats();
-      setState(() {
-        _cacheStats = stats;
-        _statusMessage = 'В кэше: ${stats.tileCount} тайлов (${stats.formattedSize})';
-      });
+      _cacheStats = stats;
+      _statusMessage = 'В кэше: ${stats.tileCount} тайлов (${stats.formattedSize})';
     } catch (e) {
-      setState(() {
-        _statusMessage = 'Ошибка инициализации: $e';
-      });
+      _statusMessage = 'Ошибка инициализации: $e';
     }
     
-    setState(() => _isLoading = false);
+    setState(() {
+      _isLoading = false;
+    });
   }
   
   void _onMapTap(TapPosition tapPosition, LatLng point) {
@@ -357,6 +351,25 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   
   @override
   Widget build(BuildContext context) {
+    // Показываем индикатор загрузки пока позиция не получена
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Кэширование карт'),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Определение местоположения...'),
+            ],
+          ),
+        ),
+      );
+    }
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Кэширование карт'),
@@ -379,7 +392,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: _initialPosition,
+              initialCenter: _currentPosition ?? const LatLng(55.7558, 37.6173),
               initialZoom: _currentZoom,
               onTap: _onMapTap,
             ),
@@ -451,6 +464,31 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                       ),
                     );
                   }).toList(),
+                ),
+              // Маркер текущей позиции
+              if (_currentPosition != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _currentPosition!,
+                      width: 24,
+                      height: 24,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
             ],
           ),

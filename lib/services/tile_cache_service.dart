@@ -5,11 +5,17 @@ import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 import 'package:latlong2/latlong.dart';
 
 /// Сервис для кэширования тайлов карт для оффлайн использования
+/// Использует Singleton паттерн для избежания повторной инициализации
 class TileCacheService {
+  static final TileCacheService _instance = TileCacheService._internal();
+  factory TileCacheService() => _instance;
+  TileCacheService._internal();
+  
   static const String _storeName = 'progulkin_map_cache';
   static const String _tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   
   bool _isInitialized = false;
+  bool _initializationAttempted = false;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
   int _downloadedTiles = 0;
@@ -26,7 +32,11 @@ class TileCacheService {
   
   /// Инициализация хранилища кэша
   Future<void> init() async {
+    // Если уже инициализирован или попытка уже была - не делаем ничего
     if (_isInitialized) return;
+    if (_initializationAttempted) return;
+    
+    _initializationAttempted = true;
     
     try {
       // Инициализируем глобальную систему кэширования
@@ -38,6 +48,10 @@ class TileCacheService {
       
       _isInitialized = true;
       debugPrint('TileCacheService: Инициализирован успешно');
+    } on RootAlreadyInitialised {
+      // Уже инициализирован - это нормально
+      _isInitialized = true;
+      debugPrint('TileCacheService: Уже был инициализирован ранее');
     } catch (e) {
       debugPrint('TileCacheService: Ошибка инициализации: $e');
       // Не пробрасываем ошибку, чтобы приложение могло работать без кэша
