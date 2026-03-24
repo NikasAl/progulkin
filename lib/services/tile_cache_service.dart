@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:dio/dio.dart';
 
 /// Сервис для кэширования тайлов карт для оффлайн использования
 class TileCacheService {
@@ -35,10 +34,7 @@ class TileCacheService {
       
       // Создаём или открываем хранилище
       final store = FMTCStore(_storeName);
-      final exists = await store.manage.readyAsync;
-      if (!exists) {
-        await store.manage.createAsync();
-      }
+      await store.manage.create();
       
       _isInitialized = true;
       debugPrint('TileCacheService: Инициализирован успешно');
@@ -56,10 +52,7 @@ class TileCacheService {
     }
     
     try {
-      return FMTCStore(_storeName).getTileProvider(
-        _tileUrl,
-        userAgent: 'progulkin/1.0',
-      );
+      return FMTCStore(_storeName).getTileProvider();
     } catch (e) {
       debugPrint('TileCacheService: Ошибка получения провайдера: $e');
       return null;
@@ -74,11 +67,11 @@ class TileCacheService {
     
     try {
       final store = FMTCStore(_storeName);
-      final stats = await store.stats.watchAsync();
+      final stats = await store.stats.downloadStats();
       
       return CacheStats(
-        tileCount: stats?.cachedTiles ?? 0,
-        sizeBytes: stats?.cachedSize ?? 0,
+        tileCount: stats.cachedTiles,
+        sizeBytes: stats.cachedSize,
       );
     } catch (e) {
       debugPrint('TileCacheService: Ошибка получения статистики: $e');
@@ -161,17 +154,16 @@ class TileCacheService {
         final region = RectangleRegion(bounds);
         
         final downloadable = region.toDownloadable(
-          zoom,
-          zoom, // мин и макс zoom одинаковые
-          TileLayer(
+          minZoom: zoom,
+          maxZoom: zoom,
+          options: TileLayer(
             urlTemplate: _tileUrl,
             userAgentPackageName: 'com.example.progulkin',
           ),
         );
         
         // Оценка количества тайлов
-        final tileCount = downloadable.downloadableTiles;
-        _totalTiles += tileCount;
+        _totalTiles += downloadable.totalTilesAndSize.totalTiles;
         
         // Запускаем загрузку
         try {
@@ -182,13 +174,13 @@ class TileCacheService {
           );
           
           await for (final progress in download) {
-            _downloadedTiles = progress.downloadedTiles;
+            _downloadedTiles = progress.downloadedTiles.toInt();
             _downloadProgress = progress.downloadProgress;
             
             onProgress?.call(_downloadProgress, _downloadedTiles, _totalTiles);
             
             if (progress.isComplete) {
-              totalDownloaded += progress.downloadedTiles;
+              totalDownloaded += progress.downloadedTiles.toInt();
               debugPrint('TileCacheService: Zoom $zoom завершён, загружено ${progress.downloadedTiles} тайлов');
             }
           }
@@ -243,15 +235,15 @@ class TileCacheService {
         final region = RectangleRegion(bounds);
         
         final downloadable = region.toDownloadable(
-          zoom,
-          zoom,
-          TileLayer(
+          minZoom: zoom,
+          maxZoom: zoom,
+          options: TileLayer(
             urlTemplate: _tileUrl,
             userAgentPackageName: 'com.example.progulkin',
           ),
         );
         
-        _totalTiles += downloadable.downloadableTiles;
+        _totalTiles += downloadable.totalTilesAndSize.totalTiles;
         
         try {
           final download = store.download.startForeground(
@@ -261,12 +253,12 @@ class TileCacheService {
           );
           
           await for (final progress in download) {
-            _downloadedTiles = progress.downloadedTiles;
+            _downloadedTiles = progress.downloadedTiles.toInt();
             _downloadProgress = progress.downloadProgress;
             onProgress?.call(_downloadProgress, _downloadedTiles, _totalTiles);
             
             if (progress.isComplete) {
-              totalDownloaded += progress.downloadedTiles;
+              totalDownloaded += progress.downloadedTiles.toInt();
             }
           }
         } catch (e) {
@@ -297,7 +289,7 @@ class TileCacheService {
     
     try {
       final store = FMTCStore(_storeName);
-      await store.manage.resetAsync();
+      await store.manage.reset();
       debugPrint('TileCacheService: Кэш очищен');
     } catch (e) {
       debugPrint('TileCacheService: Ошибка очистки кэша: $e');

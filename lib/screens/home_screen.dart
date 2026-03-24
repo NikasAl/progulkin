@@ -489,7 +489,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         onTap: () => _openHistory(context),
                       ),
                       _buildActionButton(
-                        icon: Icons.download_map,
+                        icon: Icons.map,
                         label: 'Кэш карт',
                         onTap: _openRoutePlanning,
                       ),
