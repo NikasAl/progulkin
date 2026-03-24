@@ -18,6 +18,12 @@
 @import geolocator_apple;
 #endif
 
+#if __has_include(<objectbox_flutter_libs/ObjectboxFlutterLibsPlugin.h>)
+#import <objectbox_flutter_libs/ObjectboxFlutterLibsPlugin.h>
+#else
+@import objectbox_flutter_libs;
+#endif
+
 #if __has_include(<pedometer/PedometerPlugin.h>)
 #import <pedometer/PedometerPlugin.h>
 #else
@@ -53,6 +59,7 @@
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
   [FlutterNativeSplashPlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterNativeSplashPlugin"]];
   [GeolocatorPlugin registerWithRegistrar:[registry registrarForPlugin:@"GeolocatorPlugin"]];
+  [ObjectboxFlutterLibsPlugin registerWithRegistrar:[registry registrarForPlugin:@"ObjectboxFlutterLibsPlugin"]];
   [PedometerPlugin registerWithRegistrar:[registry registrarForPlugin:@"PedometerPlugin"]];
   [PermissionHandlerPlugin registerWithRegistrar:[registry registrarForPlugin:@"PermissionHandlerPlugin"]];
   [FPPSensorsPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPSensorsPlusPlugin"]];
