@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:convert';
 
 /// Тип объекта на карте
