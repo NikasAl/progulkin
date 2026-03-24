@@ -43,6 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _stationaryRadius = _locationService.stationaryRadiusMeters;
     _pedometerSensitivity = _pedometerService.sensitivity;
     _stepLength = _pedometerService.averageStepLength;
+    _distanceSource = DistanceSource.pedometer;
     
     // Загружаем из WalkProvider
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -63,215 +64,194 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-              // Секция приоритета расстояния
-              _buildSectionHeader('Источник расстояния'),
-              _buildInfoCard(
-                'Педометр обычно точнее GPS для ходьбы. '
-                'GPS может давать ошибки до 100м из-за особенностей сигнала. '
-                'Рекомендуется: "Шагомер" или "Среднее".',
-              ),
-              
-              _buildDistanceSourceSelector(),
-              
-              const Divider(height: 32),
-              
-              // Секция GPS
-              _buildSectionHeader('Фильтрация GPS'),
-              _buildInfoCard(
-                'Настройки помогают отфильтровать неточные данные GPS. '
-                'Если расстояние завышено - уменьшите скорость и точность.',
-              ),
-              
-              _buildSliderTile(
-                title: 'Макс. скорость ходьбы',
-                subtitle: 'Точки с большей скоростью фильтруются',
-                value: _maxSpeed,
-                min: 5,
-                max: 20,
-                unit: ' км/ч',
-                icon: Icons.speed,
-                onChanged: (value) {
-                  setState(() {
-                    _maxSpeed = value;
-                    _locationService.updateSettings(maxSpeed: value);
-                  });
-                },
-              ),
-              
-              _buildSliderTile(
-                title: 'Макс. погрешность GPS',
-                subtitle: 'Точки с большей погрешностью фильтруются',
-                value: _maxAccuracy,
-                min: 10,
-                max: 100,
-                unit: ' м',
-                icon: Icons.gps_fixed,
-                onChanged: (value) {
-                  setState(() {
-                    _maxAccuracy = value;
-                    _locationService.updateSettings(maxAccuracy: value);
-                  });
-                },
-              ),
-              
-              SwitchListTile(
-                secondary: const Icon(Icons.linear_scale),
-                title: const Text('Сглаживание маршрута'),
-                subtitle: const Text('Усреднение координат для плавности'),
-                value: _enableSmoothing,
-                onChanged: (value) {
-                  setState(() {
-                    _enableSmoothing = value;
-                    _locationService.updateSettings(smoothing: value);
-                  });
-                },
-              ),
-              
-              const Divider(height: 16),
-              
-              // Секция определения неподвижности
-              _buildSectionHeader('Определение неподвижности'),
-              _buildInfoCard(
-                'Когда вы стоите на месте, GPS даёт разброс координат. '
-                'Эта функция определяет неподвижность и не записывает лишние точки.',
-              ),
-              
-              SwitchListTile(
-                secondary: const Icon(Icons.pause_circle_outline),
-                title: const Text('Определять неподвижность'),
-                subtitle: const Text('Не записывать точки при остановке'),
-                value: _enableStationaryDetection,
-                onChanged: (value) {
-                  setState(() {
-                    _enableStationaryDetection = value;
-                    _locationService.updateSettings(stationaryDetection: value);
-                  });
-                },
-              ),
-              
-              if (_enableStationaryDetection)
-                _buildSliderTile(
-                  title: 'Радиус неподвижности',
-                  subtitle: 'Смещение меньше этого радиуса за 30 сек = остановка',
-                  value: _stationaryRadius,
-                  min: 3,
-                  max: 30,
-                  unit: ' м',
-                  icon: Icons.gps_fixed,
-                  onChanged: (value) {
-                    setState(() {
-                      _stationaryRadius = value;
-                      _locationService.updateSettings(stationaryRadius: value);
-                    });
-                  },
-                ),
-              
-              const Divider(height: 32),
-              
-              // Секция педометра
-              _buildSectionHeader('Шагомер'),
-              _buildInfoCard(
-                'Алгоритм детекции шагов по пикам ускорения. '
-                'Высокая чувствительность = детектирует больше шагов (для слабой ходьбы). '
-                'Низкая = только уверенные шаги (для быстрой ходьбы).',
-              ),
-              
-              _buildSliderTile(
-                title: 'Чувствительность шагомера',
-                subtitle: 'Выше = больше шагов (для слабой ходьбы)',
-                value: _pedometerSensitivity,
-                min: 0.5,
-                max: 2.0,
-                divisions: 6,
-                unit: '',
-                icon: Icons.sensors,
-                displayValue: _getSensitivityLabel(_pedometerSensitivity),
-                onChanged: (value) {
-                  setState(() {
-                    _pedometerSensitivity = value;
-                    _pedometerService.setSensitivity(value);
-                  });
-                },
-              ),
-              
-              _buildSliderTile(
-                title: 'Длина шага',
-                subtitle: 'Для расчёта расстояния по шагам',
-                value: _stepLength,
-                min: 0.5,
-                max: 1.0,
-                divisions: 10,
-                unit: ' м',
-                icon: Icons.straighten,
-                onChanged: (value) {
-                  setState(() {
-                    _stepLength = value;
-                    _pedometerService.setAverageStepLength(value);
-                  });
-                  // Сохраняем через WalkProvider
-                  context.read<WalkProvider>().saveSettings(stepLength: value);
-                },
-              ),
-              
-              const Divider(height: 32),
-              
-              // Советы
-              _buildSectionHeader('Советы для точности'),
-              
-              _buildTipCard(
-                icon: Icons.gps_fixed,
-                title: 'GPS сигнал',
-                tips: [
-                  'Дождитесь стабилизации GPS (10-30 сек)',
-                  'Находитесь на открытом пространстве',
-                  'Избегайте высоких зданий и плотной застройки',
-                ],
-              ),
-              
-              _buildTipCard(
-                icon: Icons.phone_android,
-                title: 'Телефон',
-                tips: [
-                  'Держите телефон в кармане или на поясе',
-                  'Не блокируйте экран во время записи',
-                  'Разрешите работу в фоновом режиме',
-                ],
-              ),
-              
-              _buildTipCard(
-                icon: Icons.directions_walk,
-                title: 'Ходьба',
-                tips: [
-                  'Идите ровным шагом для лучшей детекции',
-                  'При быстрой ходьбе уменьшите чувствительность',
-                  'При медленной/слабой ходьбе - увеличьте чувствительность',
-                ],
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Информация о приложении
-              _buildSectionHeader('О приложении'),
-              
-              const ListTile(
-                leading: Icon(Icons.info_outline),
-                title: Text('Прогулкин'),
-                subtitle: Text('Версия 1.0.0\nТрекинг прогулок с OpenStreetMap'),
-              ),
-              
-              ListTile(
-                leading: Icon(Icons.code),
-                title: Text('Исходный код'),
-                subtitle: Text('github.com/NikasAl/progulkin'),
-                onTap: () {
-                  // Можно добавить открытие ссылки
-                },
-              ),
-              
-              const SizedBox(height: 24),
+          // Секция приоритета расстояния
+          _buildSectionHeader('Источник расстояния'),
+          _buildInfoCard(
+            'Педометр обычно точнее GPS для ходьбы. '
+            'GPS может давать ошибки до 100м из-за особенностей сигнала. '
+            'Рекомендуется: "Шагомер" или "Среднее".',
+          ),
+          _buildDistanceSourceSelector(),
+          const Divider(height: 32),
+          
+          // Секция GPS
+          _buildSectionHeader('Фильтрация GPS'),
+          _buildInfoCard(
+            'Настройки помогают отфильтровать неточные данные GPS. '
+            'Если расстояние завышено - уменьшите скорость и точность.',
+          ),
+          _buildSliderTile(
+            title: 'Макс. скорость ходьбы',
+            subtitle: 'Точки с большей скоростью фильтруются',
+            value: _maxSpeed,
+            min: 5,
+            max: 20,
+            unit: ' км/ч',
+            icon: Icons.speed,
+            onChanged: (value) {
+              setState(() {
+                _maxSpeed = value;
+                _locationService.updateSettings(maxSpeed: value);
+              });
+            },
+          ),
+          _buildSliderTile(
+            title: 'Макс. погрешность GPS',
+            subtitle: 'Точки с большей погрешностью фильтруются',
+            value: _maxAccuracy,
+            min: 10,
+            max: 100,
+            unit: ' м',
+            icon: Icons.gps_fixed,
+            onChanged: (value) {
+              setState(() {
+                _maxAccuracy = value;
+                _locationService.updateSettings(maxAccuracy: value);
+              });
+            },
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.linear_scale),
+            title: const Text('Сглаживание маршрута'),
+            subtitle: const Text('Усреднение координат для плавности'),
+            value: _enableSmoothing,
+            onChanged: (value) {
+              setState(() {
+                _enableSmoothing = value;
+                _locationService.updateSettings(smoothing: value);
+              });
+            },
+          ),
+          const Divider(height: 16),
+          
+          // Секция определения неподвижности
+          _buildSectionHeader('Определение неподвижности'),
+          _buildInfoCard(
+            'Когда вы стоите на месте, GPS даёт разброс координат. '
+            'Эта функция определяет неподвижность и не записывает лишние точки.',
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.pause_circle_outline),
+            title: const Text('Определять неподвижность'),
+            subtitle: const Text('Не записывать точки при остановке'),
+            value: _enableStationaryDetection,
+            onChanged: (value) {
+              setState(() {
+                _enableStationaryDetection = value;
+                _locationService.updateSettings(stationaryDetection: value);
+              });
+            },
+          ),
+          if (_enableStationaryDetection)
+            _buildSliderTile(
+              title: 'Радиус неподвижности',
+              subtitle: 'Смещение меньше этого радиуса за 30 сек = остановка',
+              value: _stationaryRadius,
+              min: 3,
+              max: 30,
+              unit: ' м',
+              icon: Icons.gps_fixed,
+              onChanged: (value) {
+                setState(() {
+                  _stationaryRadius = value;
+                  _locationService.updateSettings(stationaryRadius: value);
+                });
+              },
+            ),
+          const Divider(height: 32),
+          
+          // Секция педометра
+          _buildSectionHeader('Шагомер'),
+          _buildInfoCard(
+            'Алгоритм детекции шагов по пикам ускорения. '
+            'Высокая чувствительность = детектирует больше шагов (для слабой ходьбы). '
+            'Низкая = только уверенные шаги (для быстрой ходьбы).',
+          ),
+          _buildSliderTile(
+            title: 'Чувствительность шагомера',
+            subtitle: 'Выше = больше шагов (для слабой ходьбы)',
+            value: _pedometerSensitivity,
+            min: 0.5,
+            max: 2.0,
+            divisions: 6,
+            unit: '',
+            icon: Icons.sensors,
+            displayValue: _getSensitivityLabel(_pedometerSensitivity),
+            onChanged: (value) {
+              setState(() {
+                _pedometerSensitivity = value;
+                _pedometerService.setSensitivity(value);
+              });
+            },
+          ),
+          _buildSliderTile(
+            title: 'Длина шага',
+            subtitle: 'Для расчёта расстояния по шагам',
+            value: _stepLength,
+            min: 0.5,
+            max: 1.0,
+            divisions: 10,
+            unit: ' м',
+            icon: Icons.straighten,
+            onChanged: (value) {
+              setState(() {
+                _stepLength = value;
+                _pedometerService.setAverageStepLength(value);
+              });
+              // Сохраняем через WalkProvider
+              context.read<WalkProvider>().saveSettings(stepLength: value);
+            },
+          ),
+          const Divider(height: 32),
+          
+          // Советы
+          _buildSectionHeader('Советы для точности'),
+          _buildTipCard(
+            icon: Icons.gps_fixed,
+            title: 'GPS сигнал',
+            tips: [
+              'Дождитесь стабилизации GPS (10-30 сек)',
+              'Находитесь на открытом пространстве',
+              'Избегайте высоких зданий и плотной застройки',
             ],
           ),
-        ),
+          _buildTipCard(
+            icon: Icons.phone_android,
+            title: 'Телефон',
+            tips: [
+              'Держите телефон в кармане или на поясе',
+              'Не блокируйте экран во время записи',
+              'Разрешите работу в фоновом режиме',
+            ],
+          ),
+          _buildTipCard(
+            icon: Icons.directions_walk,
+            title: 'Ходьба',
+            tips: [
+              'Идите ровным шагом для лучшей детекции',
+              'При быстрой ходьбе уменьшите чувствительность',
+              'При медленной/слабой ходьбе - увеличьте чувствительность',
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          // Информация о приложении
+          _buildSectionHeader('О приложении'),
+          const ListTile(
+            leading: Icon(Icons.info_outline),
+            title: Text('Прогулкин'),
+            subtitle: Text('Версия 1.0.0\nТрекинг прогулок с OpenStreetMap'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.code),
+            title: const Text('Исходный код'),
+            subtitle: const Text('github.com/NikasAl/progulkin'),
+            onTap: () {
+              // Можно добавить открытие ссылки
+            },
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
