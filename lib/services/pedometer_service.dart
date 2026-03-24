@@ -78,11 +78,11 @@ class PedometerService {
   // ========== Параметры алгоритма детекции шагов (из проверенного Java-кода) ==========
   
   // Фильтр сглаживания (convBuffer в Java)
-  final _CircularBuffer<double> _convBuffer = _CircularBuffer(5);
+  final _CircularBuffer _convBuffer = _CircularBuffer(5);
   
   // Буферы для поиска пиков (accBuffer, timeBuffer в Java)
-  final _CircularBuffer<double> _accBuffer = _CircularBuffer(20);
-  final _CircularBuffer<double> _timeBuffer = _CircularBuffer(20);
+  final _CircularBuffer _accBuffer = _CircularBuffer(20);
+  final _CircularBuffer _timeBuffer = _CircularBuffer(20);
   
   // Время предыдущего шага (для проверки интервала)
   double _stepTimePred = 0;
