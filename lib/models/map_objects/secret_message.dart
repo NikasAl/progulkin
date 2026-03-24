@@ -114,28 +114,20 @@ class SecretMessage extends MapObject {
   /// Расшифровать содержимое (только если на месте!)
   String? decryptContent(String userId, double userLat, double userLng) {
     // Проверяем, находится ли пользователь в нужном месте
-    final canInteract = canInteractAt(userLat, userLng, radiusMeters: unlockRadius);
-    print('🔓 decryptContent: userId=$userId, userLat=$userLat, userLng=$userLng');
-    print('🔓 canInteractAt: $canInteract (radius=$unlockRadius)');
-    
-    if (!canInteract) {
-      print('❌ Слишком далеко от сообщения');
+    if (!canInteractAt(userLat, userLng, radiusMeters: unlockRadius)) {
       return null; // Слишком далеко
     }
 
     // Проверяем лимит прочтений
     if (maxReads > 0 && currentReads >= maxReads) {
-      print('❌ Лимит прочтений исчерпан');
       return null; // Лимит исчерпан
     }
 
     // Для одноразовых - проверяем, не читал ли уже этот пользователь
     if (isOneTime && readByUsers.contains(userId)) {
-      print('❌ Уже прочитано этим пользователем');
       return null; // Уже прочитано
     }
 
-    print('✅ Расшифровка успешна');
     return _decrypt(encryptedContent);
   }
 

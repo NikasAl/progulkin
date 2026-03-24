@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/walk.dart';
 import '../models/walk_point.dart';
@@ -14,6 +15,7 @@ class WalkProvider extends ChangeNotifier {
   bool _isTracking = false;
   bool _isLoading = false;
   String? _error;
+  StreamSubscription<WalkPoint>? _positionSubscription;
 
   // Геттеры
   Walk? get currentWalk => _currentWalk;
@@ -61,8 +63,8 @@ class WalkProvider extends ChangeNotifier {
         _currentWalk!.points.add(position);
       }
 
-      // Начинаем отслеживание
-      _locationService.positionStream.listen((point) {
+      // Подписываемся на обновления позиции
+      _positionSubscription = _locationService.positionStream.listen((point) {
         if (_isTracking && _currentWalk != null) {
           _currentWalk!.points.add(point);
           notifyListeners();
@@ -86,6 +88,8 @@ class WalkProvider extends ChangeNotifier {
       if (_currentWalk == null) return false;
 
       _isTracking = false;
+      _positionSubscription?.cancel();
+      _positionSubscription = null;
       _locationService.stopTracking();
 
       _currentWalk!.endTime = DateTime.now();
@@ -110,7 +114,7 @@ class WalkProvider extends ChangeNotifier {
   /// Приостановить прогулку
   void pauseWalk() {
     if (_isTracking) {
-      _locationService.stopTracking();
+      // Не останавливаем GPS полностью, просто перестаём записывать точки
       _isTracking = false;
       notifyListeners();
     }
@@ -119,14 +123,24 @@ class WalkProvider extends ChangeNotifier {
   /// Продолжить прогулку
   Future<void> resumeWalk() async {
     if (_currentWalk != null && !_isTracking) {
-      await _locationService.startTracking();
       _isTracking = true;
+      // Переподписываемся на стрим, если нужно
+      if (_positionSubscription == null) {
+        _positionSubscription = _locationService.positionStream.listen((point) {
+          if (_isTracking && _currentWalk != null) {
+            _currentWalk!.points.add(point);
+            notifyListeners();
+          }
+        });
+      }
       notifyListeners();
     }
   }
 
   /// Отменить текущую прогулку
   void cancelWalk() {
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
     _locationService.stopTracking();
     _currentWalk = null;
     _isTracking = false;
@@ -177,6 +191,7 @@ class WalkProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _positionSubscription?.cancel();
     _locationService.dispose();
     super.dispose();
   }

@@ -170,7 +170,6 @@ class MapObject {
   /// Можно ли взаимодействовать в данной точке
   bool canInteractAt(double lat, double lng, {double radiusMeters = 100}) {
     final distance = calculateDistance(latitude, longitude, lat, lng);
-    print('📍 canInteractAt: objLoc=($latitude, $longitude), userLoc=($lat, $lng), distance=$distance м, radius=$radiusMeters м');
     return distance <= radiusMeters;
   }
 
