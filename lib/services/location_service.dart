@@ -30,6 +30,11 @@ class LocationService {
   double maxAccuracyMeters = 50.0; // макс. допустимая погрешность
   bool enableSmoothing = true; // включить сглаживание
   int smoothingWindowSize = 3; // окно для сглаживания
+
+  // Настройки адаптивного сглаживания
+  double sharpTurnThresholdDegrees = 30.0; // угол для определения резкого поворота
+  double smoothingWeight = 0.5; // вес текущей точки (0.5 = 50% вес, 0.33 = равные веса для 3 точек)
+  bool enableAdaptiveSmoothing = true; // адаптивное сглаживание с сохранением поворотов
   
   // Настройки определения неподвижности
   double stationaryRadiusMeters = 10.0; // радиус для определения неподвижности
@@ -48,13 +53,20 @@ class LocationService {
     bool? smoothing,
     double? stationaryRadius,
     bool? stationaryDetection,
+    bool? adaptiveSmoothing,
+    double? turnThreshold,
+    double? smoothingWeight,
   }) {
     if (maxSpeed != null) maxWalkingSpeedKmh = maxSpeed;
     if (maxAccuracy != null) maxAccuracyMeters = maxAccuracy;
     if (smoothing != null) enableSmoothing = smoothing;
     if (stationaryRadius != null) stationaryRadiusMeters = stationaryRadius;
     if (stationaryDetection != null) enableStationaryDetection = stationaryDetection;
+    if (adaptiveSmoothing != null) enableAdaptiveSmoothing = adaptiveSmoothing;
+    if (turnThreshold != null) sharpTurnThresholdDegrees = turnThreshold;
+    if (smoothingWeight != null) this.smoothingWeight = smoothingWeight;
     print('Настройки: скорость=$maxWalkingSpeedKmh км/ч, точность=$maxAccuracyMeters м, радиус неподвижности=$stationaryRadiusMeters м');
+    print('Сглаживание: вкл=$enableSmoothing, адаптивное=$enableAdaptiveSmoothing, порог поворота=$sharpTurnThresholdDegrees°, вес=${this.smoothingWeight}');
   }
 
   /// Проверка разрешений на геолокацию
@@ -300,30 +312,122 @@ class LocationService {
       }
     }
 
-    // 7. Опциональное сглаживание
+    // 7. Адаптивное сглаживание с сохранением поворотов
     WalkPoint finalPoint = point;
+
     if (enableSmoothing && _recentPoints.length >= smoothingWindowSize) {
-      final windowPoints = _recentPoints.sublist(
-        _recentPoints.length - smoothingWindowSize + 1
-      )..add(point);
-      
-      double sumLat = 0, sumLon = 0;
-      for (final p in windowPoints) {
-        sumLat += p.latitude;
-        sumLon += p.longitude;
+      final shouldSmooth = _shouldSmoothPoint(point);
+
+      if (shouldSmooth) {
+        finalPoint = _applyWeightedSmoothing(point);
+
+        if (AppConfig.enableLogging) {
+          final smoothed = finalPoint;
+          final origLat = point.latitude;
+          final origLon = point.longitude;
+          final smoothLat = smoothed.latitude;
+          final smoothLon = smoothed.longitude;
+          final shift = _calculateDistance(origLat, origLon, smoothLat, smoothLon);
+          print('〰️ Сглаживание: смещение ${shift.toStringAsFixed(2)}м');
+        }
+      } else {
+        if (AppConfig.enableLogging) {
+          print('🔺 Поворот сохранён без сглаживания');
+        }
       }
-      
-      finalPoint = WalkPoint(
-        latitude: sumLat / windowPoints.length,
-        longitude: sumLon / windowPoints.length,
-        altitude: point.altitude,
-        speed: point.speed,
-        accuracy: point.accuracy,
-        timestamp: point.timestamp,
-      );
     }
 
     return _FilterResult(accepted: true, point: finalPoint);
+  }
+
+  /// Проверка, нужно ли сглаживать точку (обнаружение поворотов)
+  bool _shouldSmoothPoint(WalkPoint point) {
+    if (!enableAdaptiveSmoothing) {
+      return true; // Старое поведение - всегда сглаживать
+    }
+
+    // Нужно минимум 2 предыдущие точки для определения угла
+    if (_recentPoints.length < 2) {
+      return true;
+    }
+
+    final prevPoint = _recentPoints[_recentPoints.length - 1];
+    final prevPrevPoint = _recentPoints[_recentPoints.length - 2];
+
+    // Вычисляем векторы направления
+    final bearing1 = _calculateBearing(prevPrevPoint, prevPoint);
+    final bearing2 = _calculateBearing(prevPoint, point);
+
+    // Вычисляем изменение направления
+    double angleChange = (bearing2 - bearing1).abs();
+    if (angleChange > 180) {
+      angleChange = 360 - angleChange;
+    }
+
+    // Если изменение направления больше порога - это поворот, не сглаживаем
+    if (angleChange > sharpTurnThresholdDegrees) {
+      if (AppConfig.enableLogging) {
+        print('↪️ Обнаружен поворот: ${angleChange.toStringAsFixed(1)}°');
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Вычисление азимута (направления) между двумя точками
+  double _calculateBearing(WalkPoint from, WalkPoint to) {
+    final double lat1 = _toRadians(from.latitude);
+    final double lat2 = _toRadians(to.latitude);
+    final double dLon = _toRadians(to.longitude - from.longitude);
+
+    final double y = math.sin(dLon) * math.cos(lat2);
+    final double x = math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
+
+    final double bearing = math.atan2(y, x) * 180 / math.pi;
+    return (bearing + 360) % 360;
+  }
+
+  /// Взвешенное сглаживание с приоритетом текущей точки
+  WalkPoint _applyWeightedSmoothing(WalkPoint point) {
+    final windowPoints = _recentPoints.sublist(
+      _recentPoints.length - smoothingWindowSize + 1
+    )..add(point);
+
+    // Взвешенное среднее с бо́льшим весом для текущей точки
+    double sumLat = 0, sumLon = 0, totalWeight = 0;
+
+    for (int i = 0; i < windowPoints.length; i++) {
+      double weight;
+
+      if (enableAdaptiveSmoothing) {
+        // Взвешенное окно: текущая точка имеет бо́льший вес
+        if (i == windowPoints.length - 1) {
+          // Текущая точка
+          weight = smoothingWeight;
+        } else {
+          // Остальные точки делят оставшийся вес поровну
+          weight = (1.0 - smoothingWeight) / (windowPoints.length - 1);
+        }
+      } else {
+        // Старое поведение - равные веса
+        weight = 1.0 / windowPoints.length;
+      }
+
+      sumLat += windowPoints[i].latitude * weight;
+      sumLon += windowPoints[i].longitude * weight;
+      totalWeight += weight;
+    }
+
+    return WalkPoint(
+      latitude: sumLat / totalWeight,
+      longitude: sumLon / totalWeight,
+      altitude: point.altitude,
+      speed: point.speed,
+      accuracy: point.accuracy,
+      timestamp: point.timestamp,
+    );
   }
 
   /// Расчёт расстояния между двумя точками

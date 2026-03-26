@@ -24,7 +24,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late double _maxSpeed;
   late double _maxAccuracy;
   late bool _enableSmoothing;
-  
+
+  // Настройки сглаживания
+  late bool _enableAdaptiveSmoothing;
+  late double _turnThreshold;
+  late double _smoothingWeight;
+
   // Настройки неподвижности
   late bool _enableStationaryDetection;
   late double _stationaryRadius;
@@ -48,6 +53,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _maxSpeed = _locationService.maxWalkingSpeedKmh;
     _maxAccuracy = _locationService.maxAccuracyMeters;
     _enableSmoothing = _locationService.enableSmoothing;
+    _enableAdaptiveSmoothing = _locationService.enableAdaptiveSmoothing;
+    _turnThreshold = _locationService.sharpTurnThresholdDegrees;
+    _smoothingWeight = _locationService.smoothingWeight;
     _enableStationaryDetection = _locationService.enableStationaryDetection;
     _stationaryRadius = _locationService.stationaryRadiusMeters;
     _pedometerSensitivity = _pedometerService.sensitivity;
@@ -144,6 +152,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
               });
             },
           ),
+          if (_enableSmoothing) ...[
+            SwitchListTile(
+              secondary: const Icon(Icons.turn_right),
+              title: const Text('Сохранять повороты'),
+              subtitle: const Text('Не сглаживать точки на резких поворотах'),
+              value: _enableAdaptiveSmoothing,
+              onChanged: (value) {
+                setState(() {
+                  _enableAdaptiveSmoothing = value;
+                  _locationService.updateSettings(adaptiveSmoothing: value);
+                });
+              },
+            ),
+            if (_enableAdaptiveSmoothing) ...[
+              _buildSliderTile(
+                title: 'Порог поворота',
+                subtitle: 'Угол больше этого значения = поворот',
+                value: _turnThreshold,
+                min: 15,
+                max: 60,
+                divisions: 9,
+                unit: '°',
+                icon: Icons.turn_slight_right,
+                displayValue: '${_turnThreshold.toStringAsFixed(0)}°',
+                onChanged: (value) {
+                  setState(() {
+                    _turnThreshold = value;
+                    _locationService.updateSettings(turnThreshold: value);
+                  });
+                },
+              ),
+              _buildSliderTile(
+                title: 'Сила сглаживания',
+                subtitle: 'Выше = плавнее, но медленнее реакция',
+                value: _smoothingWeight,
+                min: 0.33,
+                max: 0.8,
+                divisions: 10,
+                unit: '',
+                icon: Icons.tune,
+                displayValue: _getSmoothingLabel(_smoothingWeight),
+                onChanged: (value) {
+                  setState(() {
+                    _smoothingWeight = value;
+                    _locationService.updateSettings(smoothingWeight: value);
+                  });
+                },
+              ),
+            ],
+          ],
           const Divider(height: 16),
           
           // Секция определения неподвижности
@@ -634,6 +692,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (value < 1.3) return 'Нормальная';
     if (value < 1.7) return 'Повышенная';
     return 'Высокая';
+  }
+
+  String _getSmoothingLabel(double value) {
+    if (value < 0.4) return 'Слабое';
+    if (value < 0.5) return 'Умеренное';
+    if (value < 0.6) return 'Среднее';
+    if (value < 0.7) return 'Сильное';
+    return 'Очень сильное';
   }
   
   Widget _buildP2PServerSettings() {
