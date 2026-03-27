@@ -38,8 +38,8 @@ dependencies:
   crypto: ^3.0.3
 
   # Экспорт/Импорт файлов
-  share_plus: ^7.2.1
-  file_picker: ^6.1.1
+  share_plus: ^10.1.0
+  file_picker: ^10.1.0
 
   # Иконки и UI
   cupertino_icons: ^1.0.6
