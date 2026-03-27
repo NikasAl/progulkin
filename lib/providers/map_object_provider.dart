@@ -3,11 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/map_objects/map_objects.dart';
 import '../services/p2p/p2p.dart';
+import '../services/map_object_export_service.dart';
 
 /// Провайдер для управления объектами на карте
 class MapObjectProvider extends ChangeNotifier {
   final MapObjectStorage _storage = MapObjectStorage();
   final P2PService _p2pService = P2PService();
+  final MapObjectExportService _exportService = MapObjectExportService();
   final Uuid _uuid = const Uuid();
 
   List<MapObject> _objects = [];
@@ -375,6 +377,35 @@ class MapObjectProvider extends ChangeNotifier {
     _objects = [];
     _nearbyObjects = [];
     notifyListeners();
+  }
+
+  // ==================== Экспорт/Импорт ====================
+
+  /// Экспортировать все объекты в файл
+  Future<ExportResult> exportObjects() async {
+    return await _exportService.exportToFile();
+  }
+
+  /// Экспортировать и поделиться файлом
+  Future<ExportResult> exportAndShareObjects() async {
+    return await _exportService.exportAndShare();
+  }
+
+  /// Импортировать объекты из файла
+  Future<ImportResult> importObjects() async {
+    final result = await _exportService.importFromFile();
+
+    if (result.success) {
+      // Перезагружаем объекты после успешного импорта
+      await _reloadObjects();
+    }
+
+    return result;
+  }
+
+  /// Получить статистику для экспорта
+  Future<Map<String, dynamic>> getExportStats() async {
+    return await _exportService.getExportStats();
   }
 
   // Приватные методы

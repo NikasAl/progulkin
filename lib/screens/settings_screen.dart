@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/location_service.dart';
 import '../services/pedometer_service.dart';
 import '../services/user_id_service.dart';
+import '../services/map_object_export_service.dart';
 import '../models/walk.dart';
 import '../providers/walk_provider.dart';
 import '../providers/map_object_provider.dart';
@@ -396,6 +397,107 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
           ],
+          const Divider(height: 32),
+          
+          // Секция экспорта/импорта объектов
+          _buildSectionHeader('Экспорт/Импорт объектов'),
+          _buildInfoCard(
+            'Сохраняйте объекты в файл для резервного копирования '
+            'или переноса на другое устройство. '
+            'Формат JSON - человекочитаемый.',
+          ),
+          Consumer<MapObjectProvider>(
+            builder: (context, provider, child) {
+              return Column(
+                children: [
+                  // Кнопки экспорта/импорта
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: provider.allObjects.isEmpty
+                                ? null
+                                : () => _exportObjects(provider),
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Экспорт'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _importObjects(provider),
+                            icon: const Icon(Icons.download),
+                            label: const Text('Импорт'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Кнопка "Поделиться"
+                  if (provider.allObjects.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _shareObjects(provider),
+                          icon: const Icon(Icons.share),
+                          label: const Text('Поделиться файлом'),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  // Статистика объектов
+                  FutureBuilder<Map<String, dynamic>>(
+                    future: provider.getExportStats(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const SizedBox.shrink();
+                      }
+                      final stats = snapshot.data!;
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildExportStat(
+                                Icons.apps,
+                                stats['total'] ?? 0,
+                                'Всего',
+                              ),
+                              _buildExportStat(
+                                Icons.delete_outline,
+                                stats['trashMonsters'] ?? 0,
+                                'Монстров',
+                              ),
+                              _buildExportStat(
+                                Icons.message_outlined,
+                                stats['secretMessages'] ?? 0,
+                                'Секретов',
+                              ),
+                              _buildExportStat(
+                                Icons.pets,
+                                stats['creatures'] ?? 0,
+                                'Существ',
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
           const Divider(height: 32),
           
           // Советы
@@ -792,6 +894,236 @@ class _SettingsScreenState extends State<SettingsScreen> {
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
+    );
+  }
+
+  Widget _buildExportStat(IconData icon, int count, String label) {
+    return Column(
+      children: [
+        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(height: 4),
+        Text(
+          '$count',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+
+  /// Экспорт объектов в файл
+  Future<void> _exportObjects(MapObjectProvider provider) async {
+    // Показываем индикатор загрузки
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final result = await provider.exportObjects();
+
+      if (!mounted) return;
+      Navigator.pop(context); // Закрываем индикатор
+
+      if (result.success) {
+        _showExportResultDialog(result);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка экспорта: ${result.error}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Показать результат экспорта
+  void _showExportResultDialog(ExportResult result) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Экспорт завершён'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('📊 Объектов: ${result.objectsCount}'),
+            const SizedBox(height: 8),
+            Text('📁 Размер: ${result.fileSizeFormatted}'),
+            if (result.filePath != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                '📍 Файл: ${result.filePath}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Поделиться файлом экспорта
+  Future<void> _shareObjects(MapObjectProvider provider) async {
+    // Показываем индикатор загрузки
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final result = await provider.exportAndShareObjects();
+
+      if (!mounted) return;
+      Navigator.pop(context); // Закрываем индикатор
+
+      if (!result.success && result.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: ${result.error}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Импорт объектов из файла
+  Future<void> _importObjects(MapObjectProvider provider) async {
+    // Показываем индикатор загрузки
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final result = await provider.importObjects();
+
+      if (!mounted) return;
+      Navigator.pop(context); // Закрываем индикатор
+
+      _showImportResultDialog(result);
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Показать результат импорта
+  void _showImportResultDialog(ImportResult result) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              result.success ? Icons.check_circle : Icons.warning,
+              color: result.success ? Colors.green : Colors.orange,
+            ),
+            const SizedBox(width: 8),
+            Text(result.success ? 'Импорт завершён' : 'Импорт'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(result.summary),
+              if (result.importedObjects.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Импортированные объекты:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ...result.importedObjects.take(10).map(
+                  (obj) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(obj),
+                  ),
+                ),
+                if (result.importedObjects.length > 10)
+                  Text(
+                    '... и ещё ${result.importedObjects.length - 10}',
+                    style: const TextStyle(fontStyle: FontStyle.italic),
+                  ),
+              ],
+              if (result.errorDetails.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Ошибки:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+                ...result.errorDetails.take(5).map(
+                  (err) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      err,
+                      style: const TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 }
