@@ -216,6 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
               right: 16,
               top: 130,
               child: NearbyObjectsNotifier(
+                key: ValueKey('nearby_${_currentLocation!.latitude.toStringAsFixed(4)}_${_currentLocation!.longitude.toStringAsFixed(4)}'),
                 currentLat: _currentLocation!.latitude,
                 currentLng: _currentLocation!.longitude,
                 alertRadius: 100,

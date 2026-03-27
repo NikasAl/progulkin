@@ -28,7 +28,7 @@ class LocationService {
   // Настройки фильтрации (настраиваемые)
   double maxWalkingSpeedKmh = 10.0; // км/ч - макс. скорость ходьбы
   double maxAccuracyMeters = 50.0; // макс. допустимая погрешность
-  bool enableSmoothing = true; // включить сглаживание
+  bool enableSmoothing = false; // сглаживание отключено по умолчанию для лучшей точности
   int smoothingWindowSize = 3; // окно для сглаживания
 
   // Настройки адаптивного сглаживания

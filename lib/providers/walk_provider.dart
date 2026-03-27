@@ -267,6 +267,74 @@ class WalkProvider extends ChangeNotifier {
     }
   }
 
+  /// Обновить статистику объектов карты
+  void updateObjectStats({
+    int? objectsAdded,
+    int? objectsConfirmed,
+    int? objectsDenied,
+    int? objectsCleaned,
+    int? creaturesCaught,
+    int? secretsRead,
+    int? pointsEarned,
+  }) {
+    if (_currentWalk != null) {
+      _currentWalk!.objectStats = _currentWalk!.objectStats.copyWith(
+        objectsAdded: objectsAdded != null 
+            ? _currentWalk!.objectStats.objectsAdded + objectsAdded 
+            : null,
+        objectsConfirmed: objectsConfirmed != null 
+            ? _currentWalk!.objectStats.objectsConfirmed + objectsConfirmed 
+            : null,
+        objectsDenied: objectsDenied != null 
+            ? _currentWalk!.objectStats.objectsDenied + objectsDenied 
+            : null,
+        objectsCleaned: objectsCleaned != null 
+            ? _currentWalk!.objectStats.objectsCleaned + objectsCleaned 
+            : null,
+        creaturesCaught: creaturesCaught != null 
+            ? _currentWalk!.objectStats.creaturesCaught + creaturesCaught 
+            : null,
+        secretsRead: secretsRead != null 
+            ? _currentWalk!.objectStats.secretsRead + secretsRead 
+            : null,
+        pointsEarned: pointsEarned != null 
+            ? _currentWalk!.objectStats.pointsEarned + pointsEarned 
+            : null,
+      );
+      notifyListeners();
+    }
+  }
+
+  /// Зафиксировать добавление объекта
+  void recordObjectAdded(int points) {
+    updateObjectStats(objectsAdded: 1, pointsEarned: points);
+  }
+
+  /// Зафиксировать подтверждение объекта
+  void recordObjectConfirmed() {
+    updateObjectStats(objectsConfirmed: 1, pointsEarned: 5);
+  }
+
+  /// Зафиксировать опровержение объекта
+  void recordObjectDenied() {
+    updateObjectStats(objectsDenied: 1);
+  }
+
+  /// Зафиксировать уборку монстра
+  void recordMonsterCleaned(int points) {
+    updateObjectStats(objectsCleaned: 1, pointsEarned: points);
+  }
+
+  /// Зафиксировать поимку существа
+  void recordCreatureCaught(int points) {
+    updateObjectStats(creaturesCaught: 1, pointsEarned: points);
+  }
+
+  /// Зафиксировать чтение секрета
+  void recordSecretRead() {
+    updateObjectStats(secretsRead: 1, pointsEarned: 10);
+  }
+
   /// Удалить прогулку из истории
   Future<bool> deleteWalk(String walkId) async {
     try {

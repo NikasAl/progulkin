@@ -34,23 +34,24 @@ enum MonsterClass {
 
 /// Тип мусора
 enum TrashType {
-  bottles('bottles', 'Бутылки/банки', '🍺'),
-  paper('paper', 'Бумага/картон', '🗞️'),
-  tires('tires', 'Шины', '🛞'),
-  furniture('furniture', 'Мебель', '🛋️'),
-  construction('construction', 'Строймусор', '🏗️'),
-  electronics('electronics', 'Электроника', '📺'),
-  plastic('plastic', 'Пластик', '🥤'),
-  organic('organic', 'Органика', '🍂'),
-  mixed('mixed', 'Смешанный', '🗑️'),
-  other('other', 'Другое', '❓'),
+  bottles('bottles', 'Бутылки/банки', '🍺', 'assets/icons/monsters/bottles.png'),
+  paper('paper', 'Бумага/картон', '🗞️', 'assets/icons/monsters/paper.png'),
+  tires('tires', 'Шины', '🛞', 'assets/icons/monsters/tires.png'),
+  furniture('furniture', 'Мебель', '🛋️', 'assets/icons/monsters/furniture.png'),
+  construction('construction', 'Строймусор', '🏗️', 'assets/icons/monsters/construction.png'),
+  electronics('electronics', 'Электроника', '📺', 'assets/icons/monsters/electronics.png'),
+  plastic('plastic', 'Пластик', '🥤', 'assets/icons/monsters/plastic.png'),
+  organic('organic', 'Органика', '🍂', 'assets/icons/monsters/organic.png'),
+  mixed('mixed', 'Смешанный', '🗑️', 'assets/icons/monsters/mixed.png'),
+  other('other', 'Другое', '❓', 'assets/icons/monsters/other.png'),
   ;
 
   final String code;
   final String name;
   final String emoji;
+  final String assetPath;
 
-  const TrashType(this.code, this.name, this.emoji);
+  const TrashType(this.code, this.name, this.emoji, this.assetPath);
 
   static TrashType fromCode(String code) {
     return TrashType.values.firstWhere(

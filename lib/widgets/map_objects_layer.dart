@@ -94,12 +94,7 @@ class _MarkerWidget extends StatelessWidget {
             ],
           ),
           child: Center(
-            child: Text(
-              object.type.emoji,
-              style: TextStyle(
-                fontSize: _getEmojiSize(),
-              ),
-            ),
+            child: _buildMarkerContent(),
           ),
         ),
         
@@ -111,6 +106,45 @@ class _MarkerWidget extends StatelessWidget {
             child: _StatusBadge(object: object),
           ),
       ],
+    );
+  }
+
+  /// Построение содержимого маркера (эмодзи или картинка)
+  Widget _buildMarkerContent() {
+    // Для мусорных монстров используем картинки
+    if (object.type == MapObjectType.trashMonster) {
+      final monster = object as TrashMonster;
+      return ClipOval(
+        child: Image.asset(
+          monster.trashType.assetPath,
+          width: _getEmojiSize() * 1.5,
+          height: _getEmojiSize() * 1.5,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            // Fallback на эмодзи если картинка не загрузилась
+            return Text(
+              monster.trashType.emoji,
+              style: TextStyle(fontSize: _getEmojiSize()),
+            );
+          },
+        ),
+      );
+    }
+    
+    // Для существ тоже можно добавить картинки позже
+    if (object.type == MapObjectType.creature) {
+      final creature = object as Creature;
+      // Пока используем эмодзи
+      return Text(
+        creature.creatureType.emoji,
+        style: TextStyle(fontSize: _getEmojiSize()),
+      );
+    }
+    
+    // Для остальных типов - эмодзи
+    return Text(
+      object.type.emoji,
+      style: TextStyle(fontSize: _getEmojiSize()),
     );
   }
 

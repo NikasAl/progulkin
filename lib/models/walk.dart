@@ -9,6 +9,72 @@ enum DistanceSource {
   average,
 }
 
+/// Статистика по объектам карты за прогулку
+class WalkObjectStats {
+  final int objectsAdded;        // Добавлено объектов
+  final int objectsConfirmed;    // Подтверждено
+  final int objectsDenied;       // Опровергнуто
+  final int objectsCleaned;      // Убрано монстров
+  final int creaturesCaught;     // Поймано существ
+  final int secretsRead;         // Прочитано секретов
+  final int pointsEarned;        // Заработано очков
+
+  const WalkObjectStats({
+    this.objectsAdded = 0,
+    this.objectsConfirmed = 0,
+    this.objectsDenied = 0,
+    this.objectsCleaned = 0,
+    this.creaturesCaught = 0,
+    this.secretsRead = 0,
+    this.pointsEarned = 0,
+  });
+
+  int get totalActions => 
+      objectsAdded + objectsConfirmed + objectsCleaned + creaturesCaught + secretsRead;
+
+  Map<String, dynamic> toMap() => {
+    'objectsAdded': objectsAdded,
+    'objectsConfirmed': objectsConfirmed,
+    'objectsDenied': objectsDenied,
+    'objectsCleaned': objectsCleaned,
+    'creaturesCaught': creaturesCaught,
+    'secretsRead': secretsRead,
+    'pointsEarned': pointsEarned,
+  };
+
+  factory WalkObjectStats.fromMap(Map<String, dynamic> map) {
+    return WalkObjectStats(
+      objectsAdded: map['objectsAdded'] as int? ?? 0,
+      objectsConfirmed: map['objectsConfirmed'] as int? ?? 0,
+      objectsDenied: map['objectsDenied'] as int? ?? 0,
+      objectsCleaned: map['objectsCleaned'] as int? ?? 0,
+      creaturesCaught: map['creaturesCaught'] as int? ?? 0,
+      secretsRead: map['secretsRead'] as int? ?? 0,
+      pointsEarned: map['pointsEarned'] as int? ?? 0,
+    );
+  }
+
+  WalkObjectStats copyWith({
+    int? objectsAdded,
+    int? objectsConfirmed,
+    int? objectsDenied,
+    int? objectsCleaned,
+    int? creaturesCaught,
+    int? secretsRead,
+    int? pointsEarned,
+  }) {
+    return WalkObjectStats(
+      objectsAdded: objectsAdded ?? this.objectsAdded,
+      objectsConfirmed: objectsConfirmed ?? this.objectsConfirmed,
+      objectsDenied: objectsDenied ?? this.objectsDenied,
+      objectsCleaned: objectsCleaned ?? this.objectsCleaned,
+      creaturesCaught: creaturesCaught ?? this.creaturesCaught,
+      secretsRead: secretsRead ?? this.secretsRead,
+      pointsEarned: pointsEarned ?? this.pointsEarned,
+    );
+  }
+}
+
 /// Модель прогулки
 class Walk {
   final String id;
@@ -25,6 +91,9 @@ class Walk {
   /// Длина шага в метрах (для расчёта расстояния)
   final double stepLength;
 
+  /// Статистика по объектам карты
+  WalkObjectStats objectStats;
+
   Walk({
     String? id,
     required this.startTime,
@@ -35,8 +104,10 @@ class Walk {
     this.notes,
     this.distanceSource = DistanceSource.pedometer,
     this.stepLength = 0.75,
+    WalkObjectStats? objectStats,
   })  : id = id ?? const Uuid().v4(),
-        points = points ?? [];
+        points = points ?? [],
+        objectStats = objectStats ?? const WalkObjectStats();
 
   /// Продолжительность прогулки
   Duration get duration {
@@ -173,6 +244,7 @@ class Walk {
       'notes': notes,
       'distanceSource': distanceSource.index,
       'stepLength': stepLength,
+      'objectStats': objectStats.toMap(),
     };
   }
 
@@ -192,6 +264,9 @@ class Walk {
       notes: map['notes'] as String?,
       distanceSource: DistanceSource.values[map['distanceSource'] as int? ?? 1],
       stepLength: (map['stepLength'] as num?)?.toDouble() ?? 0.75,
+      objectStats: map['objectStats'] != null
+          ? WalkObjectStats.fromMap(map['objectStats'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -206,6 +281,7 @@ class Walk {
     String? notes,
     DistanceSource? distanceSource,
     double? stepLength,
+    WalkObjectStats? objectStats,
   }) {
     return Walk(
       id: id ?? this.id,
@@ -217,6 +293,7 @@ class Walk {
       notes: notes ?? this.notes,
       distanceSource: distanceSource ?? this.distanceSource,
       stepLength: stepLength ?? this.stepLength,
+      objectStats: objectStats ?? this.objectStats,
     );
   }
 

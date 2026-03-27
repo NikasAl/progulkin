@@ -55,6 +55,7 @@ flutter:
 
   assets:
     - assets/icons/
+    - assets/icons/monsters/
 
 flutter_native_splash:
   color: "#4CAF50"
