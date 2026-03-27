@@ -1,6 +1,5 @@
 import 'package:latlong2/latlong.dart';
 import '../models/map_objects/map_objects.dart';
-import '../providers/map_object_provider.dart';
 
 /// Результат проверки возможности действия
 class ActionCheckResult {
@@ -66,11 +65,11 @@ class ActionResult {
 ///
 /// Выносит бизнес-логику из UI-слоя, обеспечивая:
 /// - Проверку условий для действий
-/// - Выполнение действий через провайдер
 /// - Унифицированный интерфейс для всех типов объектов
+///
+/// Примечание: Выполнение действий делегируется провайдеру для
+/// корректной работы с состоянием приложения.
 class ObjectActionService {
-  final MapObjectProvider _objectProvider;
-
   /// Радиус действия для уборки мусора (в метрах)
   final double cleaningRadius;
 
@@ -78,10 +77,9 @@ class ObjectActionService {
   final double catchingRadius;
 
   ObjectActionService({
-    required MapObjectProvider objectProvider,
     this.cleaningRadius = 100.0,
     this.catchingRadius = 50.0,
-  }) : _objectProvider = objectProvider;
+  });
 
   /// Проверить возможность действия с объектом
   ActionCheckResult canPerformAction(
@@ -115,31 +113,6 @@ class ObjectActionService {
 
       default:
         return const ActionCheckResult.denied('Неизвестный тип объекта');
-    }
-  }
-
-  /// Выполнить действие с объектом
-  Future<ActionResult> performAction(
-    MapObject object, {
-    required String userId,
-    required String userName,
-  }) async {
-    switch (object.type) {
-      case MapObjectType.trashMonster:
-        return await _cleanTrashMonster(object as TrashMonster, userId);
-
-      case MapObjectType.secretMessage:
-        return await _readSecretMessage(object as SecretMessage, userId);
-
-      case MapObjectType.creature:
-        return await _catchCreature(
-          object as Creature,
-          userId,
-          userName,
-        );
-
-      default:
-        return const ActionResult.error('Неизвестный тип объекта');
     }
   }
 
@@ -243,53 +216,6 @@ class ObjectActionService {
     }
 
     return const ActionCheckResult.allowed(label: 'Поймать!');
-  }
-
-  // === Выполнение действий ===
-
-  Future<ActionResult> _cleanTrashMonster(
-    TrashMonster monster,
-    String userId,
-  ) async {
-    try {
-      await _objectProvider.cleanTrashMonster(monster.id, userId);
-      return ActionResult.success(
-        message: 'Отлично!',
-        points: monster.cleaningPoints,
-      );
-    } catch (e) {
-      return ActionResult.error('Не удалось отметить как убранное: $e');
-    }
-  }
-
-  Future<ActionResult> _readSecretMessage(
-    SecretMessage secret,
-    String userId,
-  ) async {
-    try {
-      final content = await _objectProvider.readSecretMessage(secret.id, userId);
-      if (content == null) {
-        return const ActionResult.error('Не удалось прочитать сообщение');
-      }
-      return ActionResult.secretRead(secret.title, content);
-    } catch (e) {
-      return ActionResult.error('Ошибка чтения: $e');
-    }
-  }
-
-  Future<ActionResult> _catchCreature(
-    Creature creature,
-    String userId,
-    String userName,
-  ) async {
-    try {
-      await _objectProvider.catchCreature(creature.id, userId, userName);
-      return ActionResult.success(
-        message: '${creature.creatureType.name} пойман!',
-      );
-    } catch (e) {
-      return ActionResult.error('Не удалось поймать: $e');
-    }
   }
 
   // === Утилиты ===

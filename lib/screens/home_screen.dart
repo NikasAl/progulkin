@@ -11,6 +11,7 @@ import '../models/map_objects/map_objects.dart';
 import '../services/location_service.dart';
 import '../services/user_id_service.dart';
 import '../services/tile_cache_service.dart';
+import '../services/object_action_service.dart';
 import '../widgets/map_objects_layer.dart';
 import '../widgets/object_filters_widget.dart';
 import '../widgets/nearby_objects_notifier.dart';
@@ -34,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final LocationService _locationService = LocationService();
   final UserIdService _userIdService = UserIdService();
   final TileCacheService _tileCacheService = TileCacheService();
+  final ObjectActionService _actionService = ObjectActionService();
   final List<LatLng> _routePoints = [];
   bool _initialized = false;
   bool _mapObjectsInitialized = false;
@@ -803,6 +805,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final mapObjectProvider = context.read<MapObjectProvider>();
     final walkProvider = context.read<WalkProvider>();
     final isWalking = walkProvider.isTracking;
+    final userId = _userInfo?.id ?? '';
     
     // Вычисляем расстояние до объекта
     double? distance;
@@ -815,8 +818,25 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     
-    // Получаем действие и подсказку
-    final actionInfo = _getObjectActionInfo(object, mapObjectProvider, isWalking);
+    // Проверяем возможность действия через сервис
+    final actionCheck = _actionService.canPerformAction(
+      object,
+      isWalking: isWalking,
+      userLocation: _currentLocation,
+      userId: userId,
+    );
+    
+    // Создаём callback для действия если оно доступно
+    VoidCallback? onAction;
+    if (actionCheck.canPerform) {
+      onAction = () async {
+        final result = await _performObjectAction(object, mapObjectProvider, userId);
+        if (mounted && result != null) {
+          Navigator.pop(context);
+          _handleActionResult(result, object);
+        }
+      };
+    }
     
     showModalBottomSheet(
       context: context,
@@ -833,7 +853,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           child: ObjectDetailsSheet(
             object: object,
-            userId: _userInfo?.id ?? '',
+            userId: userId,
             distance: distance,
             isWalking: isWalking,
             onConfirm: () async {
@@ -860,129 +880,72 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }
             },
-            onAction: actionInfo['action'],
-            actionHint: actionInfo['hint'],
+            onAction: onAction,
+            actionHint: actionCheck.hint,
           ),
         ),
       ),
     );
   }
   
-  /// Получить информацию о действии для объекта
-  Map<String, dynamic> _getObjectActionInfo(MapObject object, MapObjectProvider provider, bool isWalking) {
-    if (object.type == MapObjectType.trashMonster) {
-      final monster = object as TrashMonster;
-      if (monster.isCleaned) {
-        return {'action': null, 'hint': 'Уже убрано'};
-      }
-      if (!isWalking) {
-        return {'action': null, 'hint': '💼 Начните прогулку, чтобы отметить как убранное'};
-      }
-      if (_currentLocation == null) {
-        return {'action': null, 'hint': '📍 Определяем ваше местоположение...'};
-      }
-      final distance = calculateDistance(
-        _currentLocation!.latitude,
-        _currentLocation!.longitude,
-        monster.latitude,
-        monster.longitude,
-      );
-      if (distance > 100) {
-        return {'action': null, 'hint': '📍 Подойдите ближе (${distance.toInt()} м до цели)'};
-      }
-      return {
-        'action': () async {
-          await provider.cleanTrashMonster(monster.id, _userInfo?.id ?? '');
-          if (mounted) {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Отлично! +${monster.cleaningPoints} очков'),
-                backgroundColor: Colors.green,
-              ),
-            );
+  /// Выполнить действие с объектом
+  Future<Object?> _performObjectAction(
+    MapObject object,
+    MapObjectProvider provider,
+    String userId,
+  ) async {
+    try {
+      switch (object.type) {
+        case MapObjectType.trashMonster:
+          final monster = object as TrashMonster;
+          await provider.cleanTrashMonster(monster.id, userId);
+          return monster;
+          
+        case MapObjectType.secretMessage:
+          final secret = object as SecretMessage;
+          final content = await provider.readSecretMessage(secret.id, userId);
+          if (content != null) {
+            return _SecretReadResult(title: secret.title, content: content);
           }
-        },
-        'hint': null,
-      };
-    }
-    
-    if (object.type == MapObjectType.creature) {
-      final creature = object as Creature;
-      if (!creature.isWild) {
-        return {'action': null, 'hint': '🏠 Уже приручено ${creature.ownerName}'};
-      }
-      if (!isWalking) {
-        return {'action': null, 'hint': '💼 Начните прогулку, чтобы поймать'};
-      }
-      if (_currentLocation == null) {
-        return {'action': null, 'hint': '📍 Определяем ваше местоположение...'};
-      }
-      final distance = calculateDistance(
-        _currentLocation!.latitude,
-        _currentLocation!.longitude,
-        creature.latitude,
-        creature.longitude,
-      );
-      if (distance > 50) {
-        return {'action': null, 'hint': '📍 Подойдите ближе (${distance.toInt()} м до цели)'};
-      }
-      return {
-        'action': () async {
+          return null;
+          
+        case MapObjectType.creature:
+          final creature = object as Creature;
           await provider.catchCreature(
             creature.id,
-            _userInfo?.id ?? '',
+            userId,
             _userInfo?.name ?? 'Прогульщик',
           );
-          if (mounted) {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${creature.creatureType.name} пойман!'),
-                backgroundColor: Colors.purple,
-              ),
-            );
-          }
-        },
-        'hint': null,
-      };
+          return creature;
+          
+        default:
+          return null;
+      }
+    } catch (e) {
+      debugPrint('Ошибка выполнения действия: $e');
+      return null;
     }
-    
-    if (object.type == MapObjectType.secretMessage) {
-      final secret = object as SecretMessage;
-      final userId = _userInfo?.id ?? '';
-      
-      if (secret.isReadByUser(userId)) {
-        return {'action': null, 'hint': '✅ Вы уже прочитали это сообщение'};
-      }
-      if (!isWalking) {
-        return {'action': null, 'hint': '💼 Начните прогулку, чтобы прочитать сообщение'};
-      }
-      if (_currentLocation == null) {
-        return {'action': null, 'hint': '📍 Определяем ваше местоположение...'};
-      }
-      final distance = calculateDistance(
-        _currentLocation!.latitude,
-        _currentLocation!.longitude,
-        secret.latitude,
-        secret.longitude,
+  }
+  
+  /// Обработать результат действия
+  void _handleActionResult(dynamic result, MapObject object) {
+    if (result is TrashMonster) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Отлично! +${result.cleaningPoints} очков'),
+          backgroundColor: Colors.green,
+        ),
       );
-      if (distance > secret.unlockRadius) {
-        return {'action': null, 'hint': '📍 Подойдите ближе (${distance.toInt()} м до разблокировки)'};
-      }
-      return {
-        'action': () async {
-          final content = await provider.readSecretMessage(secret.id, userId);
-          if (mounted && content != null) {
-            Navigator.pop(context);
-            _showSecretContent(secret.title, content);
-          }
-        },
-        'hint': null,
-      };
+    } else if (result is Creature) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${result.creatureType.name} пойман!'),
+          backgroundColor: Colors.purple,
+        ),
+      );
+    } else if (result is _SecretReadResult) {
+      _showSecretContent(result.title, result.content);
     }
-    
-    return {'action': null, 'hint': null};
   }
   
   /// Показать содержимое секретного сообщения
@@ -1098,4 +1061,12 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
+
+/// Вспомогательный класс для результата чтения секретного сообщения
+class _SecretReadResult {
+  final String title;
+  final String content;
+  
+  const _SecretReadResult({required this.title, required this.content});
 }
