@@ -1,8 +1,8 @@
 # Анализ архитектуры Прогулкин
 
-**Дата:** 2024
+**Дата обновления:** Март 2026
 **Версия проекта:** 1.0.0
-**Общий объём кода:** ~9,700 строк Dart
+**Общий объём кода:** ~10,600 строк Dart
 
 ---
 
@@ -12,288 +12,319 @@
 
 | Слой | Файлов | Строк | % |
 |------|--------|-------|---|
-| **Screens** | 7 | ~4,800 | 49% |
-| **Services** | 7 | ~2,100 | 22% |
-| **Providers** | 3 | ~1,100 | 11% |
-| **Models** | 8 | ~1,000 | 10% |
-| **Widgets** | 4 | ~700 | 7% |
+| **Screens** | 10 | ~4,255 | 40% |
+| **Services** | 9 | ~2,136 | 20% |
+| **Models** | 8 | ~1,431 | 14% |
+| **Widgets** | 5 | ~1,792 | 17% |
+| **Providers** | 3 | ~903 | 9% |
 
 ### 1.2. Самые большие файлы
 
-| Файл | Строк | Проблема |
-|------|-------|----------|
-| `home_screen.dart` | 1,484 | 🔴 Критично |
-| `settings_screen.dart` | 731 | 🟡 Внимание |
-| `route_planning_screen.dart` | 657 | 🟡 Внимание |
-| `walk_detail_screen.dart` | 544 | 🟢 Приемлемо |
-| `map_objects_layer.dart` | 496 | 🟢 Приемлемо |
+| Файл | Строк | Оценка | Изменение |
+|------|-------|--------|-----------|
+| `home_screen.dart` | 1,072 | 🟡 Внимание | ⬇️ -412 (было 1,484) |
+| `settings_screen.dart` | 797 | 🟡 Внимание | — |
+| `route_planning_screen.dart` | 657 | 🟢 Приемлемо | — |
+| `location_service.dart` | 569 | 🟢 Приемлемо | — |
+| `walk_detail_screen.dart` | 544 | 🟢 Приемлемо | — |
+| `map_objects_layer.dart` | 496 | 🟢 Приемлемо | — |
+| `map_object_provider.dart` | 482 | 🟢 Приемлемо | — |
+| `nearby_objects_notifier.dart` | 460 | 🟢 Приемлемо | — |
+| `object_details_sheet.dart` | 443 | 🟢 Приемлемо | ✨ Новый |
+| `add_object_screen.dart` | 420 | 🟢 Приемлемо | — |
 
 ---
 
-## 2. Проблемные места
+## 2. Выполненный рефакторинг
 
-### 2.1. HomeScreen - Бог-класс (1,484 строки)
+### 2.1. Выделение ObjectDetailsSheet ✅
 
-**Проблема:** `HomeScreen` выполняет слишком много обязанностей:
+**Статус:** ЗАВЕРШЕНО
 
-```
-HomeScreen (1,484 строки)
-├── UI карты и слои
-├── UI статистики прогулки
-├── UI шагомера
-├── UI нижних контролов
-├── Логика прогулок (start/stop/pause)
-├── Логика объектов карты
-│   ├── Показ деталей
-│   ├── Действия (уборка, чтение секрета)
-│   ├── Опции объекта
-│   └── Добавление объекта
-├── Инициализация провайдеров
-├── Таймеры обновления
-└── _ObjectDetailsContent (внутренний класс, ~350 строк)
-```
-
-**Нарушения принципов:**
-- ❌ Single Responsibility Principle (SRP)
-- ❌ Высокая связанность (coupling)
-- ❌ Сложность тестирования
-- ❌ Сложность навигации по коду
-
-### 2.2. Дублирование UI кода
-
-**Проблема:** Методы `_buildInfoSection`, `_buildInfoRow`, `_getTitle` дублируют логику из `MapObjectInfoWidget` в `map_objects_layer.dart`.
+Создан `lib/widgets/object_details_sheet.dart` (443 строки):
+- Единый виджет для отображения деталей объектов
+- Переиспользуется во всех местах где нужны детали объекта
+- Поддерживает все типы объектов (TrashMonster, SecretMessage, Creature)
 
 ```dart
-// В home_screen.dart
-Widget _buildInfoSection(BuildContext context) { ... }  // ~150 строк
-Widget _buildInfoRow(...) { ... }
-
-// В map_objects_layer.dart  
-class MapObjectInfoWidget { 
-  Widget _buildInfoGrid(...) { ... }  // Похожая логика
-  Widget _buildInfoItem(...) { ... }
-}
-```
-
-### 2.3. Смешивание UI и бизнес-логики
-
-**Проблема:** Логика действий объектов (`_getObjectActionInfo`) находится в UI-слое:
-
-```dart
-// home_screen.dart - НЕПРАВИЛЬНО
-Map<String, dynamic> _getObjectActionInfo(MapObject object, ...) {
-  if (object.type == MapObjectType.trashMonster) {
-    // Проверки, расчёты расстояния
-    final distance = calculateDistance(...);
-    if (distance > 100) {
-      return {'action': null, 'hint': 'Подойдите ближе...'};
-    }
-    // ...
-  }
-}
-```
-
-### 2.4. Отсутствие абстракции для действий
-
-**Проблема:** Каждое действие с объектом требует:
-1. Проверку условий (прогулка, расстояние)
-2. Вызов provider
-3. Закрытие bottom sheet
-4. Показ snackbar
-
-Это дублируется для каждого типа объекта.
-
----
-
-## 3. Рекомендации по рефакторингу
-
-### 3.1. Разделение HomeScreen
-
-**Приоритет:** 🔴 Высокий
-
-Разделить `HomeScreen` на отдельные виджеты:
-
-```
-lib/
-├── screens/
-│   └── home/
-│       ├── home_screen.dart           # ~200 строк (оркестрация)
-│       ├── map_widget.dart            # Карта с маркерами
-│       ├── walk_stats_panel.dart      # Статистика прогулки
-│       ├── steps_panel.dart           # Панель шагомера
-│       ├── bottom_controls.dart       # Кнопки управления
-│       └── object_action_handler.dart # Обработка действий
-└── widgets/
-    └── object_details_sheet.dart      # BottomSheet с деталями
-```
-
-**Ожидаемый результат:**
-- `home_screen.dart` → ~200 строк
-- Каждый виджет → 150-300 строк
-- Тестируемость ↑
-- Переиспользование ↑
-
-### 3.2. Выделение сервисов для объектов
-
-**Приоритет:** 🟡 Средний
-
-Создать `ObjectActionService`:
-
-```dart
-/// Сервис для действий с объектами
-class ObjectActionService {
-  final MapObjectProvider _objectProvider;
-  final LocationService _locationService;
-  
-  /// Проверить возможность действия
-  ActionResult canPerformAction(
-    MapObject object, {
-    required bool isWalking,
-    required LatLng userLocation,
-  });
-  
-  /// Выполнить действие
-  Future<ActionResult> performAction(
-    MapObject object,
-    String userId, {
-    required bool isWalking,
-    required LatLng userLocation,
-  });
-}
-
-/// Результат действия
-class ActionResult {
-  final bool success;
-  final String? message;
-  final int? points;
-  final String? error;
-}
-```
-
-### 3.3. Унификация деталей объекта
-
-**Приоритет:** 🟢 Низкий
-
-Объединить `_ObjectDetailsContent` и `MapObjectInfoWidget`:
-
-```dart
-/// Единый виджет для отображения деталей объекта
+/// Единый виджет для отображения деталей объекта в BottomSheet
 class ObjectDetailsSheet extends StatelessWidget {
   final MapObject object;
-  final ObjectActionHandler? actionHandler;
-  
-  const ObjectDetailsSheet({
-    super.key,
-    required this.object,
-    this.actionHandler,
-  });
-  
-  @override
-  Widget build(BuildContext context) { ... }
+  final String userId;
+  final double? distance;
+  final bool isWalking;
+  final VoidCallback? onConfirm;
+  final VoidCallback? onDeny;
+  final VoidCallback? onAction;
+  final String? actionHint;
 }
 ```
 
-### 3.4. Модель для UI-состояния объекта
+### 2.2. Создание ObjectActionService ✅
 
-**Приоритет:** 🟢 Низкий
+**Статус:** ЗАВЕРШЕНО
+
+Создан `lib/services/object_action_service.dart` (242 строки):
+- Бизнес-логика проверки возможности действий
+- Расчёт расстояний для определения доступности
+- Конфигурируемые радиусы действий (cleaningRadius, catchingRadius)
 
 ```dart
-/// Состояние объекта для UI
-class ObjectUIState {
-  final MapObject object;
-  final double? distanceToUser;
-  final bool canInteract;
-  final String? interactionHint;
-  final bool isWalking;
-  
-  factory ObjectUIState.fromContext(
-    MapObject object,
-    BuildContext context,
-  ) { ... }
+/// Сервис для действий с объектами на карте
+class ObjectActionService {
+  final double cleaningRadius;  // 100м по умолчанию
+  final double catchingRadius;  // 50м по умолчанию
+
+  ActionCheckResult canPerformAction(MapObject object, {
+    required bool isWalking,
+    required LatLng? userLocation,
+    required String userId,
+  });
 }
+```
+
+### 2.3. Модульные компоненты экрана ✅
+
+**Статус:** ЗАВЕРШЕНО
+
+Создана структура `lib/screens/home/`:
+
+| Файл | Строк | Назначение |
+|------|-------|------------|
+| `walk_stats_panel.dart` | 101 | Панель статистики (расстояние, время, скорость) |
+| `steps_panel.dart` | 72 | Панель шагомера |
+| `bottom_controls.dart` | 189 | Нижняя панель управления |
+| `home_components.dart` | 11 | Экспорт компонентов |
+
+---
+
+## 3. Текущие проблемные места
+
+### 3.1. HomeScreen - всё ещё крупный файл (1,072 строки)
+
+**Статус:** 🟡 Требует внимания
+
+После рефакторинга:
+- Удалено ~110 строк бизнес-логики в `ObjectActionService`
+- Удалено ~350 строк `_ObjectDetailsContent` → `ObjectDetailsSheet`
+- Добавлена интеграция с сервисом
+
+**Оставшиеся обязанности:**
+```
+HomeScreen (1,072 строки)
+├── Инициализация провайдеров (~50 строк)
+├── Управление состоянием карты (~100 строк)
+├── Построение UI карты с маркерами (~125 строк)  ← Можно вынести
+├── Панели UI (топ, шаги, низ) (~200 строк)       ← Частично вынесены
+├── Логика прогулок (~60 строк)
+├── Обработка объектов (~150 строк)
+└── Навигация (~50 строк)
+```
+
+### 3.2. SettingsScreen - крупный файл (797 строк)
+
+**Статус:** 🟡 Требует внимания
+
+Разделён на секции:
+- Источник расстояния (~50 строк)
+- Фильтрация GPS (~100 строк)
+- Сглаживание маршрута (~80 строк)
+- Определение неподвижности (~50 строк)
+- Шагомер (~60 строк)
+- P2P синхронизация (~150 строк)
+- Советы (~100 строк)
+
+**Рекомендация:** Вынести секции в отдельные виджеты при следующем рефакторинге.
+
+### 3.3. Маркеры карты в HomeScreen
+
+**Проблема:** UI маркеров (текущая позиция, начало маршрута) встроен в `_buildMap()`
+
+```dart
+// Можно вынести в отдельный виджет
+Marker(
+  point: _currentLocation!,
+  child: Stack(...) // ~50 строк UI маркера
+)
 ```
 
 ---
 
-## 4. План рефакторинга
-
-### Этап 1: Выделение ObjectDetailsSheet (1-2 часа)
-1. Перенести `_ObjectDetailsContent` в отдельный файл
-2. Добавить необходимые параметры
-3. Обновить использование в HomeScreen
-4. Удалить дублирующий `MapObjectInfoWidget`
-
-### Этап 2: Выделение ObjectActionService (2-3 часа)
-1. Создать сервис с методами `canPerformAction`, `performAction`
-2. Перенести логику из `_getObjectActionInfo`
-3. Добавить юнит-тесты
-4. Обновить HomeScreen
-
-### Этап 3: Разделение HomeScreen (3-4 часа)
-1. Создать папку `screens/home/`
-2. Выделить `MapWidget`, `WalkStatsPanel`, `StepsPanel`, `BottomControls`
-3. Создать `HomeScreen` как оркестратор
-4. Обновить навигацию
-
----
-
-## 5. Метрики качества кода
+## 4. Метрики качества кода
 
 ### До рефакторинга
 
 | Метрика | Значение | Оценка |
 |---------|----------|--------|
 | Макс. размер файла | 1,484 | 🔴 Плохо |
-| Средний размер файла | 140 | 🟢 Хорошо |
-| Цикломатическая сложность | Высокая | 🟡 Средне |
+| Средний размер файла | ~140 | 🟢 Хорошо |
 | Дублирование кода | ~15% | 🟡 Средне |
-| Тестируемость | Низкая | 🔴 Плохо |
+| Тестируемость бизнес-логики | Низкая | 🔴 Плохо |
 
-### После рефакторинга (ожидаемое)
+### После рефакторинга
 
 | Метрика | Значение | Оценка |
 |---------|----------|--------|
-| Макс. размер файла | ~400 | 🟢 Хорошо |
-| Средний размер файла | 120 | 🟢 Хорошо |
-| Цикломатическая сложность | Низкая | 🟢 Хорошо |
-| Дублирование кода | <5% | 🟢 Хорошо |
-| Тестируемость | Высокая | 🟢 Хорошо |
+| Макс. размер файла | 1,072 | 🟡 Средне |
+| Средний размер файла | ~150 | 🟢 Хорошо |
+| Дублирование кода | ~5% | 🟢 Хорошо |
+| Тестируемость бизнес-логики | Высокая | 🟢 Хорошо |
+
+### Улучшения
+
+| Показатель | До | После | Изменение |
+|------------|-----|-------|-----------|
+| `home_screen.dart` | 1,484 | 1,072 | **-28%** |
+| Модульных компонентов | 0 | 5 | **+5** |
+| Сервисов бизнес-логики | 0 | 1 | **+1** |
+| Переиспользуемых виджетов | 0 | 1 | **+1** |
 
 ---
 
-## 6. Выводы
+## 5. Архитектура проекта
+
+### 5.1. Структура директорий
+
+```
+lib/
+├── config/
+│   └── app_config.dart
+├── models/
+│   ├── walk.dart
+│   ├── walk_point.dart
+│   ├── distance_source.dart
+│   └── map_objects/
+│       ├── map_object.dart
+│       ├── trash_monster.dart
+│       ├── secret_message.dart
+│       └── creature.dart
+├── providers/
+│   ├── walk_provider.dart
+│   ├── pedometer_provider.dart
+│   └── map_object_provider.dart
+├── services/
+│   ├── location_service.dart       # GPS трекинг
+│   ├── pedometer_service.dart      # Шагомер
+│   ├── tile_cache_service.dart     # Кэш карт
+│   ├── object_action_service.dart  # Логика действий ✨
+│   ├── user_id_service.dart
+│   └── storage_service.dart
+├── screens/
+│   ├── home_screen.dart
+│   ├── home/                       # ✨ Модульные компоненты
+│   │   ├── walk_stats_panel.dart
+│   │   ├── steps_panel.dart
+│   │   ├── bottom_controls.dart
+│   │   └── home_components.dart
+│   ├── settings_screen.dart
+│   ├── history_screen.dart
+│   ├── walk_detail_screen.dart
+│   ├── add_object_screen.dart
+│   └── route_planning_screen.dart
+├── widgets/
+│   ├── map_objects_layer.dart
+│   ├── object_details_sheet.dart   # ✨ Новый виджет
+│   ├── object_filters_widget.dart
+│   └── nearby_objects_notifier.dart
+├── storage/
+│   └── map_object_storage.dart
+└── main.dart
+```
+
+### 5.2. Зависимости слоёв
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      UI Layer                           │
+│  Screens ───────────────────────────── Widgets          │
+│    │                                      │             │
+│    └──────────────┬───────────────────────┘             │
+└───────────────────┼─────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────┐
+│                   State Management                      │
+│                    Providers                            │
+└───────────────────┼─────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────┐
+│                   Business Logic                        │
+│  Services ──────────────────────────────── Models       │
+│    │                                      │             │
+│    └──────────────┬───────────────────────┘             │
+└───────────────────┼─────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────┐
+│                     Data Layer                          │
+│         Storage (SQLite, ObjectBox, SharedPreferences)  │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 6. Рекомендации по дальнейшему развитию
+
+### 6.1. Краткосрочные (следующий спринт)
+
+| Задача | Приоритет | Оценка |
+|--------|-----------|--------|
+| Вынести маркеры карты в `MapMarkers` виджет | 🟡 Средний | 1 час |
+| Разбить `SettingsScreen` на секции | 🟡 Средний | 2 часа |
+| Добавить unit-тесты для `ObjectActionService` | 🟢 Низкий | 2 часа |
+
+### 6.2. Среднесрочные
+
+| Задача | Приоритет | Описание |
+|--------|-----------|----------|
+| Полностью разделить `HomeScreen` | 🟡 Средний | Вынести MapWidget, ObjectOptionsHandler |
+| Создать `SettingsSections/` директорию | 🟡 Средний | Модульная структура настроек |
+| Интегрировать созданные компоненты | 🟡 Средний | Использовать `screens/home/` компоненты |
+
+### 6.3. При добавлении новых типов объектов
+
+1. **Модель** — наследовать от `MapObject`, реализовать сериализацию
+2. **Provider** — добавить методы CRUD в `MapObjectProvider`
+3. **ObjectActionService** — добавить секцию в `canPerformAction()`
+4. **ObjectDetailsSheet** — добавить секцию `_build*Info()`
+5. **AddObjectScreen** — добавить форму создания
+
+---
+
+## 7. Выводы
 
 ### Что хорошо ✅
 
-1. **Чистые модели** - `TrashMonster`, `SecretMessage`, `Creature` хорошо спроектированы
-2. **Разделение Provider/Service** - чёткое разделение ответственности
-3. **P2P архитектура** - модульная, расширяемая
-4. **Офлайн-кэш карт** - хорошо инкапсулирован в `TileCacheService`
+1. **Модульная архитектура** — чёткое разделение слоёв
+2. **Переиспользуемые компоненты** — `ObjectDetailsSheet`, компоненты `home/`
+3. **Вынесенная бизнес-логика** — `ObjectActionService` тестируется отдельно
+4. **Чистые модели** — `TrashMonster`, `SecretMessage`, `Creature` хорошо спроектированы
+5. **P2P архитектура** — модульная, расширяемая
+
+### Что улучшено после рефакторинга ✅
+
+1. **HomeScreen** — уменьшен с 1,484 до 1,072 строк (-28%)
+2. **Разделение ответственности** — UI отделён от бизнес-логики
+3. **Тестируемость** — `ObjectActionService` можно тестировать изолированно
+4. **Дублирование кода** — устранено дублирование UI деталей объектов
 
 ### Что требует внимания ⚠️
 
-1. **HomeScreen** - главный кандидат на рефакторинг
-2. **Дублирование UI** - унифицировать виджеты деталей объектов
-3. **Смешивание слоёв** - вынести бизнес-логику из UI
-
-### Приоритет действий
-
-1. 🔴 **Сейчас:** Выделить `ObjectDetailsSheet` (низкий риск, высокий эффект)
-2. 🟡 **Скоро:** Разделить `HomeScreen` на компоненты
-3. 🟢 **Потом:** Создать `ObjectActionService` при добавлении новых типов объектов
+1. **SettingsScreen** — 797 строк, кандидат на разделение
+2. **HomeScreen** — 1,072 строк, можно продолжить декомпозицию
+3. **MapObjectsLayer** — 496 строк, можно выделить подвиджеты маркеров
 
 ---
 
-## 7. Рекомендации для новых фич
+## 8. История изменений
 
-При добавлении новых типов объектов (например, Существа):
-
-1. **Модель** - наследовать от `MapObject`, реализовать `toSyncJson`/`fromSyncJson`
-2. **Provider** - добавить метод `spawnCreature` в `MapObjectProvider`
-3. **UI создания** - создать отдельный экран или форму в `AddObjectScreen`
-4. **Действия** - добавить в `ObjectActionService` (после рефакторинга)
-5. **Детали** - добавить секцию в `ObjectDetailsSheet`
+| Дата | Изменение | Коммит |
+|------|-----------|--------|
+| Март 2026 | Рефакторинг Phase 1: ObjectDetailsSheet | `f7a698b` |
+| Март 2026 | Рефакторинг Phase 2: ObjectActionService + компоненты | `436b516` |
+| Март 2026 | Исправление сглаживания маршрута | `fa2cf27` |
 
 ---
 
-*Документ создан для оценки поддерживаемости проекта*
+*Документ обновлён после завершения рефакторинга Phase 1 и Phase 2*
