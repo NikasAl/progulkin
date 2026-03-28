@@ -12,6 +12,9 @@ class MapObjectProvider extends ChangeNotifier {
   final MapObjectExportService _exportService = MapObjectExportService();
   final Uuid _uuid = const Uuid();
 
+  /// Доступ к хранилищу для прямого использования
+  MapObjectStorage get storage => _storage;
+
   List<MapObject> _objects = [];
   List<MapObject> _nearbyObjects = [];
   MapObjectType? _selectedType;
@@ -233,6 +236,88 @@ class MapObjectProvider extends ChangeNotifier {
 
     await _saveAndBroadcast(creature);
     return creature;
+  }
+
+  /// Создание заметки об интересном месте
+  Future<InterestNote> createInterestNote({
+    required double latitude,
+    required double longitude,
+    required String ownerId,
+    String ownerName = 'Аноним',
+    int ownerReputation = 0,
+    required InterestCategory category,
+    required String title,
+    String description = '',
+    List<String> photoIds = const [],
+    bool contactVisible = false,
+  }) async {
+    final note = InterestNote(
+      id: _uuid.v4(),
+      latitude: latitude,
+      longitude: longitude,
+      ownerId: ownerId,
+      ownerName: ownerName,
+      ownerReputation: ownerReputation,
+      category: category,
+      title: title,
+      description: description,
+      photoIds: photoIds,
+      contactVisible: contactVisible,
+    );
+
+    await _saveAndBroadcast(note);
+    return note;
+  }
+
+  /// Создание напоминалки
+  Future<ReminderCharacter> createReminderCharacter({
+    required double latitude,
+    required double longitude,
+    required String ownerId,
+    String ownerName = 'Аноним',
+    int ownerReputation = 0,
+    required ReminderCharacterType characterType,
+    required String reminderText,
+    double triggerRadius = 50,
+  }) async {
+    final reminder = ReminderCharacter(
+      id: _uuid.v4(),
+      latitude: latitude,
+      longitude: longitude,
+      ownerId: ownerId,
+      ownerName: ownerName,
+      ownerReputation: ownerReputation,
+      characterType: characterType,
+      reminderText: reminderText,
+      triggerRadius: triggerRadius,
+    );
+
+    await _saveAndBroadcast(reminder);
+    return reminder;
+  }
+
+  /// Добавить "Интересно" к заметке
+  Future<void> addInterestToNote(String noteId, String userId) async {
+    final obj = await _storage.getObject(noteId);
+    if (obj == null || obj is! InterestNote) return;
+
+    final updated = obj.addInterest(userId);
+    await _storage.updateObject(updated);
+    await _storage.addInterest(noteId: noteId, userId: userId);
+    await _broadcastUpdate(updated);
+    notifyListeners();
+  }
+
+  /// Убрать "Интересно" с заметки
+  Future<void> removeInterestFromNote(String noteId, String userId) async {
+    final obj = await _storage.getObject(noteId);
+    if (obj == null || obj is! InterestNote) return;
+
+    final updated = obj.removeInterest(userId);
+    await _storage.updateObject(updated);
+    await _storage.removeInterest(noteId, userId);
+    await _broadcastUpdate(updated);
+    notifyListeners();
   }
 
   /// Подтвердить объект
