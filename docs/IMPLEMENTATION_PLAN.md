@@ -91,13 +91,15 @@
 
 ## Этап 2: Заметки об интересных местах (P0-P1)
 
-### 2.1. Модель InterestNote
+### 2.1. Модель InterestNote ✅
 
 **Задачи:**
-- [ ] Создать `lib/models/map_objects/interest_note.dart`
-- [ ] Добавить enum InterestCategory
-- [ ] Реализовать toSyncJson/fromSyncJson
-- [ ] Обновить map_objects.dart для экспорта
+- [x] Создать `lib/models/map_objects/interest_note.dart`
+- [x] Добавить enum InterestCategory
+- [x] Реализовать toSyncJson/fromSyncJson
+- [x] Обновить map_objects.dart для экспорта
+
+**Коммит:** 3f846bd
 
 **Модель:**
 ```dart
@@ -128,13 +130,15 @@ class InterestNote extends MapObject {
 
 ---
 
-### 2.2. Сервис сжатия фото
+### 2.2. Сервис сжатия фото ✅
 
 **Задачи:**
-- [ ] Создать `lib/services/photo_compression_service.dart`
-- [ ] Реализовать сжатие в WebP
-- [ ] Ограничить размер (max 800x600, quality 80)
-- [ ] Добавить генерацию превью
+- [x] Создать `lib/services/photo_compression_service.dart`
+- [x] Реализовать сжатие в WebP
+- [x] Ограничить размер (max 800x600, quality 80)
+- [x] Добавить генерацию превью
+
+**Коммит:** 3f846bd
 
 **Параметры:**
 ```dart
@@ -148,12 +152,14 @@ const maxPhotoSizeKB = 100;
 
 ---
 
-### 2.3. Хранилище фото
+### 2.3. Хранилище фото ✅
 
 **Задачи:**
-- [ ] Создать таблицу photos в SQLite
-- [ ] Реализовать сохранение/загрузку WebP
-- [ ] Добавить методы в MapObjectStorage
+- [x] Создать таблицу photos в SQLite
+- [x] Реализовать сохранение/загрузку WebP
+- [x] Добавить методы в MapObjectStorage
+
+**Коммит:** 3f846bd
 
 **Схема БД:**
 ```sql
@@ -200,12 +206,14 @@ CREATE TABLE photos (
 
 ## Этап 3: Социальные функции (P1)
 
-### 3.1. Модель ContactProfile
+### 3.1. Модель ContactProfile ✅
 
 **Задачи:**
-- [ ] Создать `lib/models/contact_profile.dart`
-- [ ] Реализовать сериализацию
-- [ ] Добавить хранение в SharedPreferences
+- [x] Создать `lib/models/contact_profile.dart`
+- [x] Реализовать сериализацию
+- [x] Добавить хранение в SQLite (в MapObjectStorage)
+
+**Коммит:** 3f846bd
 
 **Модель:**
 ```dart
@@ -269,11 +277,13 @@ enum ContactVisibility {
 
 ## Этап 4: P2P Мессенджер (P1)
 
-### 4.1. Модель P2PMessage
+### 4.1. Модель P2PMessage ✅
 
 **Задачи:**
-- [ ] Создать `lib/models/p2p_message.dart`
-- [ ] Реализовать сериализацию
+- [x] Создать `lib/models/p2p_message.dart`
+- [x] Реализовать сериализацию
+
+**Коммит:** 3f846bd
 
 **Модель:**
 ```dart
@@ -292,12 +302,14 @@ class P2PMessage {
 
 ---
 
-### 4.2. Хранилище сообщений
+### 4.2. Хранилище сообщений ✅
 
 **Задачи:**
-- [ ] Создать таблицу messages в SQLite
-- [ ] Реализовать CRUD операции
-- [ ] Добавить в P2PService
+- [x] Создать таблицу messages в SQLite
+- [x] Реализовать CRUD операции
+- [x] Добавить в MapObjectStorage
+
+**Коммит:** 3f846bd
 
 **Оценка:** 2-3 часа
 
@@ -339,11 +351,13 @@ class P2PMessage {
 
 ## Этап 5: Смешарики-напоминалки (P1-P2)
 
-### 5.1. Модель ReminderCharacter
+### 5.1. Модель ReminderCharacter ✅
 
 **Задачи:**
-- [ ] Создать `lib/models/map_objects/reminder_character.dart`
-- [ ] Добавить enum ReminderCharacterType
+- [x] Создать `lib/models/map_objects/reminder_character.dart`
+- [x] Добавить enum ReminderCharacterType (8 персонажей)
+
+**Коммит:** 3f846bd
 
 **Модель:**
 ```dart
@@ -453,23 +467,26 @@ class ReminderCharacter extends MapObject {
 - [x] Уникальные изображения монстров
 
 ### ⏳ Спринт 2 (этап 2) — В РАБОТЕ
-1. [ ] Модель InterestNote (2-3 ч)
-2. [ ] Сервис сжатия фото (3-4 ч)
-3. [ ] Хранилище фото (2-3 ч)
+1. [x] Модель InterestNote (2-3 ч)
+2. [x] Сервис сжатия фото (3-4 ч)
+3. [x] Хранилище фото (2-3 ч)
 4. [ ] UI создания заметки (4-5 ч)
 5. [ ] UI просмотра заметки (3-4 ч)
 
 ### ⏳ Спринт 3 (этап 3-4)
-- [ ] Модель ContactProfile (1-2 ч)
+- [x] Модель ContactProfile (1-2 ч)
 - [ ] Экран профиля (3-4 ч)
-- [ ] Система "Интересно" (3-4 ч)
-- [ ] P2P Мессенджер (10-14 ч)
+- [x] Система "Интересно" - таблица в SQLite
+- [x] P2P Мессенджер - модели и хранилище
+- [ ] UI мессенджера (6-8 ч)
 
 ### ⏳ Спринт 4 (этап 5-6)
-- [ ] Смешарики-напоминалки (8-12 ч)
+- [x] Модель ReminderCharacter (1-2 ч)
+- [ ] Гео-уведомления (3-4 ч)
+- [ ] UI напоминаний (4-6 ч)
 - [ ] Модерация фото (4-6 ч)
 
 ---
 
 *Документ создан: Март 2026*
-*Последнее обновление: Март 2026 — Этап 1 завершён, начат Этап 2*
+*Последнее обновление: Март 2026 — Этап 2: бэкенд готов, остался UI*
