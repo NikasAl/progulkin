@@ -41,6 +41,9 @@ dependencies:
   # Экспорт/Импорт файлов
   share_plus: ^10.1.0
   file_picker: ^10.1.0
+  
+  # Камера для фото
+  image_picker: ^1.0.4
 
   # Иконки и UI
   cupertino_icons: ^1.0.6

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../models/map_objects/map_objects.dart';
 import '../providers/map_object_provider.dart';
 import '../services/user_id_service.dart';
 import '../services/photo_compression_service.dart';
+import '../services/location_service.dart';
 
 /// Экран добавления нового объекта на карту
 class AddObjectScreen extends StatefulWidget {
@@ -47,8 +48,11 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
   final _interestDescriptionController = TextEditingController();
   final List<Uint8List> _selectedPhotos = [];
   final List<String> _photoIds = [];
+  final List<Map<String, dynamic>> _photoMetadata = []; // Метаданные фото (GPS, время)
   bool _showContact = false;
   final _photoCompressionService = PhotoCompressionService();
+  final _imagePicker = ImagePicker();
+  final _locationService = LocationService();
   
   // Поля для напоминалки
   ReminderCharacterType _characterType = ReminderCharacterType.kopatych;
@@ -460,11 +464,19 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             ),
             const Spacer(),
             TextButton.icon(
-              onPressed: _pickPhotos,
-              icon: const Icon(Icons.add_photo_alternate),
-              label: const Text('Добавить'),
+              onPressed: _takePhoto,
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('Снять фото'),
             ),
           ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Фото можно сделать только здесь и сейчас',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Colors.grey[600],
+            fontStyle: FontStyle.italic,
+          ),
         ),
         const SizedBox(height: 8),
         
@@ -488,6 +500,30 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
                           fit: BoxFit.cover,
                         ),
                       ),
+                      // Индикатор verified location
+                      if (_photoMetadata.isNotEmpty && index < _photoMetadata.length)
+                        Positioned(
+                          bottom: 4,
+                          left: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green[700],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.location_on, size: 10, color: Colors.white),
+                                SizedBox(width: 2),
+                                Text(
+                                  'Здесь',
+                                  style: TextStyle(fontSize: 8, color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       Positioned(
                         top: 4,
                         right: 4,
@@ -497,6 +533,9 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
                               _selectedPhotos.removeAt(index);
                               if (index < _photoIds.length) {
                                 _photoIds.removeAt(index);
+                              }
+                              if (index < _photoMetadata.length) {
+                                _photoMetadata.removeAt(index);
                               }
                             });
                           },
@@ -644,36 +683,78 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
     );
   }
   
-  /// Выбор фото
-  Future<void> _pickPhotos() async {
+  /// Сделать фото камерой
+  Future<void> _takePhoto() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: true,
-        withData: true,
+      // Проверяем текущую позицию пользователя
+      final currentPosition = await _locationService.getCurrentPosition();
+      if (currentPosition == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Не удалось определить ваше местоположение'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Проверяем расстояние до места заметки (максимум 100 метров)
+      final distance = calculateDistance(
+        currentPosition.latitude,
+        currentPosition.longitude,
+        widget.latitude,
+        widget.longitude,
       );
-      
-      if (result != null && result.files.isNotEmpty) {
-        for (final file in result.files) {
-          if (file.bytes != null) {
-            // Сжимаем фото
-            final compressed = await _photoCompressionService.compressBytes(
-              bytes: file.bytes!,
-            );
-            
-            if (compressed.success && compressed.compressedBytes != null) {
-              setState(() {
-                _selectedPhotos.add(compressed.compressedBytes!);
-                _photoIds.add(compressed.photoId!);
-              });
-            }
-          }
+
+      if (distance > 100) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Вы слишком далеко от места заметки (${distance.toInt()} м). Подойдите ближе.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Открываем камеру
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1200,
+        maxHeight: 900,
+        imageQuality: 85,
+      );
+
+      if (photo != null) {
+        final bytes = await photo.readAsBytes();
+
+        // Сжимаем фото
+        final compressed = await _photoCompressionService.compressBytes(
+          bytes: bytes,
+        );
+
+        if (compressed.success && compressed.compressedBytes != null) {
+          setState(() {
+            _selectedPhotos.add(compressed.compressedBytes!);
+            _photoIds.add(compressed.photoId!);
+            // Сохраняем метаданные о месте съёмки
+            _photoMetadata.add({
+              'latitude': currentPosition.latitude,
+              'longitude': currentPosition.longitude,
+              'distance': distance,
+              'timestamp': DateTime.now().toIso8601String(),
+              'verified': distance <= 100,
+            });
+          });
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка при выборе фото: $e')),
+          SnackBar(content: Text('Ошибка при съёмке фото: $e')),
         );
       }
     }
