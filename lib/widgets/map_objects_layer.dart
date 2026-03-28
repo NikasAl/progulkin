@@ -130,17 +130,34 @@ class _MarkerWidget extends StatelessWidget {
         ),
       );
     }
-    
+
     // Для существ тоже можно добавить картинки позже
     if (object.type == MapObjectType.creature) {
       final creature = object as Creature;
-      // Пока используем эмодзи
       return Text(
         creature.creatureType.emoji,
         style: TextStyle(fontSize: _getEmojiSize()),
       );
     }
-    
+
+    // Для заметок об интересных местах используем эмодзи категории
+    if (object.type == MapObjectType.interestNote) {
+      final note = object as InterestNote;
+      return Text(
+        note.category.emoji,
+        style: TextStyle(fontSize: _getEmojiSize()),
+      );
+    }
+
+    // Для напоминалок используем эмодзи персонажа
+    if (object.type == MapObjectType.reminderCharacter) {
+      final reminder = object as ReminderCharacter;
+      return Text(
+        reminder.characterType.emoji,
+        style: TextStyle(fontSize: _getEmojiSize()),
+      );
+    }
+
     // Для остальных типов - эмодзи
     return Text(
       object.type.emoji,
@@ -152,7 +169,7 @@ class _MarkerWidget extends StatelessWidget {
     if (object.status == MapObjectStatus.hidden) {
       return Colors.grey.withOpacity(0.7);
     }
-    
+
     switch (object.type) {
       case MapObjectType.trashMonster:
         final monster = object as TrashMonster;
@@ -160,17 +177,24 @@ class _MarkerWidget extends StatelessWidget {
           return Colors.green.withOpacity(0.8);
         }
         return Colors.orange.withOpacity(0.8);
-        
+
       case MapObjectType.secretMessage:
         return Colors.purple.withOpacity(0.8);
-        
+
       case MapObjectType.creature:
         final creature = object as Creature;
         if (!creature.isWild) {
           return Colors.blue.withOpacity(0.8);
         }
         return _getRarityColor(creature.rarity);
-        
+
+      case MapObjectType.interestNote:
+        final note = object as InterestNote;
+        return _getCategoryColor(note.category);
+
+      case MapObjectType.reminderCharacter:
+        return Colors.cyan.withOpacity(0.8);
+
       default:
         return Colors.blue.withOpacity(0.8);
     }
@@ -193,6 +217,30 @@ class _MarkerWidget extends StatelessWidget {
     }
   }
 
+  /// Цвет для категории заметки
+  Color _getCategoryColor(InterestCategory category) {
+    switch (category) {
+      case InterestCategory.nature:
+        return Colors.green.withOpacity(0.8);
+      case InterestCategory.culture:
+        return Colors.indigo.withOpacity(0.8);
+      case InterestCategory.sport:
+        return Colors.orange.withOpacity(0.8);
+      case InterestCategory.food:
+        return Colors.brown.withOpacity(0.8);
+      case InterestCategory.photo:
+        return Colors.pink.withOpacity(0.8);
+      case InterestCategory.art:
+        return Colors.purple.withOpacity(0.8);
+      case InterestCategory.games:
+        return Colors.red.withOpacity(0.8);
+      case InterestCategory.tip:
+        return Colors.amber.withOpacity(0.8);
+      case InterestCategory.other:
+        return Colors.blue.withOpacity(0.8);
+    }
+  }
+
   double _getEmojiSize() {
     if (object.type == MapObjectType.creature) {
       final creature = object as Creature;
@@ -207,6 +255,10 @@ class _MarkerWidget extends StatelessWidget {
     }
     if (object.type == MapObjectType.creature) {
       return !(object as Creature).isWild;
+    }
+    // Для заметок показываем индикатор если есть фото
+    if (object.type == MapObjectType.interestNote) {
+      return (object as InterestNote).photoIds.isNotEmpty;
     }
     return false;
   }
@@ -236,6 +288,14 @@ class _StatusBadge extends StatelessWidget {
       if (!creature.isWild) {
         icon = Icons.favorite;
         color = Colors.pink;
+      } else {
+        return const SizedBox.shrink();
+      }
+    } else if (object.type == MapObjectType.interestNote) {
+      final note = object as InterestNote;
+      if (note.photoIds.isNotEmpty) {
+        icon = Icons.photo_camera;
+        color = Colors.blue;
       } else {
         return const SizedBox.shrink();
       }

@@ -883,6 +883,22 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             onAction: onAction,
             actionHint: actionCheck.hint,
+            onInterestToggle: object.type == MapObjectType.interestNote
+                ? (noteId, userId) async {
+                    final note = object as InterestNote;
+                    if (note.hasInterestFrom(userId)) {
+                      await mapObjectProvider.removeInterestFromNote(noteId, userId);
+                    } else {
+                      await mapObjectProvider.addInterestToNote(noteId, userId);
+                    }
+                    if (context.mounted) {
+                      setState(() {});
+                    }
+                  }
+                : null,
+            onContactAuthor: object.type == MapObjectType.interestNote
+                ? (note) => _showContactAuthorDialog(note)
+                : null,
           ),
         ),
       ),
@@ -962,6 +978,153 @@ class _HomeScreenState extends State<HomeScreen> {
             child: const Text('Закрыть'),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Показать диалог связи с автором заметки
+  void _showContactAuthorDialog(InterestNote note) {
+    Navigator.pop(context); // Закрываем BottomSheet
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Заголовок
+              Row(
+                children: [
+                  Text(note.category.emoji, style: const TextStyle(fontSize: 32)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Связаться с автором',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        Text(
+                          note.ownerName,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // Заметка
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      note.title,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    if (note.description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(note.description),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Варианты связи
+              const Text(
+                'Способы связи:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+
+              // VK
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[700],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.language, color: Colors.white),
+                ),
+                title: const Text('ВКонтакте'),
+                subtitle: const Text('Написать сообщение'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  // TODO: Открыть VK профиль
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Открытие VK... (в разработке)')),
+                  );
+                },
+              ),
+
+              // Max
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.purple[600],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.chat, color: Colors.white),
+                ),
+                title: const Text('Max Messenger'),
+                subtitle: const Text('Написать сообщение'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  // TODO: Открыть Max
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Открытие Max... (в разработке)')),
+                  );
+                },
+              ),
+
+              // P2P
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green[600],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.wifi, color: Colors.white),
+                ),
+                title: const Text('P2P сообщение'),
+                subtitle: const Text('Написать напрямую через приложение'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  // TODO: Открыть P2P чат
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('P2P чат в разработке')),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

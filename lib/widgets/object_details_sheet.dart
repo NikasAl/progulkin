@@ -1,11 +1,13 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/map_objects/map_objects.dart';
+import '../services/p2p/map_object_storage.dart';
 
 /// Единый виджет для отображения деталей объекта в BottomSheet
 ///
 /// Используется как в HomeScreen так и в других местах где нужно
 /// показать информацию об объекте карты.
-class ObjectDetailsSheet extends StatelessWidget {
+class ObjectDetailsSheet extends StatefulWidget {
   final MapObject object;
   final String userId;
   final double? distance;
@@ -14,6 +16,8 @@ class ObjectDetailsSheet extends StatelessWidget {
   final VoidCallback? onDeny;
   final VoidCallback? onAction;
   final String? actionHint;
+  final void Function(String noteId, String userId)? onInterestToggle;
+  final void Function(InterestNote note)? onContactAuthor;
 
   const ObjectDetailsSheet({
     super.key,
@@ -25,14 +29,57 @@ class ObjectDetailsSheet extends StatelessWidget {
     this.onDeny,
     this.onAction,
     this.actionHint,
+    this.onInterestToggle,
+    this.onContactAuthor,
   });
+
+  @override
+  State<ObjectDetailsSheet> createState() => _ObjectDetailsSheetState();
+}
+
+class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
+  final MapObjectStorage _storage = MapObjectStorage();
+  List<Uint8List> _photos = [];
+  bool _isLoadingPhotos = false;
+  bool _isInterested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    if (widget.object.type == MapObjectType.interestNote) {
+      final note = widget.object as InterestNote;
+      setState(() => _isLoadingPhotos = true);
+
+      // Загружаем фото
+      final photos = <Uint8List>[];
+      for (final photoId in note.photoIds) {
+        final photoData = await _storage.getPhoto(photoId);
+        if (photoData != null && photoData['webp_data'] != null) {
+          photos.add(photoData['webp_data'] as Uint8List);
+        }
+      }
+
+      // Проверяем, поставил ли пользователь "Интересно"
+      final hasInterest = await _storage.hasInterest(note.id, widget.userId);
+
+      setState(() {
+        _photos = photos;
+        _isLoadingPhotos = false;
+        _isInterested = hasInterest;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     // Определяем метку и иконку для кнопки действия
     String actionLabel;
     IconData actionIcon;
-    switch (object.type) {
+    switch (widget.object.type) {
       case MapObjectType.trashMonster:
         actionLabel = 'Убрано!';
         actionIcon = Icons.cleaning_services;
@@ -65,10 +112,18 @@ class ObjectDetailsSheet extends StatelessWidget {
 
           const SizedBox(height: 16),
 
+          // Фото-галерея для InterestNote
+          if (widget.object.type == MapObjectType.interestNote)
+            _buildPhotoGallery(context),
+
           // Статистика
           _buildStatsRow(context),
 
           const SizedBox(height: 20),
+
+          // Кнопки для InterestNote
+          if (widget.object.type == MapObjectType.interestNote)
+            _buildInterestNoteButtons(context),
 
           // Кнопки подтверждения/опровержения
           _buildConfirmationButtons(context),
@@ -85,7 +140,7 @@ class ObjectDetailsSheet extends StatelessWidget {
     return Row(
       children: [
         Text(
-          object.type.emoji,
+          widget.object.type.emoji,
           style: const TextStyle(fontSize: 40),
         ),
         const SizedBox(width: 16),
@@ -98,7 +153,7 @@ class ObjectDetailsSheet extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               Text(
-                object.shortDescription,
+                widget.object.shortDescription,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.grey[600],
                 ),
@@ -112,18 +167,24 @@ class ObjectDetailsSheet extends StatelessWidget {
 
   /// Получить заголовок в зависимости от типа объекта
   String _getTitle() {
-    switch (object.type) {
+    switch (widget.object.type) {
       case MapObjectType.trashMonster:
-        final monster = object as TrashMonster;
+        final monster = widget.object as TrashMonster;
         return '${monster.trashType.emoji} ${monster.trashType.name}';
       case MapObjectType.secretMessage:
-        final secret = object as SecretMessage;
+        final secret = widget.object as SecretMessage;
         return '📜 ${secret.title}';
       case MapObjectType.creature:
-        final creature = object as Creature;
+        final creature = widget.object as Creature;
         return '${creature.rarity.badge} ${creature.creatureType.name}';
+      case MapObjectType.interestNote:
+        final note = widget.object as InterestNote;
+        return '${note.category.emoji} ${note.title}';
+      case MapObjectType.reminderCharacter:
+        final reminder = widget.object as ReminderCharacter;
+        return '${reminder.characterType.emoji} Напоминание';
       default:
-        return object.type.name;
+        return widget.object.type.name;
     }
   }
 
@@ -131,7 +192,7 @@ class ObjectDetailsSheet extends StatelessWidget {
   Widget _buildInfoSection(BuildContext context) {
     final items = <Widget>[];
 
-    switch (object.type) {
+    switch (widget.object.type) {
       case MapObjectType.trashMonster:
         items.addAll(_buildTrashMonsterInfo(context));
         break;
@@ -142,6 +203,14 @@ class ObjectDetailsSheet extends StatelessWidget {
 
       case MapObjectType.creature:
         items.addAll(_buildCreatureInfo(context));
+        break;
+
+      case MapObjectType.interestNote:
+        items.addAll(_buildInterestNoteInfo(context));
+        break;
+
+      case MapObjectType.reminderCharacter:
+        items.addAll(_buildReminderCharacterInfo(context));
         break;
 
       default:
@@ -155,7 +224,7 @@ class ObjectDetailsSheet extends StatelessWidget {
 
   /// Информация о мусорном монстре
   List<Widget> _buildTrashMonsterInfo(BuildContext context) {
-    final monster = object as TrashMonster;
+    final monster = widget.object as TrashMonster;
     return [
       _buildInfoRow(
         context,
@@ -203,7 +272,7 @@ class ObjectDetailsSheet extends StatelessWidget {
           const Icon(Icons.check_circle, color: Colors.green),
           const SizedBox(width: 8),
           Text(
-            'Убрано ${monster.cleanedBy == userId ? "вами" : ""}',
+            'Убрано ${monster.cleanedBy == widget.userId ? "вами" : ""}',
             style: const TextStyle(color: Colors.green),
           ),
         ],
@@ -213,7 +282,7 @@ class ObjectDetailsSheet extends StatelessWidget {
 
   /// Информация о секретном сообщении
   List<Widget> _buildSecretMessageInfo(BuildContext context) {
-    final secret = object as SecretMessage;
+    final secret = widget.object as SecretMessage;
     return [
       _buildInfoRow(
         context,
@@ -245,7 +314,7 @@ class ObjectDetailsSheet extends StatelessWidget {
 
   /// Информация о существе
   List<Widget> _buildCreatureInfo(BuildContext context) {
-    final creature = object as Creature;
+    final creature = widget.object as Creature;
     return [
       _buildInfoRow(
         context,
@@ -319,6 +388,188 @@ class ObjectDetailsSheet extends StatelessWidget {
     );
   }
 
+  /// Информация о заметке об интересном месте
+  List<Widget> _buildInterestNoteInfo(BuildContext context) {
+    final note = widget.object as InterestNote;
+    return [
+      _buildInfoRow(
+        context,
+        icon: Icons.category,
+        label: 'Категория',
+        value: '${note.category.emoji} ${note.category.name}',
+      ),
+      if (note.description.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            note.description,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+      _buildInfoRow(
+        context,
+        icon: Icons.favorite,
+        label: 'Интересуются',
+        value: '${note.interestCount} человек',
+      ),
+    ];
+  }
+
+  /// Информация о напоминалке
+  List<Widget> _buildReminderCharacterInfo(BuildContext context) {
+    final reminder = widget.object as ReminderCharacter;
+    return [
+      _buildInfoRow(
+        context,
+        icon: Icons.face,
+        label: 'Персонаж',
+        value: '${reminder.characterType.emoji} ${reminder.characterType.name}',
+      ),
+      _buildInfoRow(
+        context,
+        icon: Icons.location_on,
+        label: 'Радиус срабатывания',
+        value: '${reminder.triggerRadius.toInt()} м',
+      ),
+      if (reminder.reminderText.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Text(reminder.characterType.emoji, style: const TextStyle(fontSize: 24)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '"${reminder.reminderText}"',
+                  style: const TextStyle(fontStyle: FontStyle.italic),
+                ),
+              ),
+            ],
+          ),
+        ),
+    ];
+  }
+
+  /// Фото-галерея
+  Widget _buildPhotoGallery(BuildContext context) {
+    if (_isLoadingPhotos) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_photos.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 120,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: _photos.length,
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onTap: () => _showFullScreenPhoto(context, index),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      _photos[index],
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.broken_image, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  /// Полноэкранный просмотр фото
+  void _showFullScreenPhoto(BuildContext context, int initialIndex) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _FullScreenPhotoView(
+          photos: _photos,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+
+  /// Кнопки для InterestNote
+  Widget _buildInterestNoteButtons(BuildContext context) {
+    final note = widget.object as InterestNote;
+    final isOwner = note.ownerId == widget.userId;
+
+    return Column(
+      children: [
+        // Кнопка "Интересно"
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: widget.onInterestToggle != null
+                ? () => widget.onInterestToggle!(note.id, widget.userId)
+                : null,
+            icon: Icon(_isInterested ? Icons.favorite : Icons.favorite_border),
+            label: Text(_isInterested ? 'Интересно! ✓' : 'Мне интересно'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _isInterested ? Colors.pink[100] : Theme.of(context).colorScheme.primaryContainer,
+              foregroundColor: _isInterested ? Colors.pink[800] : Theme.of(context).colorScheme.onPrimaryContainer,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+
+        // Кнопка "Связаться" (не для своих заметок)
+        if (!isOwner && note.contactVisible) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: widget.onContactAuthor != null
+                  ? () => widget.onContactAuthor!(note)
+                  : null,
+              icon: const Icon(Icons.message),
+              label: const Text('Связаться с автором'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
   /// Строка статистики
   Widget _buildStatsRow(BuildContext context) {
     return Row(
@@ -326,22 +577,22 @@ class ObjectDetailsSheet extends StatelessWidget {
         Icon(Icons.person, size: 16, color: Colors.grey[600]),
         const SizedBox(width: 4),
         Text(
-          object.ownerName,
+          widget.object.ownerName,
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(width: 16),
         const Icon(Icons.thumb_up, size: 16, color: Colors.green),
         const SizedBox(width: 4),
-        Text('${object.confirms}'),
+        Text('${widget.object.confirms}'),
         const SizedBox(width: 12),
         const Icon(Icons.thumb_down, size: 16, color: Colors.red),
         const SizedBox(width: 4),
-        Text('${object.denies}'),
+        Text('${widget.object.denies}'),
         const SizedBox(width: 12),
         Icon(Icons.visibility, size: 16, color: Colors.grey[600]),
         const SizedBox(width: 4),
-        Text('${object.views}'),
-        if (object.isTrusted) ...[
+        Text('${widget.object.views}'),
+        if (widget.object.isTrusted) ...[
           const SizedBox(width: 12),
           const Icon(Icons.verified, size: 16, color: Colors.green),
         ],
@@ -351,26 +602,26 @@ class ObjectDetailsSheet extends StatelessWidget {
 
   /// Кнопки подтверждения/опровержения
   Widget _buildConfirmationButtons(BuildContext context) {
-    if (onConfirm == null && onDeny == null) {
+    if (widget.onConfirm == null && widget.onDeny == null) {
       return const SizedBox.shrink();
     }
 
     return Row(
       children: [
-        if (onConfirm != null)
+        if (widget.onConfirm != null)
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: onConfirm,
+              onPressed: widget.onConfirm,
               icon: const Icon(Icons.thumb_up, size: 18),
               label: const Text('Подтвердить'),
             ),
           ),
-        if (onConfirm != null && onDeny != null)
+        if (widget.onConfirm != null && widget.onDeny != null)
           const SizedBox(width: 8),
-        if (onDeny != null)
+        if (widget.onDeny != null)
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: onDeny,
+              onPressed: widget.onDeny,
               icon: const Icon(Icons.thumb_down, size: 18),
               label: const Text('Опровергнуть'),
               style: OutlinedButton.styleFrom(
@@ -388,14 +639,14 @@ class ObjectDetailsSheet extends StatelessWidget {
     String actionLabel,
     IconData actionIcon,
   ) {
-    if (onAction != null) {
+    if (widget.onAction != null) {
       return Column(
         children: [
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: onAction,
+              onPressed: widget.onAction,
               icon: Icon(actionIcon),
               label: Text(actionLabel),
               style: ElevatedButton.styleFrom(
@@ -409,7 +660,7 @@ class ObjectDetailsSheet extends StatelessWidget {
       );
     }
 
-    if (actionHint != null) {
+    if (widget.actionHint != null) {
       return Column(
         children: [
           const SizedBox(height: 12),
@@ -427,7 +678,7 @@ class ObjectDetailsSheet extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    actionHint!,
+                    widget.actionHint!,
                     style: TextStyle(color: Colors.orange[700]),
                   ),
                 ),
@@ -439,5 +690,71 @@ class ObjectDetailsSheet extends StatelessWidget {
     }
 
     return const SizedBox.shrink();
+  }
+}
+
+/// Полноэкранный просмотр фото
+class _FullScreenPhotoView extends StatefulWidget {
+  final List<Uint8List> photos;
+  final int initialIndex;
+
+  const _FullScreenPhotoView({
+    required this.photos,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_FullScreenPhotoView> createState() => _FullScreenPhotoViewState();
+}
+
+class _FullScreenPhotoViewState extends State<_FullScreenPhotoView> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text('${_currentIndex + 1} / ${widget.photos.length}'),
+      ),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.photos.length,
+        onPageChanged: (index) => setState(() => _currentIndex = index),
+        itemBuilder: (context, index) {
+          return Center(
+            child: InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Image.memory(
+                widget.photos[index],
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.broken_image,
+                  color: Colors.white,
+                  size: 64,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
