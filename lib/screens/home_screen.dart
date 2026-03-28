@@ -21,6 +21,7 @@ import 'walk_detail_screen.dart';
 import 'settings_screen.dart';
 import 'add_object_screen.dart';
 import 'route_planning_screen.dart';
+import 'storage_screen.dart';
 
 /// Главный экран с картой OpenStreetMap
 class HomeScreen extends StatefulWidget {
@@ -545,9 +546,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         onTap: () => _openHistory(context),
                       ),
                       _buildActionButton(
-                        icon: Icons.map,
-                        label: 'Кэш карт',
-                        onTap: _openRoutePlanning,
+                        icon: Icons.storage,
+                        label: 'Хранилище',
+                        onTap: _openStorage,
                       ),
                       _buildActionButton(
                         icon: Icons.settings,
@@ -760,6 +761,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const HistoryScreen()),
+    );
+  }
+
+  /// Открыть хранилище объектов
+  void _openStorage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const StorageScreen()),
     );
   }
 
