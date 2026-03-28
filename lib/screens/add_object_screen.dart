@@ -8,6 +8,14 @@ import '../services/user_id_service.dart';
 import '../services/photo_compression_service.dart';
 import '../services/location_service.dart';
 
+/// Результат создания объекта
+class ObjectCreatedResult {
+  final int typeIndex;
+  final int points;
+  
+  const ObjectCreatedResult({required this.typeIndex, this.points = 10});
+}
+
 /// Экран добавления нового объекта на карту
 class AddObjectScreen extends StatefulWidget {
   final double latitude;
@@ -845,7 +853,8 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
       }
       
       if (mounted) {
-        Navigator.pop(context);
+        // Возвращаем результат создания
+        Navigator.pop(context, ObjectCreatedResult(typeIndex: _selectedTypeIndex));
         final messages = [
           'Мусорный монстр создан!',
           'Секретное сообщение оставлено!',

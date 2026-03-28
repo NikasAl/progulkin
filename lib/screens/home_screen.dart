@@ -834,7 +834,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final result = await _performObjectAction(object, mapObjectProvider, userId);
         if (mounted && result != null) {
           Navigator.pop(context);
-          _handleActionResult(result, object);
+          _handleActionResult(result, object, walkProvider);
         }
       };
     }
@@ -859,6 +859,10 @@ class _HomeScreenState extends State<HomeScreen> {
             isWalking: isWalking,
             onConfirm: () async {
               await mapObjectProvider.confirmObject(object.id);
+              // Записываем статистику прогулки
+              if (walkProvider.hasCurrentWalk) {
+                walkProvider.recordObjectConfirmed();
+              }
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -871,6 +875,10 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             onDeny: () async {
               await mapObjectProvider.denyObject(object.id);
+              // Записываем статистику прогулки
+              if (walkProvider.hasCurrentWalk) {
+                walkProvider.recordObjectDenied();
+              }
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -945,8 +953,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   
   /// Обработать результат действия
-  void _handleActionResult(dynamic result, MapObject object) {
+  void _handleActionResult(dynamic result, MapObject object, WalkProvider walkProvider) {
     if (result is TrashMonster) {
+      // Записываем статистику прогулки
+      if (walkProvider.hasCurrentWalk) {
+        walkProvider.recordMonsterCleaned(result.cleaningPoints);
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Отлично! +${result.cleaningPoints} очков'),
@@ -954,6 +966,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } else if (result is Creature) {
+      // Записываем статистику прогулки
+      if (walkProvider.hasCurrentWalk) {
+        walkProvider.recordCreatureCaught(20); // Базовые очки за поимку
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${result.creatureType.name} пойман!'),
@@ -961,6 +977,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } else if (result is _SecretReadResult) {
+      // Записываем статистику прогулки
+      if (walkProvider.hasCurrentWalk) {
+        walkProvider.recordSecretRead();
+      }
       _showSecretContent(result.title, result.content);
     }
   }
@@ -1208,13 +1228,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   
   /// Открыть экран добавления объекта
-  void _openAddObject() {
+  Future<void> _openAddObject() async {
     if (_currentLocation == null) {
       _showError('Определите местоположение сначала');
       return;
     }
     
-    Navigator.push(
+    final result = await Navigator.push<ObjectCreatedResult>(
       context,
       MaterialPageRoute(
         builder: (context) => AddObjectScreen(
@@ -1224,6 +1244,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+    
+    // Записываем статистику если объект создан во время прогулки
+    if (result != null) {
+      final walkProvider = context.read<WalkProvider>();
+      if (walkProvider.hasCurrentWalk) {
+        walkProvider.recordObjectAdded(result.points);
+      }
+    }
   }
 }
 

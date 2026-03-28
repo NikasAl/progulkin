@@ -148,6 +148,12 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
                   _buildMainStats(context),
                   const SizedBox(height: 24),
 
+                  // Статистика по объектам карты
+                  if (widget.walk.objectStats.totalActions > 0) ...[
+                    _buildObjectStats(context),
+                    const SizedBox(height: 24),
+                  ],
+
                   // Детальная статистика
                   _buildDetailedStats(context),
                   const SizedBox(height: 24),
@@ -260,6 +266,137 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Статистика по объектам карты
+  Widget _buildObjectStats(BuildContext context) {
+    final stats = widget.walk.objectStats;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.map, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Активность на карте',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Сетка с действиями
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (stats.objectsAdded > 0)
+                _buildActionChip(
+                  context,
+                  icon: Icons.add_location,
+                  label: 'Добавлено: ${stats.objectsAdded}',
+                  color: Colors.blue,
+                ),
+              if (stats.objectsConfirmed > 0)
+                _buildActionChip(
+                  context,
+                  icon: Icons.thumb_up,
+                  label: 'Подтверждено: ${stats.objectsConfirmed}',
+                  color: Colors.green,
+                ),
+              if (stats.objectsCleaned > 0)
+                _buildActionChip(
+                  context,
+                  icon: Icons.cleaning_services,
+                  label: 'Убрано: ${stats.objectsCleaned}',
+                  color: Colors.teal,
+                ),
+              if (stats.creaturesCaught > 0)
+                _buildActionChip(
+                  context,
+                  icon: Icons.pets,
+                  label: 'Поймано: ${stats.creaturesCaught}',
+                  color: Colors.purple,
+                ),
+              if (stats.secretsRead > 0)
+                _buildActionChip(
+                  context,
+                  icon: Icons.lock_open,
+                  label: 'Прочитано: ${stats.secretsRead}',
+                  color: Colors.amber,
+                ),
+            ],
+          ),
+          
+          // Очки
+          if (stats.pointsEarned > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.star, color: Colors.amber, size: 20),
+                  const SizedBox(width: 4),
+                  Text(
+                    '+${stats.pointsEarned} очков',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Chip для действия
+  Widget _buildActionChip(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: color,
             ),
           ),
         ],
