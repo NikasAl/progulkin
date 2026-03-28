@@ -4,21 +4,22 @@ import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
-/// Сервис сжатия фото в WebP формат для P2P передачи
+/// Сервис сжатия фото для P2P передачи
+/// Использует JPEG для совместимости (WebP может не поддерживаться в image 4.x)
 class PhotoCompressionService {
   static const int maxPhotoWidth = 800;
   static const int maxPhotoHeight = 600;
-  static const int webpQuality = 80;
+  static const int jpegQuality = 85;
   static const int maxPhotoSizeKB = 100;
 
   final Uuid _uuid = const Uuid();
 
-  /// Сжать изображение в WebP формат
-  Future<PhotoCompressionResult> compressToWebP({
+  /// Сжать изображение в формат (JPEG для совместимости)
+  Future<PhotoCompressionResult> compress({
     required String sourcePath,
     int maxWidth = maxPhotoWidth,
     int maxHeight = maxPhotoHeight,
-    int quality = webpQuality,
+    int quality = jpegQuality,
   }) async {
     try {
       // Читаем исходное изображение
@@ -59,8 +60,8 @@ class PhotoCompressionService {
         resized = image;
       }
 
-      // Кодируем в WebP
-      final webpBytes = img.encodeWebP(resized, level: quality);
+      // Кодируем в JPEG
+      final compressedBytes = img.encodeJpg(resized, quality: quality);
 
       // Генерируем ID
       final photoId = _uuid.v4();
@@ -68,10 +69,10 @@ class PhotoCompressionService {
       return PhotoCompressionResult(
         success: true,
         photoId: photoId,
-        webpBytes: webpBytes,
+        compressedBytes: Uint8List.fromList(compressedBytes),
         width: newWidth,
         height: newHeight,
-        sizeBytes: webpBytes.length,
+        sizeBytes: compressedBytes.length,
       );
     } catch (e) {
       return PhotoCompressionResult(
@@ -82,11 +83,11 @@ class PhotoCompressionService {
   }
 
   /// Сжать изображение из байтов
-  Future<PhotoCompressionResult> compressBytesToWebP({
+  Future<PhotoCompressionResult> compressBytes({
     required Uint8List bytes,
     int maxWidth = maxPhotoWidth,
     int maxHeight = maxPhotoHeight,
-    int quality = webpQuality,
+    int quality = jpegQuality,
   }) async {
     try {
       final image = img.decodeImage(bytes);
@@ -124,18 +125,18 @@ class PhotoCompressionService {
         resized = image;
       }
 
-      // Кодируем в WebP
-      final webpBytes = img.encodeWebP(resized, level: quality);
+      // Кодируем в JPEG
+      final compressedBytes = img.encodeJpg(resized, quality: quality);
 
       final photoId = _uuid.v4();
 
       return PhotoCompressionResult(
         success: true,
         photoId: photoId,
-        webpBytes: Uint8List.fromList(webpBytes),
+        compressedBytes: Uint8List.fromList(compressedBytes),
         width: newWidth,
         height: newHeight,
-        sizeBytes: webpBytes.length,
+        sizeBytes: compressedBytes.length,
       );
     } catch (e) {
       return PhotoCompressionResult(
@@ -145,10 +146,10 @@ class PhotoCompressionService {
     }
   }
 
-  /// Декодировать WebP в байты для отображения
-  Future<Uint8List?> decodeWebP(Uint8List webpBytes) async {
+  /// Декодировать изображение в байты для отображения
+  Future<Uint8List?> decode(Uint8List compressedBytes) async {
     try {
-      final image = img.decodeWebP(webpBytes);
+      final image = img.decodeImage(compressedBytes);
       if (image == null) return null;
 
       // Кодируем в PNG для отображения в Flutter
@@ -158,12 +159,12 @@ class PhotoCompressionService {
     }
   }
 
-  /// Сохранить WebP во временный файл
-  Future<String?> saveToTempFile(Uint8List webpBytes, String photoId) async {
+  /// Сохранить во временный файл
+  Future<String?> saveToTempFile(Uint8List bytes, String photoId) async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/$photoId.webp');
-      await file.writeAsBytes(webpBytes);
+      final file = File('${tempDir.path}/$photoId.jpg');
+      await file.writeAsBytes(bytes);
       return file.path;
     } catch (e) {
       return null;
@@ -172,15 +173,15 @@ class PhotoCompressionService {
 
   /// Создать превью (миниатюру)
   Future<PhotoCompressionResult> createThumbnail({
-    required Uint8List webpBytes,
+    required Uint8List imageBytes,
     int size = 200,
   }) async {
     try {
-      final image = img.decodeWebP(webpBytes);
+      final image = img.decodeImage(imageBytes);
       if (image == null) {
         return PhotoCompressionResult(
           success: false,
-          error: 'Не удалось декодировать WebP',
+          error: 'Не удалось декодировать изображение',
         );
       }
 
@@ -192,12 +193,12 @@ class PhotoCompressionService {
         interpolation: img.Interpolation.linear,
       );
 
-      final thumbnailBytes = img.encodeWebP(thumbnail, level: 60);
+      final thumbnailBytes = img.encodeJpg(thumbnail, quality: 70);
 
       return PhotoCompressionResult(
         success: true,
         photoId: '${_uuid.v4()}_thumb',
-        webpBytes: Uint8List.fromList(thumbnailBytes),
+        compressedBytes: Uint8List.fromList(thumbnailBytes),
         width: size,
         height: size,
         sizeBytes: thumbnailBytes.length,
@@ -225,7 +226,7 @@ class PhotoCompressionService {
 class PhotoCompressionResult {
   final bool success;
   final String? photoId;
-  final Uint8List? webpBytes;
+  final Uint8List? compressedBytes;
   final int? width;
   final int? height;
   final int? sizeBytes;
@@ -234,7 +235,7 @@ class PhotoCompressionResult {
   const PhotoCompressionResult({
     required this.success,
     this.photoId,
-    this.webpBytes,
+    this.compressedBytes,
     this.width,
     this.height,
     this.sizeBytes,

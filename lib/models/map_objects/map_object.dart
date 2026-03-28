@@ -1,6 +1,3 @@
-import 'dart:math';
-import 'dart:convert';
-
 /// Тип объекта на карте
 enum MapObjectType {
   trashMonster('trash_monster', 'Мусорный монстр', '👹'),
