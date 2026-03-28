@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
 import '../models/map_objects/map_objects.dart';
-import '../models/contact_profile.dart';
 import '../providers/map_object_provider.dart';
 import '../services/user_id_service.dart';
 import '../services/photo_compression_service.dart';
