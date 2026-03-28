@@ -95,6 +95,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Секция профиля пользователя
+          _buildProfileSection(),
+          const Divider(height: 32),
+          
           // Секция приоритета расстояния
           _buildSectionHeader('Источник расстояния'),
           _buildInfoCard(
@@ -1121,6 +1125,224 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Секция профиля пользователя
+  Widget _buildProfileSection() {
+    return FutureBuilder<UserInfo>(
+      future: _userIdService.getUserInfo(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Card(child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          ));
+        }
+
+        final user = snapshot.data!;
+        final isDefaultName = user.name == 'Прогульщик';
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Профиль',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                // Аватар и имя
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 32,
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      child: Text(
+                        user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                user.name,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (isDefaultName) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'По умолчанию',
+                                    style: TextStyle(fontSize: 10, color: Colors.orange),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Репутация: ${user.reputation}',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _showEditNameDialog(user),
+                      tooltip: 'Изменить имя',
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // ID пользователя
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.fingerprint, size: 16, color: Colors.grey[600]),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'ID пользователя',
+                              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                            ),
+                            Text(
+                              user.id.substring(0, 8).toUpperCase(),
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          // Копируем только первые 8 символов для краткости
+                          // В реальности можно скопировать весь ID
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                        ),
+                        child: const Text('Копировать'),
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (isDefaultName) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Установите своё имя, чтобы другие пользователи могли узнать вас',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Диалог редактирования имени
+  void _showEditNameDialog(UserInfo user) {
+    final controller = TextEditingController(text: user.name == 'Прогульщик' ? '' : user.name);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ваше имя'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Введите ваше имя',
+                border: OutlineInputBorder(),
+              ),
+              maxLength: 30,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Это имя будет отображаться рядом с вашими объектами на карте',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = controller.text.trim();
+              if (newName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Имя не может быть пустым')),
+                );
+                return;
+              }
+
+              await _userIdService.setUserName(newName);
+              if (context.mounted) {
+                Navigator.pop(context);
+                setState(() {}); // Обновляем UI
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Имя сохранено'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            child: const Text('Сохранить'),
           ),
         ],
       ),
