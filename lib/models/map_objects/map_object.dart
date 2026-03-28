@@ -6,6 +6,8 @@ enum MapObjectType {
   trashMonster('trash_monster', 'Мусорный монстр', '👹'),
   secretMessage('secret_message', 'Секретное сообщение', '📜'),
   creature('creature', 'Существо', '🦊'),
+  interestNote('interest_note', 'Заметка', '📍'),
+  reminderCharacter('reminder_character', 'Напоминалка', '🔔'),
   checkpoint('checkpoint', 'Контрольная точка', '🏁'),
   event('event', 'Событие', '🎉'),
   ;
@@ -54,6 +56,10 @@ extension MapObjectTypeExtension on MapObjectType {
         return '📜';
       case MapObjectType.creature:
         return '🦊';
+      case MapObjectType.interestNote:
+        return '📍';
+      case MapObjectType.reminderCharacter:
+        return '🔔';
       case MapObjectType.checkpoint:
         return '🏁';
       case MapObjectType.event:

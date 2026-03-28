@@ -5,11 +5,15 @@ export 'map_object.dart';
 export 'trash_monster.dart';
 export 'secret_message.dart';
 export 'creature.dart';
+export 'interest_note.dart';
+export 'reminder_character.dart';
 
 import 'map_object.dart';
 import 'trash_monster.dart';
 import 'secret_message.dart';
 import 'creature.dart';
+import 'interest_note.dart';
+import 'reminder_character.dart';
 
 /// Инициализация фабрики для создания объектов по типу
 /// ВЫЗЫВАТЬ В main.dart ДО ИСПОЛЬЗОВАНИЯ ЛЮБОГО MapObject.fromSyncJson()
@@ -24,6 +28,10 @@ void initMapObjectFactory() {
         return SecretMessage.fromSyncJson(json);
       case MapObjectType.creature:
         return Creature.fromSyncJson(json);
+      case MapObjectType.interestNote:
+        return InterestNote.fromSyncJson(json);
+      case MapObjectType.reminderCharacter:
+        return ReminderCharacter.fromSyncJson(json);
       default:
         return MapObject.fromJson(json);
     }
