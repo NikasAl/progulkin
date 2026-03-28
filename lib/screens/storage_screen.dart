@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/map_objects/map_objects.dart';
 import '../providers/map_object_provider.dart';
 import '../services/p2p/map_object_storage.dart';
+import '../services/map_object_export_service.dart';
 
 /// Экран хранилища объектов
 class StorageScreen extends StatefulWidget {
@@ -578,7 +579,7 @@ class _StorageScreenState extends State<StorageScreen> {
         final db = await storage.database;
         await db.delete(
           'map_objects',
-          where: 'type = ? AND json_extract(data, "$.isCleaned") = ?',
+          where: 'type = ? AND json_extract(data, "\$.isCleaned") = ?',
           whereArgs: ['trash_monster', 1],
         );
       }
@@ -655,9 +656,9 @@ class _StorageScreenState extends State<StorageScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Файл: ${result.fileName}'),
+            Text('Объектов: ${result.objectsCount}'),
             const SizedBox(height: 8),
-            Text('Объектов: ${result.objectCount}'),
+            Text('Размер: ${result.fileSizeFormatted}'),
             if (result.filePath != null) ...[
               const SizedBox(height: 8),
               Text(
