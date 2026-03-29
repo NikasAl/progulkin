@@ -48,7 +48,6 @@ dependencies:
   image_picker: ^1.0.4
 
   # Иконки и UI
-  cupertino_icons: ^1.0.6
   flutter_native_splash: ^2.3.5
 
 dev_dependencies:
@@ -67,4 +66,3 @@ flutter_native_splash:
   color: "#4CAF50"
   color_dark: "#2E7D32"
   android: true
-  ios: true
