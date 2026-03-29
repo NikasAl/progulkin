@@ -40,15 +40,25 @@ class PedometerProvider extends ChangeNotifier {
       await _pedometerService.startCounting();
       _isCounting = true;
 
-      // Подписываемся на обновления
+      // Подписываемся на обновления - объединяем для избежания двойного notifyListeners
+      int pendingUpdates = 0;
+      
       _pedometerService.stepsStream.listen((steps) {
         _steps = steps;
-        notifyListeners();
+        pendingUpdates++;
+        if (pendingUpdates >= 2) {
+          notifyListeners();
+          pendingUpdates = 0;
+        }
       });
 
       _pedometerService.distanceStream.listen((distance) {
         _distance = distance;
-        notifyListeners();
+        pendingUpdates++;
+        if (pendingUpdates >= 2) {
+          notifyListeners();
+          pendingUpdates = 0;
+        }
       });
 
       notifyListeners();

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/map_objects/map_objects.dart';
@@ -26,8 +27,9 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   
-  // Отслеживаем показанные уведомления
-  final Set<String> _shownNotifications = {};
+  // Скрываем уведомление через некоторое время
+  bool _isVisible = true;
+  Timer? _hideTimer;
   
   @override
   void initState() {
@@ -40,16 +42,47 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    
+    _startHideTimer();
+  }
+  
+  @override
+  void didUpdateWidget(NearbyObjectsNotifier oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Если позиция изменилась значительно, показываем уведомление снова
+    final distance = calculateDistance(
+      oldWidget.currentLat, oldWidget.currentLng,
+      widget.currentLat, widget.currentLng,
+    );
+    if (distance > 50) {
+      // Больше 50 метров - показываем снова
+      setState(() => _isVisible = true);
+      _startHideTimer();
+    }
+  }
+  
+  void _startHideTimer() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted) {
+        setState(() => _isVisible = false);
+      }
+    });
   }
   
   @override
   void dispose() {
     _pulseController.dispose();
+    _hideTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_isVisible) {
+      return const SizedBox.shrink();
+    }
+    
     return Consumer<MapObjectProvider>(
       builder: (context, provider, child) {
         final nearbyObjects = provider.nearbyObjects.where((obj) {
@@ -67,7 +100,14 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
           return const SizedBox.shrink();
         }
         
-        return _buildNearbyIndicator(context, nearbyObjects);
+        return Dismissible(
+          key: const Key('nearby_notification'),
+          direction: DismissDirection.up,
+          onDismissed: (_) {
+            setState(() => _isVisible = false);
+          },
+          child: _buildNearbyIndicator(context, nearbyObjects),
+        );
       },
     );
   }
