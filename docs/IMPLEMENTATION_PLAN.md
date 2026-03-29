@@ -526,18 +526,6 @@ class ReminderCharacter extends MapObject {
 
 ---
 
-### 7.3. Unit-тесты
-
-**Задачи:**
-- [ ] Настроить test environment
-- [ ] Тесты для `ObjectActionService`
-- [ ] Тесты для моделей (сериализация)
-- [ ] Тесты для `WalkProvider`
-
-**Оценка:** 4-6 часов
-
----
-
 ## Сводная таблица оценок
 
 | Этап | Задачи | Оценка | Статус |
@@ -564,7 +552,6 @@ class ReminderCharacter extends MapObject {
 | 6.1-6.2 | Модерация фото | 4-6 ч | ⏳ Ожидает |
 | 7.1 | Вынести константы | 1-2 ч | ✅ Выполнено |
 | 7.2 | PhotoCaptureWidget | 2-3 ч | ✅ Выполнено |
-| 7.3 | Unit-тесты | 4-6 ч | ⏳ Ожидает |
 
 ---
 
@@ -602,7 +589,6 @@ class ReminderCharacter extends MapObject {
 ### ⏳ Спринт 5 (этап 7 - технический рефакторинг)
 - [x] Вынести константы в `lib/config/constants.dart`
 - [x] Создать `PhotoCaptureWidget` для устранения дублирования
-- [ ] Добавить unit-тесты
 
 ---
 
