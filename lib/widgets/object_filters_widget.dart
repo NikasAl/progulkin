@@ -232,19 +232,27 @@ class ObjectFiltersWidget extends StatelessWidget {
 class FilterToggleButton extends StatelessWidget {
   final VoidCallback onTap;
   final int activeFilters;
+  final bool mini;
 
   const FilterToggleButton({
     super.key,
     required this.onTap,
     this.activeFilters = 0,
+    this.mini = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final size = mini ? 40.0 : 48.0;
+    final iconSize = mini ? 20.0 : 24.0;
+    final badgeSize = mini ? 14.0 : 18.0;
+    final badgeTextSize = mini ? 7.0 : 8.0;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(10),
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           shape: BoxShape.circle,
@@ -257,27 +265,32 @@ class FilterToggleButton extends StatelessWidget {
           ],
         ),
         child: Stack(
+          alignment: Alignment.center,
           children: [
             Icon(
               Icons.tune,
+              size: iconSize,
               color: Theme.of(context).colorScheme.primary,
             ),
             if (activeFilters > 0)
               Positioned(
-                right: 0,
-                top: 0,
+                right: 4,
+                top: 4,
                 child: Container(
-                  padding: const EdgeInsets.all(4),
+                  width: badgeSize,
+                  height: badgeSize,
                   decoration: const BoxDecoration(
                     color: Colors.red,
                     shape: BoxShape.circle,
                   ),
-                  child: Text(
-                    '$activeFilters',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
+                  child: Center(
+                    child: Text(
+                      '$activeFilters',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: badgeTextSize,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),

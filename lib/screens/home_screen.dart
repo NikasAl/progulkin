@@ -20,8 +20,6 @@ import 'history_screen.dart';
 import 'walk_detail_screen.dart';
 import 'settings_screen.dart';
 import 'add_object_screen.dart';
-import 'route_planning_screen.dart';
-
 
 /// Главный экран с картой OpenStreetMap
 class HomeScreen extends StatefulWidget {
@@ -44,9 +42,11 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showFilters = false; // Показать панель фильтров
   LatLng? _currentLocation; // Текущая позиция пользователя
   LatLng _initialPosition = const LatLng(55.7558, 37.6173); // Москва по умолчанию
-  double _currentZoom = 15.0;
+  final double _currentZoom = 15.0;
   UserInfo? _userInfo;
   Timer? _updateTimer; // Таймер для обновления времени
+  bool _mapReady = false; // Карта готова
+  bool _pendingMoveToLocation = false; // Нужно перейти к позиции после готовности карты
 
   @override
   void initState() {
@@ -98,6 +98,13 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentLocation = LatLng(position.latitude, position.longitude);
         _initialPosition = _currentLocation!;
       });
+      
+      // Если карта уже готова - переходим к позиции
+      if (_mapReady) {
+        _moveToCurrentLocation();
+      } else {
+        _pendingMoveToLocation = true;
+      }
     }
     
     // Если есть текущая прогулка, загружаем маршрут
@@ -174,28 +181,27 @@ class _HomeScreenState extends State<HomeScreen> {
           // Верхняя панель со статистикой
           _buildTopPanel(),
           
-          // Панель шагов
-          _buildStepsPanel(),
-          
           // Нижняя панель управления
           _buildBottomControls(),
           
           // FAB для добавления объектов
           Positioned(
             right: 16,
-            bottom: 180,
+            bottom: 140,
             child: FloatingActionButton(
+              mini: true,
               onPressed: _openAddObject,
               backgroundColor: Theme.of(context).colorScheme.secondary,
-              child: const Icon(Icons.add_location_alt),
+              child: const Icon(Icons.add_location_alt, size: 24),
             ),
           ),
           
           // Кнопка фильтров
           Positioned(
             right: 16,
-            bottom: 250,
+            bottom: 190,
             child: FilterToggleButton(
+              mini: true,
               onTap: () => setState(() => _showFilters = !_showFilters),
               activeFilters: _getActiveFiltersCount(),
             ),
@@ -203,11 +209,11 @@ class _HomeScreenState extends State<HomeScreen> {
           
           // Панель фильтров
           if (_showFilters)
-            Positioned(
+            const Positioned(
               left: 16,
               right: 16,
-              bottom: 320,
-              child: const ObjectFiltersWidget(),
+              bottom: 250,
+              child: ObjectFiltersWidget(),
             ),
           
           // Уведомление о близлежащих объектах
@@ -236,7 +242,12 @@ class _HomeScreenState extends State<HomeScreen> {
         initialCenter: _initialPosition,
         initialZoom: _currentZoom,
         onMapReady: () {
-          // Карта готова
+          _mapReady = true;
+          // Если позиция уже получена - переходим к ней
+          if (_pendingMoveToLocation && _currentLocation != null) {
+            _moveToCurrentLocation();
+            _pendingMoveToLocation = false;
+          }
         },
       ),
       children: [
@@ -355,49 +366,62 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Верхняя панель со статистикой
+  /// Верхняя панель со статистикой (включает педометр)
   Widget _buildTopPanel() {
     return SafeArea(
       child: Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Consumer<WalkProvider>(
-          builder: (context, walkProvider, child) {
+        child: Consumer2<WalkProvider, PedometerProvider>(
+          builder: (context, walkProvider, pedometerProvider, child) {
             final walk = walkProvider.currentWalk;
             
             return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildStatItem(
-                  icon: Icons.route_outlined,
-                  label: 'Расстояние',
-                  value: walk?.formattedDistance ?? '0 м',
+                // Шаги (педометр)
+                _buildCompactStatItem(
+                  icon: Icons.directions_walk,
+                  value: '${pedometerProvider.steps}',
+                  label: 'шагов',
+                  color: Colors.green,
                 ),
-                _buildVerticalDivider(),
-                _buildStatItem(
+                _buildVerticalDivider(height: 32),
+                // Метры (педометр)
+                _buildCompactStatItem(
+                  icon: Icons.straighten,
+                  value: pedometerProvider.formattedDistance,
+                  label: 'пройдено',
+                  color: Colors.blue,
+                ),
+                _buildVerticalDivider(height: 32),
+                // Время прогулки
+                _buildCompactStatItem(
                   icon: Icons.timer_outlined,
-                  label: 'Время',
-                  // Используем геттер из провайдера для корректного времени с паузой
                   value: walkProvider.hasCurrentWalk 
                       ? walkProvider.currentWalkFormattedDuration 
-                      : '0 сек',
+                      : '0:00',
+                  label: 'время',
+                  color: Colors.orange,
                 ),
-                _buildVerticalDivider(),
-                _buildStatItem(
+                _buildVerticalDivider(height: 32),
+                // Скорость
+                _buildCompactStatItem(
                   icon: Icons.speed_outlined,
-                  label: 'Скорость',
                   value: walk?.formattedSpeed ?? '0 км/ч',
+                  label: 'скорость',
+                  color: Colors.purple,
                 ),
               ],
             );
@@ -407,107 +431,50 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Элемент статистики
-  Widget _buildStatItem({
+  /// Компактный элемент статистики для верхней панели
+  Widget _buildCompactStatItem({
     required IconData icon,
-    required String label,
     required String value,
+    required String label,
+    Color? color,
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: 24,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: color ?? Theme.of(context).colorScheme.primary,
           ),
-        ),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.grey[600],
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.grey[600],
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   /// Вертикальный разделитель
-  Widget _buildVerticalDivider() {
+  Widget _buildVerticalDivider({double height = 40}) {
     return Container(
-      height: 40,
+      height: height,
       width: 1,
       color: Colors.grey[300],
-    );
-  }
-
-  /// Панель шагов
-  Widget _buildStepsPanel() {
-    return Positioned(
-      left: 16,
-      right: 16,
-      bottom: 250,
-      child: Consumer<PedometerProvider>(
-        builder: (context, pedometerProvider, child) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.directions_walk,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${pedometerProvider.steps}',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                      Text(
-                        'шагов • ${pedometerProvider.formattedDistance}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 
@@ -518,10 +485,10 @@ class _HomeScreenState extends State<HomeScreen> {
       right: 0,
       bottom: 0,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
@@ -537,27 +504,30 @@ class _HomeScreenState extends State<HomeScreen> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Компактные кнопки в ряд
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildActionButton(
+                      _buildIconButton(
                         icon: Icons.history,
-                        label: 'История',
+                        tooltip: 'История',
                         onTap: () => _openHistory(context),
                       ),
-                      _buildActionButton(
+                      const SizedBox(width: 24),
+                      _buildIconButton(
                         icon: Icons.settings,
-                        label: 'Настройки',
+                        tooltip: 'Настройки',
                         onTap: () => _openSettings(context),
                       ),
-                      _buildActionButton(
+                      const SizedBox(width: 24),
+                      _buildIconButton(
                         icon: Icons.my_location,
-                        label: 'Место',
+                        tooltip: 'Моё местоположение',
                         onTap: _moveToCurrentLocation,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   _buildMainButton(walkProvider, pedometerProvider),
                 ],
               );
@@ -568,24 +538,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Кнопка действия
-  Widget _buildActionButton({
+  /// Компактная кнопка-иконка
+  Widget _buildIconButton({
     required IconData icon,
-    required String label,
+    required String tooltip,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: Colors.grey[100],
       borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 24),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 12)),
-          ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Tooltip(
+          message: tooltip,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Icon(icon, size: 22, color: Colors.grey[700]),
+          ),
         ),
       ),
     );
@@ -598,7 +568,6 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     // Показываем кнопки паузы/продолжить если есть текущая прогулка (активная или на паузе)
     final hasWalk = walkProvider.hasCurrentWalk;
-    final isTracking = walkProvider.isTracking;
 
     if (hasWalk) {
       return Row(
@@ -736,15 +705,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Обновить маршрут на карте
-  void _updateMapRoute(List<WalkPoint> points) {
-    _routePoints.clear();
-    for (final point in points) {
-      _routePoints.add(LatLng(point.latitude, point.longitude));
-    }
-    setState(() {});
-  }
-
   /// Очистить маршрут на карте
   void _clearMapRoute() {
     _routePoints.clear();
@@ -763,18 +723,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openSettings(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => SettingsScreen()),
+      MaterialPageRoute(builder: (context) => const SettingsScreen()),
     );
   }
   
-  /// Открыть экран планирования маршрута (кэширование карт)
-  void _openRoutePlanning() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const RoutePlanningScreen()),
-    );
-  }
-
   /// Открыть детали прогулки
   void _openWalkDetail(BuildContext context, walk) {
     Navigator.push(
