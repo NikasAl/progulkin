@@ -36,7 +36,9 @@ dependencies:
   uuid: ^4.1.0
   permission_handler: ^11.1.0
   crypto: ^3.0.3
-  image: ^4.1.0  # Сжатие фото в WebP
+  
+  # Сжатие фото в WebP (нативное)
+  flutter_image_compress: ^2.3.0
 
   # Экспорт/Импорт файлов
   share_plus: ^10.1.0
