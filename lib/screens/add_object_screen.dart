@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:typed_data';
 import '../models/map_objects/map_objects.dart';
 import '../providers/map_object_provider.dart';
 import '../services/user_id_service.dart';
-import '../services/photo_compression_service.dart';
-import '../services/location_service.dart';
+import '../config/constants.dart';
+import '../widgets/photo_capture_widget.dart';
 
 /// Результат создания объекта
 class ObjectCreatedResult {
   final int typeIndex;
   final int points;
-  
-  const ObjectCreatedResult({required this.typeIndex, this.points = 10});
+
+  const ObjectCreatedResult({required this.typeIndex, this.points = PointsConstants.objectCreationPoints});
 }
 
 /// Экран добавления нового объекта на карту
@@ -21,14 +19,14 @@ class AddObjectScreen extends StatefulWidget {
   final double latitude;
   final double longitude;
   final UserInfo userInfo;
-  
+
   const AddObjectScreen({
     super.key,
     required this.latitude,
     required this.longitude,
     required this.userInfo,
   });
-  
+
   @override
   State<AddObjectScreen> createState() => _AddObjectScreenState();
 }
@@ -37,36 +35,31 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
   int _selectedTypeIndex = 0;
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
-  
+
   // Поля для мусорного монстра
   TrashType _trashType = TrashType.mixed;
   TrashQuantity _trashQuantity = TrashQuantity.few;
   final _trashDescriptionController = TextEditingController();
-  
+
   // Поля для секретного сообщения
   final _secretTitleController = TextEditingController();
   final _secretContentController = TextEditingController();
   SecretType _secretType = SecretType.hint;
   double _unlockRadius = 50;
   bool _isOneTime = false;
-  
-  // Поля для заметки об интересном месте
+
+  // Поля для заметки об интересном месте (и фото для монстра)
   InterestCategory _interestCategory = InterestCategory.other;
   final _interestTitleController = TextEditingController();
   final _interestDescriptionController = TextEditingController();
-  final List<Uint8List> _selectedPhotos = [];
-  final List<String> _photoIds = [];
-  final List<Map<String, dynamic>> _photoMetadata = []; // Метаданные фото (GPS, время)
+  final List<PhotoCaptureResult> _photos = [];
   bool _showContact = false;
-  final _photoCompressionService = PhotoCompressionService();
-  final _imagePicker = ImagePicker();
-  final _locationService = LocationService();
-  
+
   // Поля для напоминалки
   ReminderCharacterType _characterType = ReminderCharacterType.kopatych;
   final _reminderTextController = TextEditingController();
   double _triggerRadius = 50;
-  
+
   @override
   void dispose() {
     _trashDescriptionController.dispose();
@@ -77,7 +70,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
     _reminderTextController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -86,7 +79,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
         actions: [
           TextButton.icon(
             onPressed: _isLoading ? null : _saveObject,
-            icon: _isLoading 
+            icon: _isLoading
                 ? const SizedBox(
                     width: 16,
                     height: 16,
@@ -100,7 +93,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(UIConstants.screenPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -109,11 +102,11 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
                 'Тип объекта',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: UIConstants.itemSpacing),
               _buildTypeSelector(),
-              
+
               const SizedBox(height: 24),
-              
+
               // Форма в зависимости от типа
               switch (_selectedTypeIndex) {
                 0 => _buildTrashMonsterForm(),
@@ -122,9 +115,9 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
                 3 => _buildReminderForm(),
                 _ => _buildTrashMonsterForm(),
               },
-              
-              const SizedBox(height: 16),
-              
+
+              const SizedBox(height: UIConstants.sectionSpacing),
+
               // Координаты
               Card(
                 child: Padding(
@@ -149,7 +142,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
       ),
     );
   }
-  
+
   /// Селектор типа объекта
   Widget _buildTypeSelector() {
     return SingleChildScrollView(
@@ -180,22 +173,18 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
         selected: {_selectedTypeIndex},
         onSelectionChanged: (Set<int> selection) {
           final newIndex = selection.first;
-          // Если переключаемся между типами, очищаем фото
-          // (монстр и заметка используют одни и те же переменные)
           if (newIndex != _selectedTypeIndex) {
             setState(() {
               _selectedTypeIndex = newIndex;
               // Очищаем фото при смене типа
-              _selectedPhotos.clear();
-              _photoIds.clear();
-              _photoMetadata.clear();
+              _photos.clear();
             });
           }
         },
       ),
     );
   }
-  
+
   /// Форма для мусорного монстра
   Widget _buildTrashMonsterForm() {
     return Column(
@@ -205,7 +194,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
           'Тип мусора',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -217,14 +206,14 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             },
           )).toList(),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         Text(
           'Количество',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -236,14 +225,14 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             },
           )).toList(),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         Text(
           'Описание (необязательно)',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         TextFormField(
           controller: _trashDescriptionController,
           maxLines: 3,
@@ -252,122 +241,38 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             border: OutlineInputBorder(),
           ),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         // Фото
-        Row(
-          children: [
-            Text(
-              'Фото',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: _takePhoto,
-              icon: const Icon(Icons.camera_alt),
-              label: const Text('Снять фото'),
-            ),
-          ],
+        PhotoCaptureWidget(
+          targetLatitude: widget.latitude,
+          targetLongitude: widget.longitude,
+          photos: _photos,
+          onPhotoAdded: (photo) {
+            setState(() {
+              _photos.add(photo);
+            });
+          },
+          onPhotoRemoved: (index) {
+            setState(() {
+              _photos.removeAt(index);
+            });
+          },
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Фото можно сделать только здесь и сейчас',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.grey[600],
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-        const SizedBox(height: 8),
-        
-        if (_selectedPhotos.isNotEmpty)
-          SizedBox(
-            height: 100,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _selectedPhotos.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.memory(
-                          _selectedPhotos[index],
-                          height: 100,
-                          width: 100,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      // Индикатор verified location
-                      if (_photoMetadata.isNotEmpty && index < _photoMetadata.length)
-                        Positioned(
-                          bottom: 4,
-                          left: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green[700],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.location_on, size: 10, color: Colors.white),
-                                SizedBox(width: 2),
-                                Text(
-                                  'Здесь',
-                                  style: TextStyle(fontSize: 8, color: Colors.white),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedPhotos.removeAt(index);
-                              if (index < _photoIds.length) {
-                                _photoIds.removeAt(index);
-                              }
-                              if (index < _photoMetadata.length) {
-                                _photoMetadata.removeAt(index);
-                              }
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.close, size: 16, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         // Предпросмотр класса монстра
         _buildMonsterPreview(),
       ],
     );
   }
-  
+
   /// Предпросмотр класса монстра
   Widget _buildMonsterPreview() {
     int classLevel = 1;
-    
+
     // Тип мусора влияет на сложность
     if (_trashType == TrashType.tires ||
         _trashType == TrashType.furniture ||
@@ -376,18 +281,18 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
     } else if (_trashType == TrashType.electronics) {
       classLevel += 1;
     }
-    
+
     // Количество влияет на класс
     if (_trashQuantity == TrashQuantity.many) {
       classLevel += 1;
     } else if (_trashQuantity == TrashQuantity.heap) {
       classLevel += 2;
     }
-    
+
     classLevel = classLevel.clamp(1, 5);
     final monsterClass = MonsterClass.fromLevel(classLevel);
     final points = monsterClass.basePoints * _trashQuantity.estimatedCount;
-    
+
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
       child: Padding(
@@ -416,7 +321,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
       ),
     );
   }
-  
+
   /// Форма для секретного сообщения
   Widget _buildSecretMessageForm() {
     return Column(
@@ -426,7 +331,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
           'Тип секрета',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -438,14 +343,14 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             },
           )).toList(),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         Text(
           'Название',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         TextFormField(
           controller: _secretTitleController,
           validator: (value) {
@@ -459,14 +364,14 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             border: OutlineInputBorder(),
           ),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         Text(
           'Содержимое',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         TextFormField(
           controller: _secretContentController,
           maxLines: 5,
@@ -481,14 +386,14 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             border: OutlineInputBorder(),
           ),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         Text(
           'Радиус разблокировки: ${_unlockRadius.toInt()} м',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         Slider(
           value: _unlockRadius,
           min: 10,
@@ -499,9 +404,9 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             setState(() => _unlockRadius = value);
           },
         ),
-        
-        const SizedBox(height: 8),
-        
+
+        const SizedBox(height: UIConstants.itemSpacing),
+
         SwitchListTile(
           title: const Text('Одноразовое'),
           subtitle: const Text('Исчезнет после первого прочтения'),
@@ -513,7 +418,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
       ],
     );
   }
-  
+
   /// Форма для заметки об интересном месте
   Widget _buildInterestNoteForm() {
     return Column(
@@ -523,7 +428,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
           'Категория',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -535,14 +440,14 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             },
           )).toList(),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         Text(
           'Название',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         TextFormField(
           controller: _interestTitleController,
           validator: (value) {
@@ -556,14 +461,14 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             border: OutlineInputBorder(),
           ),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         Text(
           'Описание',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         TextFormField(
           controller: _interestDescriptionController,
           maxLines: 4,
@@ -572,112 +477,28 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             border: OutlineInputBorder(),
           ),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         // Фото
-        Row(
-          children: [
-            Text(
-              'Фото',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: _takePhoto,
-              icon: const Icon(Icons.camera_alt),
-              label: const Text('Снять фото'),
-            ),
-          ],
+        PhotoCaptureWidget(
+          targetLatitude: widget.latitude,
+          targetLongitude: widget.longitude,
+          photos: _photos,
+          onPhotoAdded: (photo) {
+            setState(() {
+              _photos.add(photo);
+            });
+          },
+          onPhotoRemoved: (index) {
+            setState(() {
+              _photos.removeAt(index);
+            });
+          },
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Фото можно сделать только здесь и сейчас',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.grey[600],
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-        const SizedBox(height: 8),
-        
-        if (_selectedPhotos.isNotEmpty)
-          SizedBox(
-            height: 100,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _selectedPhotos.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.memory(
-                          _selectedPhotos[index],
-                          height: 100,
-                          width: 100,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      // Индикатор verified location
-                      if (_photoMetadata.isNotEmpty && index < _photoMetadata.length)
-                        Positioned(
-                          bottom: 4,
-                          left: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green[700],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.location_on, size: 10, color: Colors.white),
-                                SizedBox(width: 2),
-                                Text(
-                                  'Здесь',
-                                  style: TextStyle(fontSize: 8, color: Colors.white),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedPhotos.removeAt(index);
-                              if (index < _photoIds.length) {
-                                _photoIds.removeAt(index);
-                              }
-                              if (index < _photoMetadata.length) {
-                                _photoMetadata.removeAt(index);
-                              }
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.close, size: 16, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         // Показывать контакт
         SwitchListTile(
           title: const Text('Показывать мой контакт'),
@@ -687,7 +508,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             setState(() => _showContact = value);
           },
         ),
-        
+
         if (_showContact)
           Card(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -699,8 +520,8 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
                   Row(
                     children: [
                       CircleAvatar(
-                        child: Text(widget.userInfo.name.isNotEmpty 
-                            ? widget.userInfo.name[0] 
+                        child: Text(widget.userInfo.name.isNotEmpty
+                            ? widget.userInfo.name[0]
                             : '?'),
                       ),
                       const SizedBox(width: 12),
@@ -733,7 +554,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
       ],
     );
   }
-  
+
   /// Форма для напоминалки
   Widget _buildReminderForm() {
     return Column(
@@ -743,7 +564,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
           'Персонаж',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -755,14 +576,14 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             },
           )).toList(),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         Text(
           'Текст напоминания',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         TextFormField(
           controller: _reminderTextController,
           maxLines: 3,
@@ -777,14 +598,14 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             border: OutlineInputBorder(),
           ),
         ),
-        
-        const SizedBox(height: 16),
-        
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         Text(
           'Радиус срабатывания: ${_triggerRadius.toInt()} м',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: UIConstants.itemSpacing),
         Slider(
           value: _triggerRadius,
           min: 10,
@@ -802,109 +623,34 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
       ],
     );
   }
-  
-  /// Сделать фото камерой
-  Future<void> _takePhoto() async {
-    try {
-      // Проверяем текущую позицию пользователя
-      final currentPosition = await _locationService.getCurrentPosition();
-      if (currentPosition == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Не удалось определить ваше местоположение'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
 
-      // Проверяем расстояние до места заметки (максимум 100 метров)
-      final distance = calculateDistance(
-        currentPosition.latitude,
-        currentPosition.longitude,
-        widget.latitude,
-        widget.longitude,
-      );
-
-      if (distance > 100) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Вы слишком далеко от места заметки (${distance.toInt()} м). Подойдите ближе.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
-
-      // Открываем камеру
-      final XFile? photo = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1200,
-        maxHeight: 900,
-        imageQuality: 85,
-      );
-
-      if (photo != null) {
-        final bytes = await photo.readAsBytes();
-
-        // Сжимаем фото
-        final compressed = await _photoCompressionService.compressBytes(
-          bytes: bytes,
-        );
-
-        if (compressed.success && compressed.compressedBytes != null) {
-          setState(() {
-            _selectedPhotos.add(compressed.compressedBytes!);
-            _photoIds.add(compressed.photoId!);
-            // Сохраняем метаданные о месте съёмки
-            _photoMetadata.add({
-              'latitude': currentPosition.latitude,
-              'longitude': currentPosition.longitude,
-              'distance': distance,
-              'timestamp': DateTime.now().toIso8601String(),
-              'verified': distance <= 100,
-            });
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка при съёмке фото: $e')),
-        );
-      }
-    }
-  }
-  
   /// Сохранить объект
   Future<void> _saveObject() async {
     // Валидация
     if (_selectedTypeIndex == 1 || _selectedTypeIndex == 2 || _selectedTypeIndex == 3) {
       if (!_formKey.currentState!.validate()) return;
     }
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       final mapObjectProvider = context.read<MapObjectProvider>();
-      
+
       switch (_selectedTypeIndex) {
         case 0:
           // Создаём мусорного монстра
           // Сначала сохраняем фото
           final storage = mapObjectProvider.storage;
-          for (int i = 0; i < _selectedPhotos.length; i++) {
+          final photoIds = <String>[];
+          for (final photo in _photos) {
             await storage.savePhoto(
-              id: _photoIds[i],
-              webpData: _selectedPhotos[i].toList(),
+              id: photo.id,
+              webpData: photo.bytes.toList(),
               status: 'confirmed',
             );
+            photoIds.add(photo.id);
           }
-          
+
           await mapObjectProvider.createTrashMonster(
             latitude: widget.latitude,
             longitude: widget.longitude,
@@ -914,10 +660,10 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             trashType: _trashType,
             quantity: _trashQuantity,
             description: _trashDescriptionController.text,
-            photoIds: _photoIds.isNotEmpty ? _photoIds : null,
+            photoIds: photoIds.isNotEmpty ? photoIds : null,
           );
           break;
-          
+
         case 1:
           // Создаём секретное сообщение
           await mapObjectProvider.createSecretMessage(
@@ -933,19 +679,21 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             isOneTime: _isOneTime,
           );
           break;
-          
+
         case 2:
           // Создаём заметку об интересном месте
           // Сначала сохраняем фото
           final storage = mapObjectProvider.storage;
-          for (int i = 0; i < _selectedPhotos.length; i++) {
+          final photoIds = <String>[];
+          for (final photo in _photos) {
             await storage.savePhoto(
-              id: _photoIds[i],
-              webpData: _selectedPhotos[i].toList(),
+              id: photo.id,
+              webpData: photo.bytes.toList(),
               status: 'confirmed',
             );
+            photoIds.add(photo.id);
           }
-          
+
           await mapObjectProvider.createInterestNote(
             latitude: widget.latitude,
             longitude: widget.longitude,
@@ -955,11 +703,11 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             category: _interestCategory,
             title: _interestTitleController.text,
             description: _interestDescriptionController.text,
-            photoIds: _photoIds,
+            photoIds: photoIds,
             contactVisible: _showContact,
           );
           break;
-          
+
         case 3:
           // Создаём напоминалку
           await mapObjectProvider.createReminderCharacter(
@@ -974,7 +722,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
           );
           break;
       }
-      
+
       if (mounted) {
         // Возвращаем результат создания
         Navigator.pop(context, ObjectCreatedResult(typeIndex: _selectedTypeIndex));

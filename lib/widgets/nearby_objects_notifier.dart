@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/map_objects/map_objects.dart';
 import '../providers/map_object_provider.dart';
+import '../config/constants.dart';
 
 /// Виджет уведомлений о близлежащих объектах
 class NearbyObjectsNotifier extends StatefulWidget {
@@ -11,7 +12,7 @@ class NearbyObjectsNotifier extends StatefulWidget {
 
   const NearbyObjectsNotifier({
     super.key,
-    this.alertRadius = 100,
+    this.alertRadius = AppConstants.nearbyAlertRadius,
     required this.currentLat,
     required this.currentLng,
   });
@@ -32,7 +33,7 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
   void initState() {
     super.initState();
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: AppConstants.pulseAnimationDuration,
       vsync: this,
     )..repeat(reverse: true);
     
@@ -226,7 +227,7 @@ class _NearbyObjectAlertState extends State<NearbyObjectAlert>
     _slideController.forward();
     
     // Автоскрытие через 5 секунд
-    Future.delayed(const Duration(seconds: 5), () {
+    Future.delayed(AppConstants.nearbyAlertDuration, () {
       if (mounted) {
         _dismiss();
       }
@@ -392,7 +393,7 @@ class NearbyAlertOverlay extends StatefulWidget {
   const NearbyAlertOverlay({
     super.key,
     required this.child,
-    this.alertRadius = 100,
+    this.alertRadius = AppConstants.nearbyAlertRadius,
   });
 
   @override

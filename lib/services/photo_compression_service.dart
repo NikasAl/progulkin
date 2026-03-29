@@ -4,33 +4,26 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+import '../config/constants.dart';
 
 /// Сервис сжатия фото для P2P передачи
 /// Использует нативный WebP через flutter_image_compress для лучшего сжатия
 class PhotoCompressionService {
-  /// Максимальная ширина фото (для превью в приложении)
-  static const int maxPhotoWidth = 800;
-  
-  /// Максимальная высота фото
-  static const int maxPhotoHeight = 600;
-  
-  /// Качество WebP (0-100)
-  static const int webpQuality = 80;
-  
-  /// Максимальный размер фото в KB для превью
-  static const int maxPhotoSizeKB = 100;
-  
-  /// Максимальный размер оригинала в KB (для хранения)
-  static const int maxOriginalSizeKB = 250;
+  /// Алиасы к константам для обратной совместимости
+  static int get maxPhotoWidth => AppConstants.maxPhotoWidth;
+  static int get maxPhotoHeight => AppConstants.maxPhotoHeight;
+  static int get webpQuality => AppConstants.webpQuality;
+  static int get maxPhotoSizeKB => AppConstants.maxPhotoSizeKB;
+  static int get maxOriginalSizeKB => AppConstants.maxOriginalSizeKB;
 
   final Uuid _uuid = const Uuid();
 
   /// Сжать изображение из файла в WebP
   Future<PhotoCompressionResult> compress({
     required String sourcePath,
-    int maxWidth = maxPhotoWidth,
-    int maxHeight = maxPhotoHeight,
-    int quality = webpQuality,
+    int maxWidth = AppConstants.maxPhotoWidth,
+    int maxHeight = AppConstants.maxPhotoHeight,
+    int quality = AppConstants.webpQuality,
   }) async {
     try {
       final file = File(sourcePath);
@@ -103,9 +96,9 @@ class PhotoCompressionService {
   /// Сжать изображение из байтов в WebP
   Future<PhotoCompressionResult> compressBytes({
     required Uint8List bytes,
-    int maxWidth = maxPhotoWidth,
-    int maxHeight = maxPhotoHeight,
-    int quality = webpQuality,
+    int maxWidth = AppConstants.maxPhotoWidth,
+    int maxHeight = AppConstants.maxPhotoHeight,
+    int quality = AppConstants.webpQuality,
   }) async {
     try {
       // Получаем размеры оригинала
@@ -161,7 +154,7 @@ class PhotoCompressionService {
   /// Сжать оригинальное фото для хранения (больше размер, выше качество)
   Future<PhotoCompressionResult> compressOriginal({
     required String sourcePath,
-    int quality = 85,
+    int quality = AppConstants.webpOriginalQuality,
   }) async {
     try {
       final file = File(sourcePath);
@@ -213,8 +206,8 @@ class PhotoCompressionService {
   /// Создать превью (миниатюру) для списка
   Future<PhotoCompressionResult> createThumbnail({
     required Uint8List imageBytes,
-    int size = 200,
-    int quality = 75,
+    int size = AppConstants.thumbnailSize,
+    int quality = AppConstants.thumbnailQuality,
   }) async {
     try {
       final result = await FlutterImageCompress.compressWithList(

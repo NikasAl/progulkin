@@ -1,5 +1,6 @@
 import 'package:latlong2/latlong.dart';
 import '../models/map_objects/map_objects.dart';
+import '../config/constants.dart';
 
 /// Результат проверки возможности действия
 class ActionCheckResult {
@@ -77,8 +78,8 @@ class ObjectActionService {
   final double catchingRadius;
 
   ObjectActionService({
-    this.cleaningRadius = 100.0,
-    this.catchingRadius = 50.0,
+    this.cleaningRadius = AppConstants.cleaningRadius,
+    this.catchingRadius = AppConstants.catchingRadius,
   });
 
   /// Проверить возможность действия с объектом
