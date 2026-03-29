@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../models/map_objects/map_objects.dart';
+import '../../models/contact_profile.dart';
 import 'map_object_storage.dart';
 import 'p2p_connection.dart';
 
@@ -88,6 +89,18 @@ class SyncProtocol {
 
       case P2PMessageType.objectDelete:
         await _handleObjectDelete(message);
+        break;
+
+      case P2PMessageType.interestAdd:
+        await _handleInterestAdd(message);
+        break;
+
+      case P2PMessageType.interestRemove:
+        await _handleInterestRemove(message);
+        break;
+
+      case P2PMessageType.contactProfileUpdate:
+        await _handleContactProfileUpdate(message);
         break;
 
       default:
@@ -342,6 +355,110 @@ class SyncProtocol {
     }
 
     return stats;
+  }
+
+  // ==================== Синхронизация интересов ====================
+
+  /// Обработка добавления интереса
+  Future<void> _handleInterestAdd(P2PMessage message) async {
+    final payload = message.payload;
+    if (payload == null) return;
+
+    final noteId = payload['noteId'] as String?;
+    final userId = payload['userId'] as String?;
+    
+    if (noteId == null || userId == null) return;
+
+    debugPrint('📥 Получен интерес: noteId=$noteId, userId=$userId');
+    
+    await storage.addInterest(
+      noteId: noteId,
+      userId: userId,
+      contactRequestSent: payload['contactRequestSent'] as bool? ?? false,
+      contactApproved: payload['contactApproved'] as bool? ?? false,
+    );
+    
+    // Обновляем счётчик в заметке
+    final obj = await storage.getObject(noteId);
+    if (obj != null && obj is InterestNote) {
+      final updated = obj.addInterest(userId);
+      await storage.updateObject(updated);
+      _objectReceivedController.add(updated);
+    }
+  }
+
+  /// Обработка удаления интереса
+  Future<void> _handleInterestRemove(P2PMessage message) async {
+    final payload = message.payload;
+    if (payload == null) return;
+
+    final noteId = payload['noteId'] as String?;
+    final userId = payload['userId'] as String?;
+    
+    if (noteId == null || userId == null) return;
+
+    debugPrint('📥 Удаление интереса: noteId=$noteId, userId=$userId');
+    
+    await storage.removeInterest(noteId, userId);
+    
+    // Обновляем счётчик в заметке
+    final obj = await storage.getObject(noteId);
+    if (obj != null && obj is InterestNote) {
+      final updated = obj.removeInterest(userId);
+      await storage.updateObject(updated);
+      _objectReceivedController.add(updated);
+    }
+  }
+
+  /// Отправить интерес всем пирам
+  void broadcastInterestAdd({
+    required String noteId,
+    required String userId,
+    bool contactRequestSent = false,
+    bool contactApproved = false,
+  }) {
+    _connectionManager.broadcast(P2PMessage(
+      type: P2PMessageType.interestAdd,
+      payload: {
+        'noteId': noteId,
+        'userId': userId,
+        'contactRequestSent': contactRequestSent,
+        'contactApproved': contactApproved,
+      },
+    ));
+    debugPrint('📤 Интерес отправлен: noteId=$noteId');
+  }
+
+  /// Отправить удаление интереса всем пирам
+  void broadcastInterestRemove({required String noteId, required String userId}) {
+    _connectionManager.broadcast(P2PMessage(
+      type: P2PMessageType.interestRemove,
+      payload: {
+        'noteId': noteId,
+        'userId': userId,
+      },
+    ));
+    debugPrint('📤 Удаление интереса отправлено: noteId=$noteId');
+  }
+
+  // ==================== Синхронизация профилей контактов ====================
+
+  /// Обработка обновления профиля контакта
+  Future<void> _handleContactProfileUpdate(P2PMessage message) async {
+    final payload = message.payload;
+    if (payload == null) return;
+
+    debugPrint('📥 Получен профиль контакта: ${payload['userId']}');
+    await storage.saveContactProfile(payload);
+  }
+
+  /// Отправить профиль контакта всем пирам
+  void broadcastContactProfile(Map<String, dynamic> profile) {
+    _connectionManager.broadcast(P2PMessage(
+      type: P2PMessageType.contactProfileUpdate,
+      payload: profile,
+    ));
+    debugPrint('📤 Профиль контакта отправлен');
   }
 
   void dispose() {

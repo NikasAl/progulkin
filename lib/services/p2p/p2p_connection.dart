@@ -10,6 +10,9 @@ enum P2PMessageType {
   objectCreate,
   objectUpdate,
   objectDelete,
+  interestAdd,
+  interestRemove,
+  contactProfileUpdate,
   ping,
   pong,
 }
