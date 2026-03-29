@@ -179,9 +179,18 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
         ],
         selected: {_selectedTypeIndex},
         onSelectionChanged: (Set<int> selection) {
-          setState(() {
-            _selectedTypeIndex = selection.first;
-          });
+          final newIndex = selection.first;
+          // Если переключаемся между типами, очищаем фото
+          // (монстр и заметка используют одни и те же переменные)
+          if (newIndex != _selectedTypeIndex) {
+            setState(() {
+              _selectedTypeIndex = newIndex;
+              // Очищаем фото при смене типа
+              _selectedPhotos.clear();
+              _photoIds.clear();
+              _photoMetadata.clear();
+            });
+          }
         },
       ),
     );
@@ -243,6 +252,109 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             border: OutlineInputBorder(),
           ),
         ),
+        
+        const SizedBox(height: 16),
+        
+        // Фото
+        Row(
+          children: [
+            Text(
+              'Фото',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _takePhoto,
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('Снять фото'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Фото можно сделать только здесь и сейчас',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Colors.grey[600],
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+        const SizedBox(height: 8),
+        
+        if (_selectedPhotos.isNotEmpty)
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _selectedPhotos.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(
+                          _selectedPhotos[index],
+                          height: 100,
+                          width: 100,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      // Индикатор verified location
+                      if (_photoMetadata.isNotEmpty && index < _photoMetadata.length)
+                        Positioned(
+                          bottom: 4,
+                          left: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green[700],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.location_on, size: 10, color: Colors.white),
+                                SizedBox(width: 2),
+                                Text(
+                                  'Здесь',
+                                  style: TextStyle(fontSize: 8, color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedPhotos.removeAt(index);
+                              if (index < _photoIds.length) {
+                                _photoIds.removeAt(index);
+                              }
+                              if (index < _photoMetadata.length) {
+                                _photoMetadata.removeAt(index);
+                              }
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.close, size: 16, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         
         const SizedBox(height: 16),
         
@@ -783,6 +895,16 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
       switch (_selectedTypeIndex) {
         case 0:
           // Создаём мусорного монстра
+          // Сначала сохраняем фото
+          final storage = mapObjectProvider.storage;
+          for (int i = 0; i < _selectedPhotos.length; i++) {
+            await storage.savePhoto(
+              id: _photoIds[i],
+              webpData: _selectedPhotos[i].toList(),
+              status: 'confirmed',
+            );
+          }
+          
           await mapObjectProvider.createTrashMonster(
             latitude: widget.latitude,
             longitude: widget.longitude,
@@ -792,6 +914,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             trashType: _trashType,
             quantity: _trashQuantity,
             description: _trashDescriptionController.text,
+            photoIds: _photoIds.isNotEmpty ? _photoIds : null,
           );
           break;
           

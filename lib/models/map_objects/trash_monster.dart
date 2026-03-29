@@ -90,6 +90,7 @@ class TrashMonster extends MapObject {
   final TrashQuantity quantity;
   final MonsterClass monsterClass;
   final String description;
+  final List<String> photoIds; // ID фото в хранилище
   final bool isCleaned;
   final String? cleanedBy;
   final DateTime? cleanedAt;
@@ -105,6 +106,7 @@ class TrashMonster extends MapObject {
     required this.quantity,
     required this.monsterClass,
     this.description = '',
+    List<String>? photoIds,
     this.isCleaned = false,
     this.cleanedBy,
     this.cleanedAt,
@@ -114,7 +116,7 @@ class TrashMonster extends MapObject {
     super.views,
     super.version,
     super.expiresAt,
-  }) : super(type: MapObjectType.trashMonster);
+  }) : photoIds = photoIds ?? [], super(type: MapObjectType.trashMonster);
 
   /// Автоматический расчёт класса на основе типа и количества
   factory TrashMonster.autoClass({
@@ -127,6 +129,7 @@ class TrashMonster extends MapObject {
     required TrashType trashType,
     required TrashQuantity quantity,
     String description = '',
+    List<String>? photoIds,
   }) {
     int classLevel = 1;
 
@@ -159,6 +162,7 @@ class TrashMonster extends MapObject {
       quantity: quantity,
       monsterClass: MonsterClass.fromLevel(classLevel),
       description: description,
+      photoIds: photoIds,
     );
   }
 
@@ -188,6 +192,7 @@ class TrashMonster extends MapObject {
       quantity: quantity,
       monsterClass: monsterClass,
       description: description,
+      photoIds: photoIds,
       isCleaned: true,
       cleanedBy: userId,
       cleanedAt: DateTime.now(),
@@ -207,6 +212,7 @@ class TrashMonster extends MapObject {
       'quantity': quantity.code,
       'monsterClass': monsterClass.level,
       'description': description,
+      'photoIds': photoIds,
       'isCleaned': isCleaned,
       'cleanedBy': cleanedBy,
       'cleanedAt': cleanedAt?.toIso8601String(),
@@ -225,6 +231,7 @@ class TrashMonster extends MapObject {
       quantity: TrashQuantity.fromCode(json['quantity'] as String? ?? 'few'),
       monsterClass: MonsterClass.fromLevel(json['monsterClass'] as int? ?? 2),
       description: json['description'] as String? ?? '',
+      photoIds: (json['photoIds'] as List?)?.map((e) => e as String).toList(),
       isCleaned: json['isCleaned'] as bool? ?? false,
       cleanedBy: json['cleanedBy'] as String?,
       cleanedAt: json['cleanedAt'] != null

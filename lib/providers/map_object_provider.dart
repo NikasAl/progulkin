@@ -165,6 +165,7 @@ class MapObjectProvider extends ChangeNotifier {
     required TrashType trashType,
     required TrashQuantity quantity,
     String description = '',
+    List<String>? photoIds,
   }) async {
     final monster = TrashMonster.autoClass(
       id: _uuid.v4(),
@@ -176,6 +177,7 @@ class MapObjectProvider extends ChangeNotifier {
       trashType: trashType,
       quantity: quantity,
       description: description,
+      photoIds: photoIds,
     );
 
     await _saveAndBroadcast(monster);

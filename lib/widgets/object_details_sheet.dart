@@ -50,27 +50,42 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
   }
 
   Future<void> _loadData() async {
-    if (widget.object.type == MapObjectType.interestNote) {
-      final note = widget.object as InterestNote;
-      setState(() => _isLoadingPhotos = true);
-
-      // Загружаем фото
-      final photos = <Uint8List>[];
-      for (final photoId in note.photoIds) {
-        final photoData = await _storage.getPhoto(photoId);
-        if (photoData != null && photoData['webp_data'] != null) {
-          photos.add(photoData['webp_data'] as Uint8List);
-        }
+    if (widget.object.type == MapObjectType.interestNote ||
+        widget.object.type == MapObjectType.trashMonster) {
+      List<String> photoIds = [];
+      
+      if (widget.object.type == MapObjectType.interestNote) {
+        final note = widget.object as InterestNote;
+        photoIds = note.photoIds;
+      } else if (widget.object.type == MapObjectType.trashMonster) {
+        final monster = widget.object as TrashMonster;
+        photoIds = monster.photoIds;
       }
+      
+      if (photoIds.isNotEmpty) {
+        setState(() => _isLoadingPhotos = true);
 
-      // Проверяем, поставил ли пользователь "Интересно"
-      final hasInterest = await _storage.hasInterest(note.id, widget.userId);
+        // Загружаем фото
+        final photos = <Uint8List>[];
+        for (final photoId in photoIds) {
+          final photoData = await _storage.getPhoto(photoId);
+          if (photoData != null && photoData['webp_data'] != null) {
+            photos.add(photoData['webp_data'] as Uint8List);
+          }
+        }
 
-      setState(() {
-        _photos = photos;
-        _isLoadingPhotos = false;
-        _isInterested = hasInterest;
-      });
+        setState(() {
+          _photos = photos;
+          _isLoadingPhotos = false;
+        });
+      }
+      
+      // Проверяем, поставил ли пользователь "Интересно" для InterestNote
+      if (widget.object.type == MapObjectType.interestNote) {
+        final note = widget.object as InterestNote;
+        final hasInterest = await _storage.hasInterest(note.id, widget.userId);
+        setState(() => _isInterested = hasInterest);
+      }
     }
   }
 
@@ -112,8 +127,9 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
 
           const SizedBox(height: 16),
 
-          // Фото-галерея для InterestNote
-          if (widget.object.type == MapObjectType.interestNote)
+          // Фото-галерея для InterestNote и TrashMonster
+          if (widget.object.type == MapObjectType.interestNote ||
+              widget.object.type == MapObjectType.trashMonster)
             _buildPhotoGallery(context),
 
           // Статистика
