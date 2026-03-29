@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/map_objects/map_objects.dart';
+import '../models/contact_profile.dart';
 import '../services/p2p/p2p.dart';
 import '../services/map_object_export_service.dart';
 
@@ -300,26 +301,75 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Добавить "Интересно" к заметке
   Future<void> addInterestToNote(String noteId, String userId) async {
+    await _storage.addInterest(noteId: noteId, userId: userId);
+    
     final obj = await _storage.getObject(noteId);
     if (obj == null || obj is! InterestNote) return;
 
     final updated = obj.addInterest(userId);
     await _storage.updateObject(updated);
-    await _storage.addInterest(noteId: noteId, userId: userId);
     await _broadcastUpdate(updated);
+    
+    // Обновляем локальный список
+    final index = _objects.indexWhere((o) => o.id == noteId);
+    if (index >= 0) {
+      _objects[index] = updated;
+    }
+    
     notifyListeners();
   }
 
   /// Убрать "Интересно" с заметки
   Future<void> removeInterestFromNote(String noteId, String userId) async {
+    await _storage.removeInterest(noteId, userId);
+    
     final obj = await _storage.getObject(noteId);
     if (obj == null || obj is! InterestNote) return;
 
     final updated = obj.removeInterest(userId);
     await _storage.updateObject(updated);
-    await _storage.removeInterest(noteId, userId);
     await _broadcastUpdate(updated);
+    
+    // Обновляем локальный список
+    final index = _objects.indexWhere((o) => o.id == noteId);
+    if (index >= 0) {
+      _objects[index] = updated;
+    }
+    
     notifyListeners();
+  }
+
+  /// Получить список пользователей, отметивших "Интересно"
+  Future<List<NoteInterest>> getInterestsForNote(String noteId) async {
+    final results = await _storage.getInterestsForNote(noteId);
+    return results.map((json) => NoteInterest.fromJson(json)).toList();
+  }
+
+  /// Проверил ли пользователь "Интересно" на заметке
+  Future<bool> hasInterest(String noteId, String userId) async {
+    final interests = await getInterestsForNote(noteId);
+    return interests.any((i) => i.userId == userId);
+  }
+
+  /// Запросить контакт у автора заметки
+  Future<void> requestContact(String noteId, String userId) async {
+    await _storage.addInterest(
+      noteId: noteId,
+      userId: userId,
+      contactRequestSent: true,
+    );
+    
+    // TODO: Отправить P2P уведомление автору
+  }
+
+  /// Одобрить запрос на контакт
+  Future<void> approveContactRequest(String noteId, String userId) async {
+    await _storage.addInterest(
+      noteId: noteId,
+      userId: userId,
+      contactRequestSent: true,
+      contactApproved: true,
+    );
   }
 
   /// Подтвердить объект
@@ -586,6 +636,75 @@ class MapObjectProvider extends ChangeNotifier {
 
       return true;
     }).toList();
+  }
+
+  // ==================== Профили контактов ====================
+
+  /// Получить профиль контакта
+  Future<ContactProfile?> getContactProfile(String userId) async {
+    final json = await _storage.getContactProfile(userId);
+    if (json == null) return null;
+    
+    // Конвертируем snake_case в camelCase
+    final converted = <String, dynamic>{};
+    json.forEach((key, value) {
+      switch (key) {
+        case 'user_id':
+          converted['userId'] = value;
+          break;
+        case 'about':
+          converted['about'] = value;
+          break;
+        case 'vk_link':
+          converted['vkLink'] = value;
+          break;
+        case 'max_link':
+          converted['maxLink'] = value;
+          break;
+        case 'visibility':
+          converted['visibility'] = value;
+          break;
+        case 'accept_p2p_messages':
+          converted['acceptP2PMessages'] = value == 1 || value == true;
+          break;
+        default:
+          converted[key] = value;
+      }
+    });
+    
+    return ContactProfile.fromJson(converted);
+  }
+
+  /// Проверить, можно ли показать контакт
+  Future<bool> canShowContact({
+    required String ownerId,
+    required String viewerId,
+    required String noteId,
+  }) async {
+    final profile = await getContactProfile(ownerId);
+    if (profile == null) return false;
+    
+    // Владелец всегда видит свой контакт
+    if (ownerId == viewerId) return true;
+    
+    // Проверяем настройки видимости
+    switch (profile.visibility) {
+      case ContactVisibility.afterApproval:
+        // Проверяем, одобрен ли контакт
+        final interests = await getInterestsForNote(noteId);
+        final interest = interests.firstWhere(
+          (i) => i.userId == viewerId,
+          orElse: () => NoteInterest(noteId: '', userId: '', timestamp: DateTime.now()),
+        );
+        return interest.contactApproved;
+        
+      case ContactVisibility.afterInterest:
+        // Проверяем, есть ли "Интересно"
+        return await hasInterest(noteId, viewerId);
+        
+      case ContactVisibility.nobody:
+        return false;
+    }
   }
 
   @override

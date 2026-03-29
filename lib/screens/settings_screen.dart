@@ -8,6 +8,7 @@ import '../providers/walk_provider.dart';
 import '../providers/map_object_provider.dart';
 import 'storage_screen.dart';
 import 'route_planning_screen.dart';
+import 'profile_screen.dart';
 
 /// Экран настроек приложения
 class SettingsScreen extends StatefulWidget {
@@ -984,6 +985,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
+                
+                const SizedBox(height: 16),
+                
+                // Кнопка редактирования профиля контакта
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.contact_page),
+                  label: const Text('Профиль для контактов'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 44),
+                  ),
+                ),
               ],
             ),
           ),
