@@ -241,20 +241,9 @@ class PhotoCompressionService {
 
   /// Получить размеры изображения
   Future<(int, int)?> _getImageDimensions(Uint8List bytes) async {
-    try {
-      final result = await FlutterImageCompress.compressWithList(
-        bytes,
-        minHeight: 1,
-        minWidth: 1,
-        quality: 1,
-        format: CompressFormat.jpeg, // Временно для получения размеров
-      );
-      // К сожалению, flutter_image_compress не возвращает размеры напрямую
-      // Используем альтернативный метод через декодирование
-      return null; // Будет определено позже при необходимости
-    } catch (e) {
-      return null;
-    }
+    // К сожалению, flutter_image_compress не возвращает размеры напрямую
+    // Будет определено позже при необходимости
+    return null;
   }
 
   /// Сохранить во временный файл

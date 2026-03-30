@@ -652,7 +652,7 @@ class _SpeedChartPainter extends CustomPainter {
       return;
     }
 
-    final walkPoints = points as List<dynamic>;
+    final walkPoints = points;
     
     // Находим максимальную скорость
     double maxSpeed = 0;

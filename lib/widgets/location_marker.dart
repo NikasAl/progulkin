@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:sensors_plus/sensors_plus.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 
 /// Маркер текущей позиции со стрелкой направления
 /// 
@@ -63,7 +63,7 @@ class _LocationMarkerState extends State<LocationMarker>
   Future<void> _initCompass() async {
     try {
       // Проверяем доступность компаса
-      _compassSubscription = compassEvents.listen(
+      _compassSubscription = FlutterCompass.events?.listen(
         (CompassEvent event) {
           if (event.heading != null && mounted) {
             setState(() {

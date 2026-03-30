@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/walk.dart';
 
@@ -14,12 +12,10 @@ class StorageService {
   static const String _settingsKey = 'app_settings';
   
   SharedPreferences? _prefs;
-  Directory? _appDir;
 
   /// Инициализация
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
-    _appDir = await getApplicationDocumentsDirectory();
   }
 
   /// Сохранение прогулки

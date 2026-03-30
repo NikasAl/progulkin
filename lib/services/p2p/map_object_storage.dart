@@ -160,7 +160,6 @@ class MapObjectStorage {
   /// Сохранить объект
   Future<void> saveObject(MapObject object) async {
     final db = await database;
-    final now = DateTime.now().toIso8601String();
 
     await db.insert(
       'map_objects',

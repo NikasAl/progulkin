@@ -80,7 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   
   Future<void> _loadP2PSettings() async {
     final mapObjectProvider = context.read<MapObjectProvider>();
-    final userInfo = await _userIdService.getUserInfo();
+    await _userIdService.getUserInfo();
     
     setState(() {
       _p2pEnabled = mapObjectProvider.p2pEnabled;

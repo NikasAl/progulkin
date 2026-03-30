@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../models/map_objects/map_objects.dart';
-import '../../models/contact_profile.dart';
 import 'map_object_storage.dart';
 import 'p2p_connection.dart';
 

@@ -1,12 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:archive/archive.dart';
-import 'package:uuid/uuid.dart';
 import '../models/map_objects/map_objects.dart';
 import 'p2p/map_object_storage.dart';
 import 'merge_engine.dart';
@@ -70,7 +68,6 @@ class SyncService {
 
   final MapObjectStorage _storage = MapObjectStorage();
   final MergeEngine _mergeEngine = MergeEngine();
-  final Uuid _uuid = const Uuid();
 
   /// Версия формата экспорта
   static const int formatVersion = 2;
@@ -273,7 +270,6 @@ class SyncService {
       // Находим манифест
       ArchiveFile? manifestFile;
       ArchiveFile? objectsFile;
-      ArchiveFile? previewFile;
       final photoFiles = <ArchiveFile>[];
 
       for (final file in archive) {
@@ -281,8 +277,6 @@ class SyncService {
           manifestFile = file;
         } else if (file.name == 'objects.json') {
           objectsFile = file;
-        } else if (file.name == 'preview.json') {
-          previewFile = file;
         } else if (file.name.startsWith('photos/')) {
           photoFiles.add(file);
         }

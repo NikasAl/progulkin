@@ -21,6 +21,9 @@ dependencies:
   # Подсчёт шагов
   pedometer: ^4.0.1
   sensors_plus: ^3.0.3
+  
+  # Компас
+  flutter_compass: ^0.8.0
 
   # Состояние
   provider: ^6.1.1
