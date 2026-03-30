@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -303,96 +302,8 @@ class HistoryScreen extends StatelessWidget {
           return const SizedBox.shrink();
         }
         
-        // Находим максимальное значение для масштабирования
-        double maxDistance = 0;
-        int maxSteps = 0;
-        for (final day in dailyStats) {
-          final dist = (day['distance'] as num?)?.toDouble() ?? 0;
-          final steps = (day['steps'] as int?) ?? 0;
-          if (dist > maxDistance) maxDistance = dist;
-          if (steps > maxSteps) maxSteps = steps;
-        }
-        
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[200]!),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.bar_chart,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Активность за неделю',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Пройдено километров по дням',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // График
-              SizedBox(
-                height: 150,
-                child: _WeeklyChart(
-                  dailyStats: dailyStats,
-                  maxValue: maxDistance,
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Легенда
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildLegendItem(context, 'Расстояние (км)', Colors.blue),
-                  const SizedBox(width: 16),
-                  _buildLegendItem(context, 'Шаги', Colors.orange),
-                ],
-              ),
-            ],
-          ),
-        );
+        return _WeeklyChartContainer(dailyStats: dailyStats);
       },
-    );
-  }
-  
-  Widget _buildLegendItem(BuildContext context, String label, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
     );
   }
 
@@ -611,28 +522,151 @@ class HistoryScreen extends StatelessWidget {
   }
 }
 
+/// Контейнер графика с переключателем
+class _WeeklyChartContainer extends StatefulWidget {
+  final List<dynamic> dailyStats;
+  
+  const _WeeklyChartContainer({required this.dailyStats});
+  
+  @override
+  State<_WeeklyChartContainer> createState() => _WeeklyChartContainerState();
+}
+
+class _WeeklyChartContainerState extends State<_WeeklyChartContainer> {
+  /// true = показывать шаги, false = показывать расстояние
+  bool _showSteps = false;
+  
+  @override
+  Widget build(BuildContext context) {
+    // Находим максимальные значения для масштабирования
+    double maxDistance = 0;
+    int maxSteps = 0;
+    for (final day in widget.dailyStats) {
+      final dist = (day['distance'] as num?)?.toDouble() ?? 0;
+      final steps = (day['steps'] as int?) ?? 0;
+      if (dist > maxDistance) maxDistance = dist;
+      if (steps > maxSteps) maxSteps = steps;
+    }
+    
+    final maxStepsDouble = maxSteps.toDouble();
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Заголовок с переключателем
+          Row(
+            children: [
+              Icon(
+                Icons.bar_chart,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Активность за неделю',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          
+          // Переключатель
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildToggleButton(
+                  label: 'Километры',
+                  isSelected: !_showSteps,
+                  onTap: () => setState(() => _showSteps = false),
+                ),
+                _buildToggleButton(
+                  label: 'Шаги',
+                  isSelected: _showSteps,
+                  onTap: () => setState(() => _showSteps = true),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // График
+          SizedBox(
+            height: 150,
+            child: _WeeklyChart(
+              dailyStats: widget.dailyStats,
+              maxValue: _showSteps ? maxStepsDouble : maxDistance,
+              showSteps: _showSteps,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildToggleButton({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.grey[600],
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Виджет графика за неделю
 class _WeeklyChart extends StatelessWidget {
   final List<dynamic> dailyStats;
   final double maxValue;
+  final bool showSteps;
   
   const _WeeklyChart({
     required this.dailyStats,
     required this.maxValue,
+    required this.showSteps,
   });
   
   @override
   Widget build(BuildContext context) {
     final weekdayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
     final today = DateTime.now();
-    final todayWeekday = today.weekday - 1; // 0 = понедельник
+    final todayDate = DateTime(today.year, today.month, today.day);
     
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       crossAxisAlignment: CrossAxisAlignment.end,
-      children: dailyStats.asMap().entries.map((entry) {
-        final index = entry.key;
-        final day = entry.value as Map<String, dynamic>;
+      children: dailyStats.map((dayData) {
+        final day = dayData as Map<String, dynamic>;
         final distance = (day['distance'] as num?)?.toDouble() ?? 0;
         final steps = (day['steps'] as int?) ?? 0;
         final date = day['date'] as DateTime?;
@@ -640,21 +674,32 @@ class _WeeklyChart extends StatelessWidget {
         // Определяем название дня
         String dayName = '';
         if (date != null) {
-          final weekday = date.weekday - 1;
-          dayName = weekdayNames[weekday];
+          final weekday = date.weekday; // 1 = понедельник
+          dayName = weekdayNames[weekday - 1];
         }
         
-        // Высота столбца (в километрах)
-        final barHeight = maxValue > 0 ? (distance / 1000) / (maxValue / 1000) * 100 : 0.0;
-        final isToday = index == todayWeekday || (todayWeekday < 6 && index == todayWeekday);
+        // Проверяем, является ли этот день сегодняшним
+        final isToday = date != null && 
+            date.year == todayDate.year && 
+            date.month == todayDate.month && 
+            date.day == todayDate.day;
+        
+        // Значение для отображения
+        final value = showSteps ? steps.toDouble() : distance;
+        final displayMaxValue = showSteps ? maxValue : (maxValue / 1000);
+        final normalizedValue = showSteps ? value : (value / 1000);
+        
+        // Высота столбца
+        final barHeight = displayMaxValue > 0 
+            ? (normalizedValue / displayMaxValue * 100).clamp(4.0, 100.0) 
+            : 4.0;
         
         return _DayColumn(
           dayName: dayName,
-          distance: distance,
-          steps: steps,
+          value: value,
           barHeight: barHeight,
           isToday: isToday,
-          maxValue: maxValue,
+          showSteps: showSteps,
         );
       }).toList(),
     );
@@ -664,32 +709,50 @@ class _WeeklyChart extends StatelessWidget {
 /// Столбец дня на графике
 class _DayColumn extends StatelessWidget {
   final String dayName;
-  final double distance;
-  final int steps;
+  final double value;
   final double barHeight;
   final bool isToday;
-  final double maxValue;
+  final bool showSteps;
   
   const _DayColumn({
     required this.dayName,
-    required this.distance,
-    required this.steps,
+    required this.value,
     required this.barHeight,
     required this.isToday,
-    required this.maxValue,
+    required this.showSteps,
   });
   
   @override
   Widget build(BuildContext context) {
-    final distanceKm = distance / 1000;
+    // Форматируем значение для отображения
+    String displayValue;
+    if (showSteps) {
+      final steps = value.toInt();
+      if (steps >= 1000) {
+        displayValue = '${(steps / 1000).toStringAsFixed(1)}К';
+      } else if (steps > 0) {
+        displayValue = '$steps';
+      } else {
+        displayValue = '';
+      }
+    } else {
+      final km = value / 1000;
+      if (km >= 1) {
+        displayValue = '${km.toStringAsFixed(1)}';
+      } else if (km > 0) {
+        displayValue = km.toStringAsFixed(2);
+      } else {
+        displayValue = '';
+      }
+    }
     
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         // Значение над столбцом
-        if (distance > 0)
+        if (value > 0)
           Text(
-            distanceKm.toStringAsFixed(1),
+            displayValue,
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
@@ -704,7 +767,7 @@ class _DayColumn extends StatelessWidget {
         // Столбец
         Container(
           width: 28,
-          height: math.max(barHeight, 4),
+          height: barHeight,
           decoration: BoxDecoration(
             gradient: isToday
                 ? LinearGradient(
