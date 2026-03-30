@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -34,22 +35,50 @@ class HistoryScreen extends StatelessWidget {
             return _buildEmptyState(context);
           }
 
-          return Column(
-            children: [
-              // Статистика
-              _buildStatisticsCard(context, walkProvider),
-              
-              // Список прогулок
-              Expanded(
-                child: ListView.builder(
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                // Расширенная статистика
+                _buildExtendedStatisticsCard(context, walkProvider),
+                
+                // График по дням
+                _buildWeeklyChart(context, walkProvider),
+                
+                // Список прогулок
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Прогулки',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${walks.length} записей',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                
+                // Список прогулок (ограниченная высота для прокрутки)
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   itemCount: walks.length,
                   itemBuilder: (context, index) {
                     return _buildWalkCard(context, walks[index], walkProvider);
                   },
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -86,8 +115,8 @@ class HistoryScreen extends StatelessWidget {
     );
   }
 
-  /// Карточка статистики
-  Widget _buildStatisticsCard(BuildContext context, WalkProvider walkProvider) {
+  /// Расширенная карточка статистики
+  Widget _buildExtendedStatisticsCard(BuildContext context, WalkProvider walkProvider) {
     return FutureBuilder<Map<String, dynamic>>(
       future: walkProvider.getStatistics(),
       builder: (context, snapshot) {
@@ -95,53 +124,249 @@ class HistoryScreen extends StatelessWidget {
         
         return Container(
           margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.primary,
-                Theme.of(context).colorScheme.primaryContainer,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Column(
             children: [
+              // Заголовок
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.primaryContainer,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.insights, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Статистика',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Два ряда: неделя и всего
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // За неделю
+                    _buildStatsRow(
+                      context,
+                      title: 'За неделю',
+                      walks: stats['weekWalks'] ?? 0,
+                      distance: stats['weekDistance'] ?? 0.0,
+                      steps: stats['weekSteps'] ?? 0,
+                      color: Colors.green,
+                    ),
+                    const Divider(height: 24),
+                    // Всего
+                    _buildStatsRow(
+                      context,
+                      title: 'Всего',
+                      walks: stats['totalWalks'] ?? 0,
+                      distance: stats['totalDistance'] ?? 0.0,
+                      steps: stats['totalSteps'] ?? 0,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  /// Ряд статистики
+  Widget _buildStatsRow(
+    BuildContext context, {
+    required String title,
+    required int walks,
+    required double distance,
+    required int steps,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 16,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatItem(
+                context,
+                icon: Icons.directions_walk,
+                value: '$walks',
+                label: 'Прогулок',
+                color: color,
+              ),
+            ),
+            Expanded(
+              child: _buildStatItem(
+                context,
+                icon: Icons.route,
+                value: _formatDistance(distance),
+                label: 'Километров',
+                color: color,
+              ),
+            ),
+            Expanded(
+              child: _buildStatItem(
+                context,
+                icon: Icons.directions_walk,
+                value: _formatNumber(steps),
+                label: 'Шагов',
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+  
+  /// Элемент статистики
+  Widget _buildStatItem(
+    BuildContext context, {
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// График по дням за неделю
+  Widget _buildWeeklyChart(BuildContext context, WalkProvider walkProvider) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: walkProvider.getStatistics(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+        
+        final dailyStats = snapshot.data!['dailyStats'] as List<dynamic>? ?? [];
+        if (dailyStats.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        
+        // Находим максимальное значение для масштабирования
+        double maxDistance = 0;
+        int maxSteps = 0;
+        for (final day in dailyStats) {
+          final dist = (day['distance'] as num?)?.toDouble() ?? 0;
+          final steps = (day['steps'] as int?) ?? 0;
+          if (dist > maxDistance) maxDistance = dist;
+          if (steps > maxSteps) maxSteps = steps;
+        }
+        
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.bar_chart,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Активность за неделю',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
               Text(
-                'Общая статистика',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+                'Пройдено километров по дням',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey[600],
                 ),
               ),
               const SizedBox(height: 16),
+              
+              // График
+              SizedBox(
+                height: 150,
+                child: _WeeklyChart(
+                  dailyStats: dailyStats,
+                  maxValue: maxDistance,
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Легенда
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildStatColumn(
-                    context,
-                    label: 'Прогулок',
-                    value: '${stats['totalWalks'] ?? 0}',
-                  ),
-                  _buildStatColumn(
-                    context,
-                    label: 'Километров',
-                    value: _formatDistance(stats['totalDistance'] ?? 0),
-                  ),
-                  _buildStatColumn(
-                    context,
-                    label: 'Шагов',
-                    value: _formatNumber(stats['totalSteps'] ?? 0),
-                  ),
+                  _buildLegendItem(context, 'Расстояние (км)', Colors.blue),
+                  const SizedBox(width: 16),
+                  _buildLegendItem(context, 'Шаги', Colors.orange),
                 ],
               ),
             ],
@@ -150,27 +375,22 @@ class HistoryScreen extends StatelessWidget {
       },
     );
   }
-
-  Widget _buildStatColumn(
-    BuildContext context, {
-    required String label,
-    required String value,
-  }) {
-    return Column(
+  
+  Widget _buildLegendItem(BuildContext context, String label, Color color) {
+    return Row(
       children: [
-        Text(
-          value,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(width: 4),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.white.withOpacity(0.8),
-          ),
+          style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
     );
@@ -387,6 +607,129 @@ class HistoryScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Виджет графика за неделю
+class _WeeklyChart extends StatelessWidget {
+  final List<dynamic> dailyStats;
+  final double maxValue;
+  
+  const _WeeklyChart({
+    required this.dailyStats,
+    required this.maxValue,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    final weekdayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    final today = DateTime.now();
+    final todayWeekday = today.weekday - 1; // 0 = понедельник
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: dailyStats.asMap().entries.map((entry) {
+        final index = entry.key;
+        final day = entry.value as Map<String, dynamic>;
+        final distance = (day['distance'] as num?)?.toDouble() ?? 0;
+        final steps = (day['steps'] as int?) ?? 0;
+        final date = day['date'] as DateTime?;
+        
+        // Определяем название дня
+        String dayName = '';
+        if (date != null) {
+          final weekday = date.weekday - 1;
+          dayName = weekdayNames[weekday];
+        }
+        
+        // Высота столбца (в километрах)
+        final barHeight = maxValue > 0 ? (distance / 1000) / (maxValue / 1000) * 100 : 0.0;
+        final isToday = index == todayWeekday || (todayWeekday < 6 && index == todayWeekday);
+        
+        return _DayColumn(
+          dayName: dayName,
+          distance: distance,
+          steps: steps,
+          barHeight: barHeight,
+          isToday: isToday,
+          maxValue: maxValue,
+        );
+      }).toList(),
+    );
+  }
+}
+
+/// Столбец дня на графике
+class _DayColumn extends StatelessWidget {
+  final String dayName;
+  final double distance;
+  final int steps;
+  final double barHeight;
+  final bool isToday;
+  final double maxValue;
+  
+  const _DayColumn({
+    required this.dayName,
+    required this.distance,
+    required this.steps,
+    required this.barHeight,
+    required this.isToday,
+    required this.maxValue,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    final distanceKm = distance / 1000;
+    
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        // Значение над столбцом
+        if (distance > 0)
+          Text(
+            distanceKm.toStringAsFixed(1),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: isToday ? Colors.blue : Colors.grey[600],
+            ),
+          )
+        else
+          const SizedBox(height: 12),
+        
+        const SizedBox(height: 4),
+        
+        // Столбец
+        Container(
+          width: 28,
+          height: math.max(barHeight, 4),
+          decoration: BoxDecoration(
+            gradient: isToday
+                ? LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Colors.blue, Colors.blue.withValues(alpha: 0.7)],
+                  )
+                : null,
+            color: isToday ? null : Colors.grey[300],
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+          ),
+        ),
+        
+        const SizedBox(height: 4),
+        
+        // Название дня
+        Text(
+          dayName,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+            color: isToday ? Colors.blue : Colors.grey[600],
+          ),
+        ),
+      ],
     );
   }
 }

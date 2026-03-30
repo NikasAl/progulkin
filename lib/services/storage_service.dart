@@ -139,6 +139,9 @@ class StorageService {
       totalDuration += walk.duration;
     }
 
+    // Недельная статистика
+    final weekStats = await getWeekStatistics();
+
     return {
       'totalWalks': walks.length,
       'totalDistance': totalDistance,
@@ -146,6 +149,60 @@ class StorageService {
       'totalDuration': totalDuration,
       'averageDistance': walks.isNotEmpty ? totalDistance / walks.length : 0,
       'averageSteps': walks.isNotEmpty ? totalSteps / walks.length : 0,
+      // Недельная статистика
+      'weekWalks': weekStats['walks'],
+      'weekDistance': weekStats['distance'],
+      'weekSteps': weekStats['steps'],
+      'weekDuration': weekStats['duration'],
+      'dailyStats': weekStats['dailyStats'],
+    };
+  }
+
+  /// Статистика за последние 7 дней
+  Future<Map<String, dynamic>> getWeekStatistics() async {
+    final now = DateTime.now();
+    final startDate = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+    final endDate = startDate.add(const Duration(days: 7));
+    
+    final walks = await getWalksByDateRange(startDate, endDate);
+    
+    double totalDistance = 0;
+    int totalSteps = 0;
+    Duration totalDuration = Duration.zero;
+    
+    // Группируем по дням
+    final dailyStats = <DateTime, Map<String, dynamic>>{};
+    
+    for (int i = 0; i < 7; i++) {
+      final day = startDate.add(Duration(days: i));
+      dailyStats[day] = {
+        'date': day,
+        'distance': 0.0,
+        'steps': 0,
+        'walks': 0,
+      };
+    }
+    
+    for (final walk in walks) {
+      totalDistance += walk.totalDistance;
+      totalSteps += walk.steps;
+      totalDuration += walk.duration;
+      
+      // Находим день прогулки
+      final walkDay = DateTime(walk.startTime.year, walk.startTime.month, walk.startTime.day);
+      if (dailyStats.containsKey(walkDay)) {
+        dailyStats[walkDay]!['distance'] = (dailyStats[walkDay]!['distance'] as double) + walk.totalDistance;
+        dailyStats[walkDay]!['steps'] = (dailyStats[walkDay]!['steps'] as int) + walk.steps;
+        dailyStats[walkDay]!['walks'] = (dailyStats[walkDay]!['walks'] as int) + 1;
+      }
+    }
+    
+    return {
+      'walks': walks.length,
+      'distance': totalDistance,
+      'steps': totalSteps,
+      'duration': totalDuration,
+      'dailyStats': dailyStats.values.toList(),
     };
   }
 
