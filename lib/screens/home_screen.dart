@@ -38,7 +38,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<LatLng> _routePoints = [];
   bool _initialized = false;
   bool _mapObjectsInitialized = false;
-  bool _tileCacheInitialized = false;
   bool _showFilters = false; // Показать панель фильтров
   LatLng? _currentLocation; // Текущая позиция пользователя
   LatLng _initialPosition = const LatLng(55.7558, 37.6173); // Москва по умолчанию
@@ -83,7 +82,6 @@ class _HomeScreenState extends State<HomeScreen> {
     // Инициализируем кэш тайлов
     try {
       await _tileCacheService.init();
-      _tileCacheInitialized = true;
     } catch (e) {
       debugPrint('Ошибка инициализации кэша тайлов: $e');
     }
@@ -257,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
           userAgentPackageName: 'com.example.progulkin',
           maxZoom: 19,
           // Используем кэшированные тайлы если доступны
-          tileProvider: _tileCacheInitialized 
+          tileProvider: _tileCacheService.isInitialized 
               ? _tileCacheService.getTileProvider()
               : null,
         ),

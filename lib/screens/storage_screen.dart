@@ -676,6 +676,10 @@ class _StorageScreenState extends State<StorageScreen> {
       Navigator.pop(context);
 
       if (result.success) {
+        // Перезагружаем объекты в провайдере для обновления карты
+        final provider = context.read<MapObjectProvider>();
+        await provider.reload();
+        
         _showSyncResultDialog(result);
         await _loadStats();
       } else if (result.error != null) {
@@ -704,7 +708,9 @@ class _StorageScreenState extends State<StorageScreen> {
               color: result.success ? Colors.green : Colors.orange,
             ),
             const SizedBox(width: 8),
-            Text(result.success ? 'Импорт завершён' : 'Импорт'),
+            Flexible(
+              child: Text(result.success ? 'Импорт завершён' : 'Импорт'),
+            ),
           ],
         ),
         content: SingleChildScrollView(

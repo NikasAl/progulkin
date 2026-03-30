@@ -20,7 +20,6 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
   final MapController _mapController = MapController();
   final TileCacheService _tileCacheService = TileCacheService();
   List<LatLng> _routePoints = [];
-  bool _tileCacheInitialized = false;
 
   @override
   void initState() {
@@ -37,12 +36,8 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
 
   Future<void> _initTileCache() async {
     try {
+      // Инициализируем кэш тайлов (singleton, безопасно вызывать многократно)
       await _tileCacheService.init();
-      if (mounted) {
-        setState(() {
-          _tileCacheInitialized = true;
-        });
-      }
     } catch (e) {
       debugPrint('TileCache init error: $e');
     }
@@ -77,7 +72,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
                           userAgentPackageName: 'com.example.progulkin',
                           maxZoom: 19,
                           // Используем кэшированные тайлы если доступны
-                          tileProvider: _tileCacheInitialized 
+                          tileProvider: _tileCacheService.isInitialized 
                               ? _tileCacheService.getTileProvider()
                               : null,
                         ),
@@ -227,7 +222,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
             label: 'Расстояние',
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
           child: _buildStatCard(
             context,
@@ -237,7 +232,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
             label: 'Шагов',
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
           child: _buildStatCard(
             context,
@@ -260,7 +255,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
     required String label,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -269,17 +264,18 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
               color: iconColor.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: iconColor, size: 20),
+            child: Icon(icon, color: iconColor, size: 18),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            style: const TextStyle(
+              fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
@@ -288,9 +284,9 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
           ),
           Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            style: TextStyle(
+              fontSize: 10,
               color: Colors.grey[600],
-              fontSize: 11,
             ),
           ),
         ],
