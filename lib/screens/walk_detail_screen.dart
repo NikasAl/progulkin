@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 import '../models/walk.dart';
+import '../services/tile_cache_service.dart';
 
 /// Экран деталей прогулки
 class WalkDetailScreen extends StatefulWidget {
@@ -17,18 +18,34 @@ class WalkDetailScreen extends StatefulWidget {
 
 class _WalkDetailScreenState extends State<WalkDetailScreen> {
   final MapController _mapController = MapController();
+  final TileCacheService _tileCacheService = TileCacheService();
   List<LatLng> _routePoints = [];
+  bool _tileCacheInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _initRoutePoints();
+    _initTileCache();
   }
 
   void _initRoutePoints() {
     _routePoints = widget.walk.points.map((p) => 
       LatLng(p.latitude, p.longitude)
     ).toList();
+  }
+
+  Future<void> _initTileCache() async {
+    try {
+      await _tileCacheService.init();
+      if (mounted) {
+        setState(() {
+          _tileCacheInitialized = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('TileCache init error: $e');
+    }
   }
 
   @override
@@ -59,6 +76,10 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
                           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                           userAgentPackageName: 'com.example.progulkin',
                           maxZoom: 19,
+                          // Используем кэшированные тайлы если доступны
+                          tileProvider: _tileCacheInitialized 
+                              ? _tileCacheService.getTileProvider()
+                              : null,
                         ),
                         if (_routePoints.length >= 2)
                           PolylineLayer(
@@ -239,7 +260,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
     required String label,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -248,24 +269,28 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: iconColor.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: iconColor),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Colors.grey[600],
+              fontSize: 11,
             ),
           ),
         ],

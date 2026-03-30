@@ -516,6 +516,11 @@ class MapObjectProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Перезагрузить объекты из хранилища (после импорта)
+  Future<void> reload() async {
+    await _reloadObjects();
+  }
+
   // ==================== Экспорт/Импорт ====================
 
   /// Экспортировать все объекты в файл

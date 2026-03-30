@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/sync_service.dart';
 import '../services/merge_engine.dart';
+import '../providers/map_object_provider.dart';
 
 /// Диалог синхронизации карты
 class SyncDialog extends StatefulWidget {
@@ -70,6 +72,12 @@ class _SyncDialogState extends State<SyncDialog> {
       );
 
       if (mounted) {
+        // Обновляем провайдер после успешного импорта
+        if (result.success) {
+          final provider = context.read<MapObjectProvider>();
+          await provider.reload();
+        }
+
         setState(() {
           _importResult = result;
           _statusMessage = result.success
