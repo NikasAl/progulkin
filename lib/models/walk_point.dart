@@ -6,6 +6,7 @@ class WalkPoint {
   final double speed;
   final double accuracy;
   final DateTime timestamp;
+  final double heading; // Направление движения в градусах (0-360)
 
   const WalkPoint({
     required this.latitude,
@@ -14,6 +15,7 @@ class WalkPoint {
     this.speed = 0,
     this.accuracy = 0,
     required this.timestamp,
+    this.heading = 0,
   });
 
   /// Преобразование в формат для Яндекс карт
@@ -29,6 +31,7 @@ class WalkPoint {
       'speed': speed,
       'accuracy': accuracy,
       'timestamp': timestamp.toIso8601String(),
+      'heading': heading,
     };
   }
 
@@ -41,6 +44,28 @@ class WalkPoint {
       speed: (map['speed'] as num?)?.toDouble() ?? 0,
       accuracy: (map['accuracy'] as num?)?.toDouble() ?? 0,
       timestamp: DateTime.parse(map['timestamp'] as String),
+      heading: (map['heading'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  /// Копировать с новыми значениями
+  WalkPoint copyWith({
+    double? latitude,
+    double? longitude,
+    double? altitude,
+    double? speed,
+    double? accuracy,
+    DateTime? timestamp,
+    double? heading,
+  }) {
+    return WalkPoint(
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      altitude: altitude ?? this.altitude,
+      speed: speed ?? this.speed,
+      accuracy: accuracy ?? this.accuracy,
+      timestamp: timestamp ?? this.timestamp,
+      heading: heading ?? this.heading,
     );
   }
 

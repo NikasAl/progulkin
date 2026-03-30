@@ -31,6 +31,10 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
   bool _isVisible = true;
   Timer? _hideTimer;
   
+  // Отслеживаем предыдущее количество объектов
+  int _lastObjectCount = -1;
+  Set<String> _lastObjectIds = {};
+  
   @override
   void initState() {
     super.initState();
@@ -42,23 +46,13 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    
-    _startHideTimer();
   }
   
   @override
   void didUpdateWidget(NearbyObjectsNotifier oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Если позиция изменилась значительно, показываем уведомление снова
-    final distance = calculateDistance(
-      oldWidget.currentLat, oldWidget.currentLng,
-      widget.currentLat, widget.currentLng,
-    );
-    if (distance > 50) {
-      // Больше 50 метров - показываем снова
-      setState(() => _isVisible = true);
-      _startHideTimer();
-    }
+    // Показываем уведомление только если изменился состав объектов рядом
+    // Расчёт расстояния происходит в build()
   }
   
   void _startHideTimer() {
@@ -79,14 +73,11 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
 
   @override
   Widget build(BuildContext context) {
-    if (!_isVisible) {
-      return const SizedBox.shrink();
-    }
-    
     return Consumer<MapObjectProvider>(
       builder: (context, provider, child) {
-        final nearbyObjects = provider.nearbyObjects.where((obj) {
-          // Фильтруем по расстоянию
+        // Фильтруем объекты по расстоянию напрямую, а не через provider.nearbyObjects
+        // т.к. nearbyObjects может содержать устаревшие данные если позиция не обновилась
+        final nearbyObjects = provider.objects.where((obj) {
           final distance = calculateDistance(
             widget.currentLat,
             widget.currentLng,
@@ -96,7 +87,32 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
           return distance <= widget.alertRadius;
         }).toList();
         
-        if (nearbyObjects.isEmpty) {
+        // Проверяем, изменился ли состав объектов
+        final currentIds = nearbyObjects.map((o) => o.id).toSet();
+        final hasChanges = !_setEquals(currentIds, _lastObjectIds);
+        
+        // Обновляем состояние при изменении объектов
+        if (hasChanges && currentIds.isNotEmpty) {
+          // Отложенное обновление состояния
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && currentIds.isNotEmpty) {
+              setState(() {
+                _lastObjectIds = currentIds;
+                _lastObjectCount = nearbyObjects.length;
+                _isVisible = true;
+              });
+              _startHideTimer();
+            }
+          });
+        }
+        
+        // Инициализация при первом построении
+        if (_lastObjectCount == -1 && nearbyObjects.isNotEmpty) {
+          _lastObjectIds = currentIds;
+          _lastObjectCount = nearbyObjects.length;
+        }
+        
+        if (nearbyObjects.isEmpty || !_isVisible) {
           return const SizedBox.shrink();
         }
         
@@ -110,6 +126,12 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
         );
       },
     );
+  }
+  
+  /// Сравнение двух множеств
+  bool _setEquals<T>(Set<T> a, Set<T> b) {
+    if (a.length != b.length) return false;
+    return a.containsAll(b);
   }
 
   Widget _buildNearbyIndicator(BuildContext context, List<MapObject> objects) {

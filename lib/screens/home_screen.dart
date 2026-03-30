@@ -16,6 +16,7 @@ import '../widgets/map_objects_layer.dart';
 import '../widgets/object_filters_widget.dart';
 import '../widgets/nearby_objects_notifier.dart';
 import '../widgets/object_details_sheet.dart';
+import '../widgets/location_marker.dart';
 import 'history_screen.dart';
 import 'walk_detail_screen.dart';
 import 'settings_screen.dart';
@@ -29,7 +30,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
   final LocationService _locationService = LocationService();
   final UserIdService _userIdService = UserIdService();
@@ -46,10 +47,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _updateTimer; // Таймер для обновления времени
   bool _mapReady = false; // Карта готова
   bool _pendingMoveToLocation = false; // Нужно перейти к позиции после готовности карты
+  
+  // Направление и скорость для маркера
+  double _currentHeading = 0;
+  double _currentSpeed = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initProviders();
     });
@@ -64,7 +70,41 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // При возобновлении приложения - переместить карту к текущей позиции
+    if (state == AppLifecycleState.resumed) {
+      _moveToCurrentLocationOnResume();
+    }
+  }
+  
+  /// Переместить карту к текущей позиции при возобновлении приложения
+  Future<void> _moveToCurrentLocationOnResume() async {
+    // Небольшая задержка для корректного восстановления состояния
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    if (!mounted) return;
+    
+    // Получаем актуальную позицию
+    final position = await _locationService.getCurrentPosition();
+    if (position != null && mounted) {
+      setState(() {
+        _currentLocation = LatLng(position.latitude, position.longitude);
+        _currentHeading = position.heading;
+        _currentSpeed = position.speed;
+      });
+      
+      // Перемещаем карту к позиции
+      if (_mapReady) {
+        _moveToCurrentLocation();
+      }
+    }
+  }
+  
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _updateTimer?.cancel();
     super.dispose();
   }
@@ -95,6 +135,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _currentLocation = LatLng(position.latitude, position.longitude);
         _initialPosition = _currentLocation!;
+        _currentHeading = position.heading;
+        _currentSpeed = position.speed;
       });
       
       // Если карта уже готова - переходим к позиции
@@ -115,6 +157,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _currentLocation = LatLng(point.latitude, point.longitude);
         _routePoints.add(_currentLocation!);
+        _currentHeading = point.heading;
+        _currentSpeed = point.speed;
       });
       
       // Обновляем позицию для MapObjectProvider
@@ -221,7 +265,6 @@ class _HomeScreenState extends State<HomeScreen> {
               right: 16,
               top: 130,
               child: NearbyObjectsNotifier(
-                key: ValueKey('nearby_${_currentLocation!.latitude.toStringAsFixed(4)}_${_currentLocation!.longitude.toStringAsFixed(4)}'),
                 currentLat: _currentLocation!.latitude,
                 currentLng: _currentLocation!.longitude,
                 alertRadius: 100,
@@ -290,53 +333,15 @@ class _HomeScreenState extends State<HomeScreen> {
         if (_currentLocation != null)
           MarkerLayer(
             markers: [
-              // Маркер текущего положения (синий круг с пульсацией)
+              // Маркер текущего положения со стрелкой направления
               Marker(
                 point: _currentLocation!,
                 width: 50,
                 height: 50,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Внешний пульсирующий круг
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    // Средний круг
-                    Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.3),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    // Внутренний круг с направлением
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 3,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                child: LocationMarker(
+                  movementHeading: _currentHeading,
+                  speed: _currentSpeed,
+                  showCompassWhenStationary: true,
                 ),
               ),
               // Маркер начала маршрута (зелёный)

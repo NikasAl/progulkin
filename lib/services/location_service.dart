@@ -215,18 +215,26 @@ class LocationService {
     
     if (filterResult.accepted && filterResult.point != null) {
       _pointsAccepted++;
-      _lastValidPoint = filterResult.point;
+      
+      // Вычисляем heading из последних двух точек
+      WalkPoint finalPoint = filterResult.point!;
+      if (_lastValidPoint != null) {
+        final heading = calculateBearing(_lastValidPoint!, finalPoint);
+        finalPoint = finalPoint.copyWith(heading: heading);
+      }
+      
+      _lastValidPoint = finalPoint;
       
       // Добавляем в буфер
-      _recentPoints.add(filterResult.point!);
+      _recentPoints.add(finalPoint);
       if (_recentPoints.length > 10) {
         _recentPoints.removeAt(0);
       }
       
-      _positionController.add(filterResult.point!);
+      _positionController.add(finalPoint);
       
       if (AppConfig.enableLogging) {
-        print('✓ ПРИНЯТА (принято: $_pointsAccepted из $_pointsReceived)');
+        print('✓ ПРИНЯТА (принято: $_pointsAccepted из $_pointsReceived), heading: ${finalPoint.heading.toStringAsFixed(0)}°');
       }
     } else {
       if (AppConfig.enableLogging) {
@@ -355,8 +363,8 @@ class LocationService {
     final prevPrevPoint = _recentPoints[_recentPoints.length - 2];
 
     // Вычисляем векторы направления
-    final bearing1 = _calculateBearing(prevPrevPoint, prevPoint);
-    final bearing2 = _calculateBearing(prevPoint, point);
+    final bearing1 = calculateBearing(prevPrevPoint, prevPoint);
+    final bearing2 = calculateBearing(prevPoint, point);
 
     // Вычисляем изменение направления
     double angleChange = (bearing2 - bearing1).abs();
@@ -376,7 +384,7 @@ class LocationService {
   }
 
   /// Вычисление азимута (направления) между двумя точками
-  double _calculateBearing(WalkPoint from, WalkPoint to) {
+  double calculateBearing(WalkPoint from, WalkPoint to) {
     final double lat1 = _toRadians(from.latitude);
     final double lat2 = _toRadians(to.latitude);
     final double dLon = _toRadians(to.longitude - from.longitude);
