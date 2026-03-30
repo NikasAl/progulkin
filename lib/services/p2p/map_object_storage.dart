@@ -27,13 +27,16 @@ class MapObjectStorage {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await _createTables(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _createV2Tables(db);
+        }
+        if (oldVersion < 3) {
+          await _createV3Tables(db);
         }
       },
     );
@@ -68,6 +71,7 @@ class MapObjectStorage {
     await db.execute('CREATE INDEX idx_owner ON map_objects(owner_id)');
 
     await _createV2Tables(db);
+    await _createV3Tables(db);
   }
 
   /// Создать таблицы версии 2 (фото, интересы, сообщения)
@@ -131,6 +135,28 @@ class MapObjectStorage {
     ''');
   }
 
+  /// Создать таблицы версии 3 (updatedAt, deletedAt для мержа)
+  Future<void> _createV3Tables(Database db) async {
+    // Добавляем новые колонки в map_objects
+    try {
+      await db.execute('ALTER TABLE map_objects ADD COLUMN updated_at TEXT');
+    } catch (e) {
+      // Колонка уже существует
+    }
+    try {
+      await db.execute('ALTER TABLE map_objects ADD COLUMN deleted_at TEXT');
+    } catch (e) {
+      // Колонка уже существует
+    }
+    
+    // Создаём индекс для быстрого поиска удалённых
+    try {
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_deleted ON map_objects(deleted_at)');
+    } catch (e) {
+      // Индекс уже существует
+    }
+  }
+
   /// Сохранить объект
   Future<void> saveObject(MapObject object) async {
     final db = await database;
@@ -153,7 +179,8 @@ class MapObjectStorage {
         'views': object.views,
         'version': object.version,
         'created_at': object.createdAt.toIso8601String(),
-        'updated_at': now,
+        'updated_at': object.updatedAt.toIso8601String(),
+        'deleted_at': object.deletedAt?.toIso8601String(),
         'geohash': object.geohash,
         'is_synced': 0,
       },
@@ -178,10 +205,12 @@ class MapObjectStorage {
     return MapObject.fromSyncJson(data);
   }
 
-  /// Получить все объекты
-  Future<List<MapObject>> getAllObjects() async {
+  /// Получить все объекты (исключая удалённые)
+  Future<List<MapObject>> getAllObjects({bool includeDeleted = false}) async {
     final db = await database;
-    final results = await db.query('map_objects');
+    final results = includeDeleted
+        ? await db.query('map_objects')
+        : await db.query('map_objects', where: 'deleted_at IS NULL');
 
     return results.map((row) {
       final data = jsonDecode(row['data'] as String) as Map<String, dynamic>;
@@ -189,12 +218,17 @@ class MapObjectStorage {
     }).toList();
   }
 
+  /// Получить все объекты, включая удалённые (для синхронизации)
+  Future<List<MapObject>> getAllObjectsForSync() async {
+    return await getAllObjects(includeDeleted: true);
+  }
+
   /// Обновить объект
   Future<void> updateObject(MapObject object) async {
     await saveObject(object);
   }
 
-  /// Удалить объект
+  /// Удалить объект (hard delete)
   Future<void> deleteObject(String id) async {
     final db = await database;
     await db.delete(
@@ -202,6 +236,74 @@ class MapObjectStorage {
       where: 'id = ?',
       whereArgs: [id],
     );
+    _notifyUpdate();
+  }
+
+  /// Soft delete - пометить объект как удалённый
+  Future<void> softDeleteObject(String id) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    
+    // Получаем текущий объект
+    final results = await db.query(
+      'map_objects',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    
+    if (results.isNotEmpty) {
+      final row = results.first;
+      final data = jsonDecode(row['data'] as String) as Map<String, dynamic>;
+      final object = MapObject.fromSyncJson(data);
+      
+      // Обновляем с пометкой удаления
+      await db.update(
+        'map_objects',
+        {
+          'deleted_at': now,
+          'updated_at': now,
+          'status': 'hidden',
+          'data': jsonEncode(object.markAsDeleted().toSyncJson()),
+          'version': (row['version'] as int? ?? 1) + 1,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+    
+    _notifyUpdate();
+  }
+
+  /// Восстановить удалённый объект
+  Future<void> restoreObject(String id) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    
+    final results = await db.query(
+      'map_objects',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    
+    if (results.isNotEmpty) {
+      final row = results.first;
+      final data = jsonDecode(row['data'] as String) as Map<String, dynamic>;
+      final object = MapObject.fromSyncJson(data);
+      
+      await db.update(
+        'map_objects',
+        {
+          'deleted_at': null,
+          'updated_at': now,
+          'status': 'active',
+          'data': jsonEncode(object.restore().toSyncJson()),
+          'version': (row['version'] as int? ?? 1) + 1,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+    
     _notifyUpdate();
   }
 

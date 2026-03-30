@@ -102,6 +102,10 @@ class TrashMonster extends MapObject {
     required super.ownerId,
     super.ownerName,
     super.ownerReputation,
+    super.createdAt,
+    super.updatedAt,
+    super.expiresAt,
+    super.deletedAt,
     required this.trashType,
     required this.quantity,
     required this.monsterClass,
@@ -115,7 +119,6 @@ class TrashMonster extends MapObject {
     super.denies,
     super.views,
     super.version,
-    super.expiresAt,
   }) : photoIds = photoIds ?? [], super(type: MapObjectType.trashMonster);
 
   /// Автоматический расчёт класса на основе типа и количества
@@ -188,6 +191,10 @@ class TrashMonster extends MapObject {
       ownerId: ownerId,
       ownerName: ownerName,
       ownerReputation: ownerReputation,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+      expiresAt: expiresAt,
+      deletedAt: deletedAt,
       trashType: trashType,
       quantity: quantity,
       monsterClass: monsterClass,
@@ -197,6 +204,35 @@ class TrashMonster extends MapObject {
       cleanedBy: userId,
       cleanedAt: DateTime.now(),
       status: MapObjectStatus.cleaned,
+      confirms: confirms,
+      denies: denies,
+      views: views,
+      version: version + 1,
+    );
+  }
+
+  /// Пометить как удалённый
+  TrashMonster markAsDeletedObject() {
+    return TrashMonster(
+      id: id,
+      latitude: latitude,
+      longitude: longitude,
+      ownerId: ownerId,
+      ownerName: ownerName,
+      ownerReputation: ownerReputation,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+      expiresAt: expiresAt,
+      deletedAt: DateTime.now(),
+      trashType: trashType,
+      quantity: quantity,
+      monsterClass: monsterClass,
+      description: description,
+      photoIds: photoIds,
+      isCleaned: isCleaned,
+      cleanedBy: cleanedBy,
+      cleanedAt: cleanedAt,
+      status: MapObjectStatus.hidden,
       confirms: confirms,
       denies: denies,
       views: views,
@@ -227,6 +263,18 @@ class TrashMonster extends MapObject {
       ownerId: json['ownerId'] as String,
       ownerName: json['ownerName'] as String? ?? 'Аноним',
       ownerReputation: json['ownerReputation'] as int? ?? 0,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
+      expiresAt: json['expiresAt'] != null
+          ? DateTime.parse(json['expiresAt'] as String)
+          : null,
+      deletedAt: json['deletedAt'] != null
+          ? DateTime.parse(json['deletedAt'] as String)
+          : null,
       trashType: TrashType.fromCode(json['trashType'] as String? ?? 'mixed'),
       quantity: TrashQuantity.fromCode(json['quantity'] as String? ?? 'few'),
       monsterClass: MonsterClass.fromLevel(json['monsterClass'] as int? ?? 2),

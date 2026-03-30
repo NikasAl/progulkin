@@ -43,6 +43,7 @@ dependencies:
   # Экспорт/Импорт файлов
   share_plus: ^10.1.0
   file_picker: ^10.1.0
+  archive: ^3.6.1
   
   # Камера для фото
   image_picker: ^1.0.4

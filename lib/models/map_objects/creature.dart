@@ -114,6 +114,10 @@ class Creature extends MapObject {
     required super.ownerId,
     super.ownerName,
     super.ownerReputation,
+    super.createdAt,
+    super.updatedAt,
+    super.expiresAt,
+    super.deletedAt,
     required this.creatureType,
     required this.rarity,
     required this.habitat,
@@ -232,6 +236,10 @@ class Creature extends MapObject {
       longitude: longitude,
       ownerId: userId,
       ownerName: userName,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+      expiresAt: expiresAt,
+      deletedAt: deletedAt,
       creatureType: creatureType,
       rarity: rarity,
       habitat: habitat,
@@ -264,6 +272,10 @@ class Creature extends MapObject {
       longitude: longitude,
       ownerId: ownerId,
       ownerName: ownerName,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+      expiresAt: expiresAt,
+      deletedAt: deletedAt,
       creatureType: creatureType,
       rarity: rarity,
       habitat: habitat,
@@ -330,6 +342,18 @@ class Creature extends MapObject {
       ownerId: json['ownerId'] as String,
       ownerName: json['ownerName'] as String? ?? 'Природа',
       ownerReputation: json['ownerReputation'] as int? ?? 0,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
+      expiresAt: json['expiresAt'] != null
+          ? DateTime.parse(json['expiresAt'] as String)
+          : null,
+      deletedAt: json['deletedAt'] != null
+          ? DateTime.parse(json['deletedAt'] as String)
+          : null,
       creatureType: CreatureType.fromCode(json['creatureType'] as String? ?? 'domovoy'),
       rarity: CreatureRarity.fromLevel(json['rarity'] as int? ?? 1),
       habitat: CreatureHabitat.fromCode(json['habitat'] as String? ?? 'anywhere'),

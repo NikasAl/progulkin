@@ -75,7 +75,9 @@ class MapObject {
   final String ownerName;
   final int ownerReputation;
   final DateTime createdAt;
+  final DateTime updatedAt;  // Для мержа - время последнего изменения
   final DateTime? expiresAt;
+  final DateTime? deletedAt; // Soft delete - время удаления (null = не удалён)
   MapObjectStatus status;
   int confirms;
   int denies;
@@ -91,13 +93,19 @@ class MapObject {
     this.ownerName = 'Аноним',
     this.ownerReputation = 0,
     DateTime? createdAt,
+    DateTime? updatedAt,
     this.expiresAt,
+    this.deletedAt,
     this.status = MapObjectStatus.active,
     this.confirms = 0,
     this.denies = 0,
     this.views = 0,
     this.version = 1,
-  }) : createdAt = createdAt ?? DateTime.now();
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
+
+  /// Проверка, удалён ли объект (soft delete)
+  bool get isDeleted => deletedAt != null;
 
   /// Уникальный идентификатор для синхронизации
   String get syncId => '${type.code}_$id';
@@ -116,7 +124,9 @@ class MapObject {
       'ownerName': ownerName,
       'ownerReputation': ownerReputation,
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
       'expiresAt': expiresAt?.toIso8601String(),
+      'deletedAt': deletedAt?.toIso8601String(),
       'status': status.code,
       'confirms': confirms,
       'denies': denies,
@@ -156,8 +166,14 @@ class MapObject {
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
       expiresAt: json['expiresAt'] != null
           ? DateTime.parse(json['expiresAt'] as String)
+          : null,
+      deletedAt: json['deletedAt'] != null
+          ? DateTime.parse(json['deletedAt'] as String)
           : null,
       status: MapObjectStatus.fromCode(json['status'] as String? ?? 'active'),
       confirms: json['confirms'] as int? ?? 0,
@@ -191,6 +207,83 @@ class MapObject {
   /// Обновить версию при изменении
   void incrementVersion() {
     version++;
+  }
+
+  /// Сравнить время обновления с другим объектом
+  /// Возвращает: < 0 если этот объект старее, > 0 если новее, 0 если равны
+  int compareUpdateTime(MapObject other) {
+    return updatedAt.compareTo(other.updatedAt);
+  }
+
+  /// Проверить, новее ли этот объект чем другой
+  bool isNewerThan(MapObject other) {
+    return updatedAt.isAfter(other.updatedAt);
+  }
+
+  /// Создать копию с обновлённым временем (для модификации)
+  MapObject withUpdatedTime() {
+    return MapObject(
+      id: id,
+      type: type,
+      latitude: latitude,
+      longitude: longitude,
+      ownerId: ownerId,
+      ownerName: ownerName,
+      ownerReputation: ownerReputation,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+      expiresAt: expiresAt,
+      deletedAt: deletedAt,
+      status: status,
+      confirms: confirms,
+      denies: denies,
+      views: views,
+      version: version + 1,
+    );
+  }
+
+  /// Помечает объект как удалённый (soft delete)
+  MapObject markAsDeleted() {
+    return MapObject(
+      id: id,
+      type: type,
+      latitude: latitude,
+      longitude: longitude,
+      ownerId: ownerId,
+      ownerName: ownerName,
+      ownerReputation: ownerReputation,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+      expiresAt: expiresAt,
+      deletedAt: DateTime.now(),
+      status: MapObjectStatus.hidden,
+      confirms: confirms,
+      denies: denies,
+      views: views,
+      version: version + 1,
+    );
+  }
+
+  /// Восстановить удалённый объект
+  MapObject restore() {
+    return MapObject(
+      id: id,
+      type: type,
+      latitude: latitude,
+      longitude: longitude,
+      ownerId: ownerId,
+      ownerName: ownerName,
+      ownerReputation: ownerReputation,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+      expiresAt: expiresAt,
+      deletedAt: null,
+      status: MapObjectStatus.active,
+      confirms: confirms,
+      denies: denies,
+      views: views,
+      version: version + 1,
+    );
   }
 
   /// Кодирование geohash
