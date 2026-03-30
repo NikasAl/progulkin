@@ -4,7 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/map_objects/map_objects.dart';
 import '../providers/map_object_provider.dart';
 import '../services/p2p/map_object_storage.dart';
-import '../services/map_object_export_service.dart';
+import '../services/sync_service.dart';
+import '../widgets/sync_dialog.dart';
 
 /// Экран хранилища объектов
 class StorageScreen extends StatefulWidget {
@@ -420,7 +421,7 @@ class _StorageScreenState extends State<StorageScreen> {
                     Icon(Icons.sync, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 8),
                     Text(
-                      'Резервное копирование',
+                      'Синхронизация',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -429,45 +430,58 @@ class _StorageScreenState extends State<StorageScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Сохраняйте объекты в файл для резервного копирования или переноса на другое устройство.',
+                  'Экспорт в ZIP-архив с фото для передачи на другое устройство или резервного копирования.',
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
                 const SizedBox(height: 16),
+                // Кнопка открытия диалога синхронизации
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      await showSyncDialog(context);
+                      // Обновляем статистику после закрытия диалога
+                      if (mounted) {
+                        await _loadStats();
+                      }
+                    },
+                    icon: const Icon(Icons.sync_alt),
+                    label: const Text('Открыть синхронизацию'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Быстрые кнопки
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton.icon(
+                      child: OutlinedButton.icon(
                         onPressed: provider.allObjects.isEmpty
                             ? null
-                            : () => _exportObjects(provider),
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Экспорт'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                        ),
+                            : () => _quickExport(),
+                        icon: const Icon(Icons.upload_file, size: 18),
+                        label: const Text('Быстрый экспорт'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => _importObjects(provider),
-                        icon: const Icon(Icons.download),
-                        label: const Text('Импорт'),
+                        onPressed: () => _quickImport(),
+                        icon: const Icon(Icons.download, size: 18),
+                        label: const Text('Быстрый импорт'),
                       ),
                     ),
                   ],
                 ),
-                if (provider.allObjects.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () => _shareObjects(provider),
-                      icon: const Icon(Icons.share),
-                      label: const Text('Поделиться файлом'),
-                    ),
-                  ),
-                ],
+                const SizedBox(height: 8),
+                Text(
+                  'Формат файла: .progulkin (ZIP-архив с объектами и фото)',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                ),
               ],
             ),
           ),
@@ -607,8 +621,8 @@ class _StorageScreenState extends State<StorageScreen> {
     }
   }
 
-  /// Экспорт объектов
-  Future<void> _exportObjects(MapObjectProvider provider) async {
+  /// Быстрый экспорт
+  Future<void> _quickExport() async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -616,17 +630,23 @@ class _StorageScreenState extends State<StorageScreen> {
     );
 
     try {
-      final result = await provider.exportObjects();
+      final syncService = SyncService();
+      final result = await syncService.exportToZip();
 
       if (!mounted) return;
       Navigator.pop(context);
 
       if (result.success) {
-        _showExportResultDialog(result);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Экспортировано: ${result.objectsCount} объектов, ${result.photosCount} фото (${result.fileSizeFormatted})'),
+            backgroundColor: Colors.green,
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка экспорта: ${result.error}'),
+            content: Text('Ошибка: ${result.error}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -640,46 +660,8 @@ class _StorageScreenState extends State<StorageScreen> {
     }
   }
 
-  /// Показать результат экспорта
-  void _showExportResultDialog(ExportResult result) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 8),
-            Text('Экспорт завершён'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Объектов: ${result.objectsCount}'),
-            const SizedBox(height: 8),
-            Text('Размер: ${result.fileSizeFormatted}'),
-            if (result.filePath != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Путь: ${result.filePath}',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Поделиться файлом
-  Future<void> _shareObjects(MapObjectProvider provider) async {
+  /// Быстрый импорт
+  Future<void> _quickImport() async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -687,12 +669,16 @@ class _StorageScreenState extends State<StorageScreen> {
     );
 
     try {
-      final result = await provider.exportAndShareObjects();
+      final syncService = SyncService();
+      final result = await syncService.importFromZip();
 
       if (!mounted) return;
       Navigator.pop(context);
 
-      if (!result.success && result.error != null) {
+      if (result.success) {
+        _showSyncResultDialog(result);
+        await _loadStats();
+      } else if (result.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка: ${result.error}'), backgroundColor: Colors.red),
         );
@@ -706,33 +692,8 @@ class _StorageScreenState extends State<StorageScreen> {
     }
   }
 
-  /// Импорт объектов
-  Future<void> _importObjects(MapObjectProvider provider) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      final result = await provider.importObjects();
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      _showImportResultDialog(result);
-      await _loadStats();
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  /// Показать результат импорта
-  void _showImportResultDialog(ImportResult result) {
+  /// Показать результат синхронизации
+  void _showSyncResultDialog(ZipImportResult result) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -752,21 +713,31 @@ class _StorageScreenState extends State<StorageScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(result.summary),
-              if (result.importedObjects.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Text('Импортированные объекты:', style: TextStyle(fontWeight: FontWeight.bold)),
+              if (result.photosImported > 0) ...[
                 const SizedBox(height: 8),
-                ...result.importedObjects.take(10).map(
-                  (obj) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(obj),
+                Text('Фото импортировано: ${result.photosImported}'),
+              ],
+              if (result.hasConflicts) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Конфликтов: ${result.conflicts!.length}. Откройте диалог синхронизации для разрешения.',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (result.importedObjects.length > 10)
-                  Text(
-                    '... и ещё ${result.importedObjects.length - 10}',
-                    style: const TextStyle(fontStyle: FontStyle.italic),
-                  ),
               ],
             ],
           ),
@@ -776,6 +747,14 @@ class _StorageScreenState extends State<StorageScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('OK'),
           ),
+          if (result.hasConflicts)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                showSyncDialog(context);
+              },
+              child: const Text('Разрешить конфликты'),
+            ),
         ],
       ),
     );

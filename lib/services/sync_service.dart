@@ -317,7 +317,7 @@ class SyncService {
       final localObjects = await _storage.getAllObjectsForSync();
 
       // Выполняем мерж
-      final mergeResult = _mergeEngine.merge(
+      final mergeResult = await _mergeEngine.merge(
         localObjects: localObjects,
         remoteObjects: remoteObjects,
         strategy: strategy,
