@@ -202,11 +202,13 @@ class _SyncDialogState extends State<SyncDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.sync),
-          SizedBox(width: 8),
-          Text('Синхронизация карты'),
+          const Icon(Icons.sync),
+          const SizedBox(width: 8),
+          Expanded(
+            child: const Text('Синхронизация'),
+          ),
         ],
       ),
       content: SingleChildScrollView(
