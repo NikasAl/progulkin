@@ -51,9 +51,6 @@ dependencies:
   # Камера для фото
   image_picker: ^1.0.4
 
-  # Иконки и UI
-  flutter_native_splash: ^2.3.5
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -65,13 +62,3 @@ flutter:
   assets:
     - assets/icons/
     - assets/icons/monsters/
-    - assets/splash_icon.webp
-
-flutter_native_splash:
-  color: "#FFFFFF"
-  color_dark: "#1a1a2e"
-  image: assets/splash_icon.png
-  android: true
-  android_gravity: center
-  android_screen_orientation: portrait
-  fullscreen: true
