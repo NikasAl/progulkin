@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/map_objects/map_objects.dart';
 import '../providers/map_object_provider.dart';
-import '../config/constants.dart';
 
 /// Результат срабатывания напоминания
 class ReminderTrigger {

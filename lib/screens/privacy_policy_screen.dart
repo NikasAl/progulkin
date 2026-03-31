@@ -224,7 +224,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             _BulletItem('Требований RuStore к приложениям'),
             SizedBox(height: 32),
 
-            _Divider(),
+            const _Divider(),
             SizedBox(height: 16),
             _FooterText(
               'Приложение «Прогулкин» не собирает персональные данные пользователей. '
@@ -360,6 +360,8 @@ class _ContactItem extends StatelessWidget {
 }
 
 class _Divider extends StatelessWidget {
+  const _Divider();
+
   @override
   Widget build(BuildContext context) {
     return Divider(color: Colors.grey[300]);
