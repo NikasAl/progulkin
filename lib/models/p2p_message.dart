@@ -114,6 +114,7 @@ class Chat {
   final DateTime? lastMessageTime;
   final int unreadCount;
   final bool otherUserOnline;
+  final bool isBlocked;
 
   const Chat({
     required this.chatId,
@@ -123,6 +124,7 @@ class Chat {
     this.lastMessageTime,
     this.unreadCount = 0,
     this.otherUserOnline = false,
+    this.isBlocked = false,
   });
 
   /// Создать ID чата для пары пользователей
@@ -138,6 +140,7 @@ class Chat {
     DateTime? lastMessageTime,
     int? unreadCount,
     bool? otherUserOnline,
+    bool? isBlocked,
   }) {
     return Chat(
       chatId: chatId,
@@ -147,6 +150,7 @@ class Chat {
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
       unreadCount: unreadCount ?? this.unreadCount,
       otherUserOnline: otherUserOnline ?? this.otherUserOnline,
+      isBlocked: isBlocked ?? this.isBlocked,
     );
   }
 }

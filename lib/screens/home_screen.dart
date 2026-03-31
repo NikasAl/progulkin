@@ -22,6 +22,7 @@ import 'walk_detail_screen.dart';
 import 'settings_screen.dart';
 import 'add_object_screen.dart';
 import 'creature_collection_screen.dart';
+import 'chat_list_screen.dart';
 
 /// Главный экран с картой OpenStreetMap
 class HomeScreen extends StatefulWidget {
@@ -533,6 +534,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                       const SizedBox(width: 16),
                       _buildIconButton(
+                        icon: Icons.chat,
+                        tooltip: 'Сообщения',
+                        onTap: () => _openChatList(context),
+                      ),
+                      const SizedBox(width: 16),
+                      _buildIconButton(
                         icon: Icons.my_location,
                         tooltip: 'Моё местоположение',
                         onTap: _moveToCurrentLocation,
@@ -792,6 +799,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const CreatureCollectionScreen()),
+    );
+  }
+  
+  /// Открыть список чатов
+  void _openChatList(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ChatListScreen()),
     );
   }
   

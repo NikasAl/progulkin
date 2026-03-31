@@ -5,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'providers/walk_provider.dart';
 import 'providers/pedometer_provider.dart';
 import 'providers/map_object_provider.dart';
+import 'providers/chat_provider.dart';
 import 'screens/home_screen.dart';
 import 'models/map_objects/map_objects.dart'; // Инициализация фабрики объектов
 
@@ -37,6 +38,7 @@ class ProgulkinApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => WalkProvider()),
         ChangeNotifierProvider(create: (_) => PedometerProvider()),
         ChangeNotifierProvider(create: (_) => MapObjectProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: MaterialApp(
         title: 'Прогулкин',
