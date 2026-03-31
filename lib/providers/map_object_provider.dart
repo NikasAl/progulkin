@@ -5,6 +5,7 @@ import '../models/map_objects/map_objects.dart';
 import '../models/contact_profile.dart';
 import '../services/p2p/p2p.dart';
 import '../services/map_object_export_service.dart';
+import '../services/creature_service.dart';
 
 /// Провайдер для управления объектами на карте
 class MapObjectProvider extends ChangeNotifier {
@@ -12,6 +13,7 @@ class MapObjectProvider extends ChangeNotifier {
   final P2PService _p2pService = P2PService();
   final MapObjectExportService _exportService = MapObjectExportService();
   final Uuid _uuid = const Uuid();
+  final CreatureService _creatureService = CreatureService();
 
   /// Доступ к хранилищу для прямого использования
   MapObjectStorage get storage => _storage;
@@ -239,6 +241,114 @@ class MapObjectProvider extends ChangeNotifier {
 
     await _saveAndBroadcast(creature);
     return creature;
+  }
+
+  /// Спавн существ вокруг игрока
+  /// Возвращает список заспавненных существ
+  Future<List<Creature>> spawnCreaturesAroundPlayer({
+    required double playerLat,
+    required double playerLng,
+    int maxCreatures = 2,
+    double radiusKm = 1.5,
+  }) async {
+    final spawned = _creatureService.spawnAroundPlayer(
+      playerLat: playerLat,
+      playerLng: playerLng,
+      maxCreatures: maxCreatures,
+      radiusKm: radiusKm,
+    );
+
+    for (final creature in spawned) {
+      await _saveAndBroadcast(creature);
+    }
+
+    return spawned;
+  }
+
+  /// Попытка поимки существа с расчётом шанса
+  Future<CatchResult> attemptCatchCreature({
+    required String creatureId,
+    required String userId,
+    required String userName,
+    required int playerLevel,
+  }) async {
+    final obj = await _storage.getObject(creatureId);
+    if (obj == null || obj is! Creature) {
+      return CatchResult.failed(
+        creature: Creature.spawnWild(
+          id: '',
+          latitude: 0,
+          longitude: 0,
+          creatureType: CreatureType.domovoy,
+          rarity: CreatureRarity.common,
+          habitat: CreatureHabitat.anywhere,
+        ),
+        chance: 0,
+      );
+    }
+
+    // Существо уже поймано
+    if (!obj.isWild) {
+      return CatchResult.failed(
+        creature: obj,
+        chance: 0,
+        escaped: false,
+      );
+    }
+
+    final result = _creatureService.tryCatchCreature(obj, playerLevel);
+
+    if (result.isSuccess) {
+      final caught = obj.catchCreature(userId, userName);
+      await _storage.updateObject(caught);
+      await _broadcastUpdate(caught);
+
+      final index = _objects.indexWhere((o) => o.id == creatureId);
+      if (index >= 0) {
+        _objects[index] = caught;
+      }
+      notifyListeners();
+    }
+
+    return result;
+  }
+
+  /// Получить коллекцию пойманных существ пользователя
+  List<Creature> getUserCreatureCollection(String userId) {
+    return _objects
+        .whereType<Creature>()
+        .where((c) => c.caughtBy == userId)
+        .toList();
+  }
+
+  /// Получить диких существ рядом с игроком
+  List<Creature> getWildCreaturesNearby() {
+    return _nearbyObjects
+        .whereType<Creature>()
+        .where((c) => c.isWild && c.isAlive)
+        .toList();
+  }
+
+  /// Получить статистику коллекции существ
+  Map<String, dynamic> getCreatureCollectionStats(String userId) {
+    final collection = getUserCreatureCollection(userId);
+
+    final byRarity = <CreatureRarity, int>{};
+    for (final rarity in CreatureRarity.values) {
+      byRarity[rarity] = collection.where((c) => c.rarity == rarity).length;
+    }
+
+    final byType = <CreatureType, int>{};
+    for (final creature in collection) {
+      byType[creature.creatureType] = (byType[creature.creatureType] ?? 0) + 1;
+    }
+
+    return {
+      'total': collection.length,
+      'byRarity': byRarity,
+      'byType': byType,
+      'totalPoints': collection.fold(0, (sum, c) => sum + c.catchPoints),
+    };
   }
 
   /// Создание заметки об интересном месте

@@ -21,6 +21,7 @@ import 'history_screen.dart';
 import 'walk_detail_screen.dart';
 import 'settings_screen.dart';
 import 'add_object_screen.dart';
+import 'creature_collection_screen.dart';
 
 /// Главный экран с картой OpenStreetMap
 class HomeScreen extends StatefulWidget {
@@ -45,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final double _currentZoom = 15.0;
   UserInfo? _userInfo;
   Timer? _updateTimer; // Таймер для обновления времени
+  Timer? _creatureSpawnTimer; // Таймер для спавна существ
   bool _mapReady = false; // Карта готова
   bool _pendingMoveToLocation = false; // Нужно перейти к позиции после готовности карты
   
@@ -106,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _updateTimer?.cancel();
+    _creatureSpawnTimer?.cancel();
     super.dispose();
   }
 
@@ -516,13 +519,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         tooltip: 'История',
                         onTap: () => _openHistory(context),
                       ),
-                      const SizedBox(width: 24),
+                      const SizedBox(width: 16),
                       _buildIconButton(
                         icon: Icons.settings,
                         tooltip: 'Настройки',
                         onTap: () => _openSettings(context),
                       ),
-                      const SizedBox(width: 24),
+                      const SizedBox(width: 16),
+                      _buildIconButton(
+                        icon: Icons.pets,
+                        tooltip: 'Коллекция',
+                        onTap: () => _openCreatureCollection(context),
+                      ),
+                      const SizedBox(width: 16),
                       _buildIconButton(
                         icon: Icons.my_location,
                         tooltip: 'Моё местоположение',
@@ -655,8 +664,53 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final point = walk!.points.first;
         _moveToPosition(point.latitude, point.longitude);
       }
+      
+      // Запускаем спавн существ каждые 2 минуты
+      _startCreatureSpawning();
     } else {
       _showError(walkProvider.error ?? 'Не удалось начать прогулку');
+    }
+  }
+
+  /// Запустить периодический спавн существ
+  void _startCreatureSpawning() {
+    _creatureSpawnTimer?.cancel();
+    
+    // Первоначальный спавн через 30 секунд
+    Future.delayed(const Duration(seconds: 30), () {
+      if (!mounted) return;
+      _spawnCreatures();
+    });
+    
+    // Периодический спавн каждые 2 минуты
+    _creatureSpawnTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (!mounted) return;
+      _spawnCreatures();
+    });
+  }
+
+  /// Остановить спавн существ
+  void _stopCreatureSpawning() {
+    _creatureSpawnTimer?.cancel();
+    _creatureSpawnTimer = null;
+  }
+
+  /// Спавн существ вокруг игрока
+  Future<void> _spawnCreatures() async {
+    if (_currentLocation == null) return;
+    
+    final mapObjectProvider = context.read<MapObjectProvider>();
+    final spawned = await mapObjectProvider.spawnCreaturesAroundPlayer(
+      playerLat: _currentLocation!.latitude,
+      playerLng: _currentLocation!.longitude,
+      maxCreatures: 2,
+      radiusKm: 1.5,
+    );
+    
+    if (spawned.isNotEmpty && mounted) {
+      for (final creature in spawned) {
+        debugPrint('🦊 Заспавнено: ${creature.creatureType.emoji} ${creature.creatureType.name} (${creature.rarity.badge})');
+      }
     }
   }
 
@@ -665,6 +719,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WalkProvider walkProvider,
     PedometerProvider pedometerProvider,
   ) async {
+    // Останавливаем спавн существ
+    _stopCreatureSpawning();
+    
     final steps = pedometerProvider.getCurrentSteps();
     final success = await walkProvider.stopWalk(steps: steps);
     
@@ -727,6 +784,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const SettingsScreen()),
+    );
+  }
+  
+  /// Открыть коллекцию существ
+  void _openCreatureCollection(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CreatureCollectionScreen()),
     );
   }
   

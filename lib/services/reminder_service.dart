@@ -117,7 +117,7 @@ class ReminderService extends ChangeNotifier {
     }
 
     // Вычисляем расстояние
-    final distance = MapObject.calculateDistance(
+    final distance = calculateDistance(
       lat, lng,
       reminder.latitude, reminder.longitude,
     );
@@ -289,7 +289,7 @@ class ReminderService extends ChangeNotifier {
   double? getDistanceToReminder(ReminderCharacter reminder) {
     if (_currentLat == null || _currentLng == null) return null;
 
-    return MapObject.calculateDistance(
+    return calculateDistance(
       _currentLat!, _currentLng!,
       reminder.latitude, reminder.longitude,
     );
