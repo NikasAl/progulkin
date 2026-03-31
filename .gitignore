@@ -52,6 +52,9 @@ app.*.map.json
 .externalNativeBuild
 .cxx
 local.properties
+**/key.properties
+*.jks
+*.keystore
 
 # iOS
 **/ios/Flutter/.last_build_id

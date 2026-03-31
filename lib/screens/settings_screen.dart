@@ -9,6 +9,7 @@ import '../providers/map_object_provider.dart';
 import 'storage_screen.dart';
 import 'route_planning_screen.dart';
 import 'profile_screen.dart';
+import 'privacy_policy_screen.dart';
 
 /// Экран настроек приложения
 class SettingsScreen extends StatefulWidget {
@@ -467,6 +468,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('github.com/NikasAl/progulkin'),
             onTap: () {
               // Можно добавить открытие ссылки
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Политика конфиденциальности'),
+            subtitle: const Text('Информация об обработке данных'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PrivacyPolicyScreen(),
+                ),
+              );
             },
           ),
           const SizedBox(height: 24),

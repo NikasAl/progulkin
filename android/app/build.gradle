@@ -22,8 +22,17 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// Keystore configuration for release builds
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader('UTF-8') { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 android {
-    namespace "com.example.progulkin"
+    namespace "ru.kreagenium.progulkin"
     compileSdk 36
     ndkVersion flutter.ndkVersion
 
@@ -42,7 +51,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.example.progulkin"
+        applicationId "ru.kreagenium.progulkin"
         minSdkVersion flutter.minSdkVersion
         targetSdk 36
         versionCode flutterVersionCode.toInteger()
@@ -50,11 +59,36 @@ android {
         multiDexEnabled true
     }
 
+    signingConfigs {
+        debug {
+            storeFile rootProject.file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+        if (keystorePropertiesFile.exists()) {
+            release {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
+        }
+    }
+
     buildTypes {
-        release {
+        debug {
             signingConfig signingConfigs.debug
-            minifyEnabled false
-            shrinkResources false
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release {
+            signingConfig keystorePropertiesFile.exists() 
+                ? signingConfigs.release 
+                : signingConfigs.debug
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
