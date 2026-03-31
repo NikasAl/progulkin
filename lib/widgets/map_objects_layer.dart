@@ -260,6 +260,10 @@ class _MarkerWidget extends StatelessWidget {
     if (object.type == MapObjectType.interestNote) {
       return (object as InterestNote).photoIds.isNotEmpty;
     }
+    // Для напоминаний показываем статус
+    if (object.type == MapObjectType.reminderCharacter) {
+      return true;
+    }
     return false;
   }
 }
@@ -298,6 +302,18 @@ class _StatusBadge extends StatelessWidget {
         color = Colors.blue;
       } else {
         return const SizedBox.shrink();
+      }
+    } else if (object.type == MapObjectType.reminderCharacter) {
+      final reminder = object as ReminderCharacter;
+      if (!reminder.isActive) {
+        icon = Icons.pause_circle;
+        color = Colors.grey;
+      } else if (reminder.snoozedUntil != null && DateTime.now().isBefore(reminder.snoozedUntil!)) {
+        icon = Icons.schedule;
+        color = Colors.orange;
+      } else {
+        icon = Icons.notifications_active;
+        color = Colors.cyan;
       }
     } else {
       return const SizedBox.shrink();

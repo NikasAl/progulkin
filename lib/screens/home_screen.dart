@@ -858,6 +858,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onContactAuthor: object.type == MapObjectType.interestNote
                 ? (note) => _showContactAuthorDialog(note)
                 : null,
+            // Управление напоминаниями
+            onReminderToggle: object.type == MapObjectType.reminderCharacter
+                ? (reminderId) async {
+                    final reminder = object as ReminderCharacter;
+                    if (reminder.isActive) {
+                      await mapObjectProvider.deactivateReminder(reminderId);
+                    } else {
+                      await mapObjectProvider.activateReminder(reminderId);
+                    }
+                    if (context.mounted) {
+                      setState(() {});
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(reminder.isActive ? 'Напоминание отключено' : 'Напоминание включено'),
+                          backgroundColor: Colors.cyan,
+                        ),
+                      );
+                    }
+                  }
+                : null,
+            onReminderSnooze: object.type == MapObjectType.reminderCharacter
+                ? (reminderId, duration) async {
+                    await mapObjectProvider.snoozeReminder(reminderId, duration);
+                    if (context.mounted) {
+                      setState(() {});
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Напоминание отложено на ${_formatSnoozeDuration(duration)}'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  }
+                : null,
           ),
         ),
       ),
@@ -1202,6 +1236,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (walkProvider.hasCurrentWalk) {
         walkProvider.recordObjectAdded(result.points);
       }
+    }
+  }
+  
+  /// Форматировать длительность откладывания
+  String _formatSnoozeDuration(Duration duration) {
+    if (duration.inHours >= 24) {
+      return 'до завтра';
+    } else if (duration.inHours > 0) {
+      final hours = duration.inHours;
+      final minutes = duration.inMinutes % 60;
+      if (minutes > 0) {
+        return '$hours ч $minutes мин';
+      }
+      return '$hours ч';
+    } else {
+      return '${duration.inMinutes} мин';
     }
   }
 }

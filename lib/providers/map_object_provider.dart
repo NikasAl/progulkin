@@ -425,6 +425,72 @@ class MapObjectProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ==================== Управление напоминаниями ====================
+
+  /// Активировать напоминание
+  Future<void> activateReminder(String reminderId) async {
+    final obj = await _storage.getObject(reminderId);
+    if (obj == null || obj is! ReminderCharacter) return;
+
+    final activated = obj.activate();
+    await _storage.updateObject(activated);
+    await _broadcastUpdate(activated);
+
+    final index = _objects.indexWhere((o) => o.id == reminderId);
+    if (index >= 0) {
+      _objects[index] = activated;
+    }
+    notifyListeners();
+  }
+
+  /// Деактивировать напоминание
+  Future<void> deactivateReminder(String reminderId) async {
+    final obj = await _storage.getObject(reminderId);
+    if (obj == null || obj is! ReminderCharacter) return;
+
+    final deactivated = obj.deactivate();
+    await _storage.updateObject(deactivated);
+    await _broadcastUpdate(deactivated);
+
+    final index = _objects.indexWhere((o) => o.id == reminderId);
+    if (index >= 0) {
+      _objects[index] = deactivated;
+    }
+    notifyListeners();
+  }
+
+  /// Отложить напоминание
+  Future<void> snoozeReminder(String reminderId, Duration duration) async {
+    final obj = await _storage.getObject(reminderId);
+    if (obj == null || obj is! ReminderCharacter) return;
+
+    final snoozed = obj.snooze(duration);
+    await _storage.updateObject(snoozed);
+    await _broadcastUpdate(snoozed);
+
+    final index = _objects.indexWhere((o) => o.id == reminderId);
+    if (index >= 0) {
+      _objects[index] = snoozed;
+    }
+    notifyListeners();
+  }
+
+  /// Получить напоминания пользователя
+  List<ReminderCharacter> getUserReminders(String userId) {
+    return _objects
+        .whereType<ReminderCharacter>()
+        .where((r) => r.ownerId == userId)
+        .toList();
+  }
+
+  /// Получить активные напоминания пользователя
+  List<ReminderCharacter> getActiveReminders(String userId) {
+    return _objects
+        .whereType<ReminderCharacter>()
+        .where((r) => r.ownerId == userId && r.isActive)
+        .toList();
+  }
+
   /// Прочитать секретное сообщение
   Future<String?> readSecretMessage(String objectId, String userId) async {
     final obj = await _storage.getObject(objectId);

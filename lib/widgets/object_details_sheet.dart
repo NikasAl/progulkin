@@ -18,6 +18,9 @@ class ObjectDetailsSheet extends StatefulWidget {
   final String? actionHint;
   final void Function(String noteId, String userId)? onInterestToggle;
   final void Function(InterestNote note)? onContactAuthor;
+  // Управление напоминаниями
+  final void Function(String reminderId)? onReminderToggle;
+  final void Function(String reminderId, Duration duration)? onReminderSnooze;
 
   const ObjectDetailsSheet({
     super.key,
@@ -31,6 +34,8 @@ class ObjectDetailsSheet extends StatefulWidget {
     this.actionHint,
     this.onInterestToggle,
     this.onContactAuthor,
+    this.onReminderToggle,
+    this.onReminderSnooze,
   });
 
   @override
@@ -434,6 +439,8 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
   /// Информация о напоминалке
   List<Widget> _buildReminderCharacterInfo(BuildContext context) {
     final reminder = widget.object as ReminderCharacter;
+    final isOwner = reminder.ownerId == widget.userId;
+
     return [
       _buildInfoRow(
         context,
@@ -447,6 +454,15 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
         label: 'Радиус срабатывания',
         value: '${reminder.triggerRadius.toInt()} м',
       ),
+      _buildInfoRow(
+        context,
+        icon: Icons.notifications,
+        label: 'Срабатываний',
+        value: '${reminder.triggeredCount}',
+      ),
+      // Статус
+      _buildReminderStatus(reminder),
+      // Текст напоминания
       if (reminder.reminderText.isNotEmpty)
         Container(
           margin: const EdgeInsets.symmetric(vertical: 8),
@@ -468,7 +484,162 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
             ],
           ),
         ),
+      // Кнопки управления (только для владельца)
+      if (isOwner) ...[
+        const SizedBox(height: 12),
+        _buildReminderControls(reminder),
+      ],
     ];
+  }
+
+  /// Статус напоминания
+  Widget _buildReminderStatus(ReminderCharacter reminder) {
+    String status;
+    Color color;
+    IconData icon;
+
+    if (!reminder.isActive) {
+      status = 'Отключено';
+      color = Colors.grey;
+      icon = Icons.pause_circle;
+    } else if (reminder.snoozedUntil != null && DateTime.now().isBefore(reminder.snoozedUntil!)) {
+      final remaining = reminder.snoozedUntil!.difference(DateTime.now());
+      status = 'Отложено на ${_formatDuration(remaining)}';
+      color = Colors.orange;
+      icon = Icons.schedule;
+    } else {
+      status = 'Активно';
+      color = Colors.green;
+      icon = Icons.check_circle;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(
+            status,
+            style: TextStyle(color: color, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Кнопки управления напоминанием
+  Widget _buildReminderControls(ReminderCharacter reminder) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            // Включить/Выключить
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: widget.onReminderToggle != null
+                    ? () => widget.onReminderToggle!(reminder.id)
+                    : null,
+                icon: Icon(reminder.isActive ? Icons.pause : Icons.play_arrow),
+                label: Text(reminder.isActive ? 'Откл.' : 'Вкл.'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: reminder.isActive ? Colors.orange : Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Отложить
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: reminder.isActive && widget.onReminderSnooze != null
+                    ? () => _showSnoozeDialog(reminder.id)
+                    : null,
+                icon: const Icon(Icons.schedule),
+                label: const Text('Отложить'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Диалог выбора времени откладывания
+  void _showSnoozeDialog(String reminderId) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Отложить напоминание',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.timer),
+              title: const Text('15 минут'),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onReminderSnooze?.call(reminderId, const Duration(minutes: 15));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.timer),
+              title: const Text('30 минут'),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onReminderSnooze?.call(reminderId, const Duration(minutes: 30));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.timer),
+              title: const Text('1 час'),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onReminderSnooze?.call(reminderId, const Duration(hours: 1));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.timer),
+              title: const Text('2 часа'),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onReminderSnooze?.call(reminderId, const Duration(hours: 2));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.timer),
+              title: const Text('До завтра'),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onReminderSnooze?.call(reminderId, const Duration(hours: 24));
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Форматирование длительности
+  String _formatDuration(Duration duration) {
+    if (duration.inHours > 0) {
+      return '${duration.inHours}ч ${duration.inMinutes % 60}мин';
+    }
+    return '${duration.inMinutes} мин';
   }
 
   /// Фото-галерея
