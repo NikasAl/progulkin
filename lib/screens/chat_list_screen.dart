@@ -121,7 +121,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
-              'Здесь будут отображаться ваши диалогы с другими пользователями. '
+              'Здесь будут отображаться ваши диалоги с другими пользователями. '
               'Нажмите "Интересно" на заметке, чтобы начать общение.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
