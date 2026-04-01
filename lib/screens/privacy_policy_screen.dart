@@ -17,7 +17,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           children: [
             _SectionHeader('Политика конфиденциальности приложения «Прогулкин»'),
             SizedBox(height: 8),
-            _DateText('Последнее обновление: 31 марта 2026 г.'),
+            _DateText('Последнее обновление: 1 апреля 2026 г.'),
             SizedBox(height: 24),
 
             _SectionHeader('1. Общие положения'),
@@ -90,6 +90,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             _BulletItem('История ваших прогулок'),
             _BulletItem('Личные заметки и напоминания'),
             _BulletItem('Контактная информация'),
+            _BulletItem('Сообщения в чатах (хранятся только на устройствах отправителя и получателя)'),
             SizedBox(height: 12),
             _BodyText(
               'P2P-синхронизация работает только в локальной сети или через интернет '
@@ -98,7 +99,33 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             SizedBox(height: 24),
 
-            _SectionHeader('5. Фотографии'),
+            _SectionHeader('5. P2P-мессенджер'),
+            SizedBox(height: 8),
+            _BodyText(
+              'Приложение включает децентрализованный мессенджер для общения между пользователями '
+              'без использования центрального сервера.',
+            ),
+            SizedBox(height: 12),
+            _SubHeader('Как работает мессенджер:'),
+            SizedBox(height: 8),
+            _BulletItem('Сообщения передаются напрямую между устройствами (P2P)'),
+            _BulletItem('Текст сообщений хранится только на устройствах отправителя и получателя'),
+            _BulletItem('Сервер не имеет доступа к содержимому сообщений'),
+            _BulletItem('История чатов сохраняется в локальной базе данных SQLite'),
+            SizedBox(height: 12),
+            _SubHeader('Когда можно отправлять сообщения:'),
+            SizedBox(height: 8),
+            _BulletItem('После нажатия кнопки «Интересно» на заметке другого пользователя'),
+            _BulletItem('После одобрения запроса на связь владельцем заметки'),
+            _BulletItem('При нахождении в радиусе P2P-связи с другим пользователем'),
+            SizedBox(height: 12),
+            _BodyText(
+              'Вы можете отключить приём P2P-сообщений в настройках профиля контакта. '
+              'При этом вы перестанете получать новые сообщения, но история сохранится.',
+            ),
+            SizedBox(height: 24),
+
+            _SectionHeader('6. Фотографии'),
             SizedBox(height: 8),
             _BodyText(
               'Фотографии, сделанные в приложении, используются для:',
@@ -114,7 +141,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             SizedBox(height: 24),
 
-            _SectionHeader('6. Карта'),
+            _SectionHeader('7. Карта'),
             SizedBox(height: 8),
             _BodyText(
               'Приложение использует карты OpenStreetMap — бесплатный проект по созданию '
@@ -128,7 +155,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             SizedBox(height: 24),
 
-            _SectionHeader('7. Уведомления'),
+            _SectionHeader('8. Уведомления'),
             SizedBox(height: 8),
             _BodyText(
               'Приложение может отправлять локальные уведомления на ваше устройство:',
@@ -136,6 +163,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             SizedBox(height: 8),
             _BulletItem('Гео-напоминания при приближении к заданным местам'),
             _BulletItem('Уведомления о близлежащих объектах'),
+            _BulletItem('Уведомления о новых сообщениях в чатах'),
             SizedBox(height: 12),
             _BodyText(
               'Все уведомления генерируются локально на устройстве и не требуют '
@@ -143,7 +171,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             SizedBox(height: 24),
 
-            _SectionHeader('8. Безопасность данных'),
+            _SectionHeader('9. Безопасность данных'),
             SizedBox(height: 8),
             _BodyText(
               'Мы применяем следующие меры для защиты ваших данных:',
@@ -152,10 +180,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
             _BulletItem('Все данные хранятся в локальной базе данных SQLite'),
             _BulletItem('Секретные сообщения шифруются перед сохранением'),
             _BulletItem('P2P-соединения защищены шифрованием'),
+            _BulletItem('Личные сообщения передаются напрямую между устройствами'),
             _BulletItem('Фото сжимаются без сохранения метаданных'),
             SizedBox(height: 24),
 
-            _SectionHeader('9. Удаление данных'),
+            _SectionHeader('10. Удаление данных'),
             SizedBox(height: 8),
             _BodyText(
               'Вы можете удалить все свои данные в любой момент:',
@@ -169,18 +198,19 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             SizedBox(height: 24),
 
-            _SectionHeader('10. Права пользователя'),
+            _SectionHeader('11. Права пользователя'),
             SizedBox(height: 8),
             _BodyText('Вы имеете право:'),
             SizedBox(height: 8),
             _BulletItem('Не предоставлять никаких персональных данных'),
             _BulletItem('Использовать приложение без регистрации'),
             _BulletItem('Отключить синхронизацию в настройках'),
+            _BulletItem('Отключить приём P2P-сообщений в настройках профиля'),
             _BulletItem('Удалить все свои данные в любой момент'),
             _BulletItem('Экспортировать свои данные для резервного копирования'),
             SizedBox(height: 24),
 
-            _SectionHeader('11. Детская аудитория'),
+            _SectionHeader('12. Детская аудитория'),
             SizedBox(height: 8),
             _BodyText(
               'Приложение не предназначено для детей младше 6 лет. '
@@ -190,7 +220,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             SizedBox(height: 24),
 
-            _SectionHeader('12. Изменения политики'),
+            _SectionHeader('13. Изменения политики'),
             SizedBox(height: 8),
             _BodyText(
               'Мы можем обновлять данную Политику конфиденциальности. '
@@ -199,7 +229,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             SizedBox(height: 24),
 
-            _SectionHeader('13. Контактная информация'),
+            _SectionHeader('14. Контактная информация'),
             SizedBox(height: 8),
             _BodyText(
               'По вопросам, связанным с данной Политикой конфиденциальности, '
@@ -213,7 +243,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             SizedBox(height: 24),
 
-            _SectionHeader('14. Соответствие законодательству'),
+            _SectionHeader('15. Соответствие законодательству'),
             SizedBox(height: 8),
             _BodyText(
               'Приложение разработано с учётом требований:',
