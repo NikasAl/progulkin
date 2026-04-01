@@ -60,6 +60,13 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
   final _reminderTextController = TextEditingController();
   double _triggerRadius = 50;
 
+  // Поля для места сбора (грибы/ягоды)
+  ForagingCategory _foragingCategory = ForagingCategory.mushroom;
+  String _foragingItemTypeCode = 'white'; // По умолчанию белый гриб
+  ForagingQuantity _foragingQuantity = ForagingQuantity.some;
+  ForagingSeason _foragingSeason = ForagingSeason.summer;
+  final _foragingNotesController = TextEditingController();
+
   @override
   void dispose() {
     _trashDescriptionController.dispose();
@@ -68,6 +75,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
     _interestTitleController.dispose();
     _interestDescriptionController.dispose();
     _reminderTextController.dispose();
+    _foragingNotesController.dispose();
     super.dispose();
   }
 
@@ -113,6 +121,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
                 1 => _buildSecretMessageForm(),
                 2 => _buildInterestNoteForm(),
                 3 => _buildReminderForm(),
+                4 => _buildForagingSpotForm(),
                 _ => _buildTrashMonsterForm(),
               },
 
@@ -168,6 +177,11 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             value: 3,
             label: Text('Напоминание'),
             icon: Text('🔔'),
+          ),
+          ButtonSegment(
+            value: 4,
+            label: Text('Сбор'),
+            icon: Text('🍄'),
           ),
         ],
         selected: {_selectedTypeIndex},
@@ -624,6 +638,191 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
     );
   }
 
+  /// Форма для места сбора (грибы, ягоды, орехи, травы)
+  Widget _buildForagingSpotForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Категория',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: UIConstants.itemSpacing),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: ForagingCategory.values.map((cat) => ChoiceChip(
+            label: Text('${cat.emoji} ${cat.name}'),
+            selected: _foragingCategory == cat,
+            onSelected: (selected) {
+              if (selected) {
+                setState(() {
+                  _foragingCategory = cat;
+                  // Сбрасываем тип на первый из новой категории
+                  _foragingItemTypeCode = _getDefaultItemType(cat);
+                });
+              }
+            },
+          )).toList(),
+        ),
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
+        // Динамический выбор типа в зависимости от категории
+        Text(
+          _getTypeLabelForCategory(_foragingCategory),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: UIConstants.itemSpacing),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _getItemTypesForCategory(_foragingCategory).map((item) => ChoiceChip(
+            label: Text('${item['emoji']} ${item['name']}'),
+            selected: _foragingItemTypeCode == item['code'],
+            onSelected: (selected) {
+              if (selected) setState(() => _foragingItemTypeCode = item['code'] as String);
+            },
+          )).toList(),
+        ),
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
+        Text(
+          'Количество',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: UIConstants.itemSpacing),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: ForagingQuantity.values.map((qty) => ChoiceChip(
+            label: Text('${qty.name} (${qty.range})'),
+            selected: _foragingQuantity == qty,
+            onSelected: (selected) {
+              if (selected) setState(() => _foragingQuantity = qty);
+            },
+          )).toList(),
+        ),
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
+        Text(
+          'Сезон',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: UIConstants.itemSpacing),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: ForagingSeason.values.map((season) => ChoiceChip(
+            label: Text('${season.emoji} ${season.name}'),
+            selected: _foragingSeason == season,
+            onSelected: (selected) {
+              if (selected) setState(() => _foragingSeason = season);
+            },
+          )).toList(),
+        ),
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
+        Text(
+          'Заметки (необязательно)',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: UIConstants.itemSpacing),
+        TextFormField(
+          controller: _foragingNotesController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Например: "Растут под ёлками, много маслят"',
+            border: OutlineInputBorder(),
+          ),
+        ),
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
+        // Предупреждение о безопасности
+        Card(
+          color: Theme.of(context).colorScheme.errorContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber, color: Theme.of(context).colorScheme.error),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Собирайте только те грибы и ягоды, в которых уверены. Некоторые виды могут быть опасны!',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Получить список типов для категории
+  List<Map<String, dynamic>> _getItemTypesForCategory(ForagingCategory category) {
+    switch (category) {
+      case ForagingCategory.mushroom:
+        return MushroomType.values.map((m) => {
+          'code': m.code,
+          'name': m.name,
+          'emoji': m.emoji,
+        }).toList();
+      case ForagingCategory.berry:
+        return BerryType.values.map((b) => {
+          'code': b.code,
+          'name': b.name,
+          'emoji': b.emoji,
+        }).toList();
+      case ForagingCategory.nut:
+        return NutType.values.map((n) => {
+          'code': n.code,
+          'name': n.name,
+          'emoji': n.emoji,
+        }).toList();
+      case ForagingCategory.herb:
+        return HerbType.values.map((h) => {
+          'code': h.code,
+          'name': h.name,
+          'emoji': h.emoji,
+        }).toList();
+    }
+  }
+
+  /// Получить название для типа в категории
+  String _getTypeLabelForCategory(ForagingCategory category) {
+    switch (category) {
+      case ForagingCategory.mushroom:
+        return 'Вид грибов';
+      case ForagingCategory.berry:
+        return 'Вид ягод';
+      case ForagingCategory.nut:
+        return 'Вид орехов';
+      case ForagingCategory.herb:
+        return 'Вид трав';
+    }
+  }
+
+  /// Получить тип по умолчанию для категории
+  String _getDefaultItemType(ForagingCategory category) {
+    switch (category) {
+      case ForagingCategory.mushroom:
+        return MushroomType.white.code;
+      case ForagingCategory.berry:
+        return BerryType.blueberry.code;
+      case ForagingCategory.nut:
+        return NutType.hazelnut.code;
+      case ForagingCategory.herb:
+        return HerbType.nettle.code;
+    }
+  }
+
   /// Сохранить объект
   Future<void> _saveObject() async {
     // Валидация
@@ -721,6 +920,22 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             triggerRadius: _triggerRadius,
           );
           break;
+
+        case 4:
+          // Создаём место сбора
+          await mapObjectProvider.createForagingSpot(
+            latitude: widget.latitude,
+            longitude: widget.longitude,
+            ownerId: widget.userInfo.id,
+            ownerName: widget.userInfo.name,
+            ownerReputation: widget.userInfo.reputation,
+            category: _foragingCategory,
+            itemTypeCode: _foragingItemTypeCode,
+            quantity: _foragingQuantity,
+            season: _foragingSeason,
+            notes: _foragingNotesController.text,
+          );
+          break;
       }
 
       if (mounted) {
@@ -731,6 +946,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
           'Секретное сообщение оставлено!',
           'Заметка добавлена!',
           'Напоминание создано!',
+          'Место сбора отмечено!',
         ];
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

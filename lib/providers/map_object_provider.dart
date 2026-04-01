@@ -414,6 +414,93 @@ class MapObjectProvider extends ChangeNotifier {
     return reminder;
   }
 
+  /// Создание места для сбора (грибы, ягоды, орехи, травы)
+  Future<ForagingSpot> createForagingSpot({
+    required double latitude,
+    required double longitude,
+    required String ownerId,
+    String ownerName = 'Аноним',
+    int ownerReputation = 0,
+    required ForagingCategory category,
+    required String itemTypeCode,
+    required ForagingQuantity quantity,
+    ForagingSeason season = ForagingSeason.summer,
+    String notes = '',
+  }) async {
+    final spot = ForagingSpot(
+      id: _uuid.v4(),
+      latitude: latitude,
+      longitude: longitude,
+      ownerId: ownerId,
+      ownerName: ownerName,
+      ownerReputation: ownerReputation,
+      category: category,
+      itemTypeCode: itemTypeCode,
+      quantity: quantity,
+      season: season,
+      notes: notes,
+    );
+
+    await _saveAndBroadcast(spot);
+    return spot;
+  }
+
+  /// Отметить сбор в месте
+  Future<void> markForagingHarvest(String spotId) async {
+    final obj = await _storage.getObject(spotId);
+    if (obj == null || obj is! ForagingSpot) return;
+
+    final updated = obj.markHarvest();
+    await _storage.updateObject(updated);
+    await _broadcastUpdate(updated);
+
+    final index = _objects.indexWhere((o) => o.id == spotId);
+    if (index >= 0) {
+      _objects[index] = updated;
+    }
+    notifyListeners();
+  }
+
+  /// Подтвердить место сбора
+  Future<void> verifyForagingSpot(String spotId) async {
+    final obj = await _storage.getObject(spotId);
+    if (obj == null || obj is! ForagingSpot) return;
+
+    final updated = obj.verify();
+    await _storage.updateObject(updated);
+    await _broadcastUpdate(updated);
+
+    final index = _objects.indexWhere((o) => o.id == spotId);
+    if (index >= 0) {
+      _objects[index] = updated;
+    }
+    notifyListeners();
+  }
+
+  /// Получить места сбора рядом с пользователем
+  List<ForagingSpot> getForagingSpotsNearby() {
+    return _nearbyObjects
+        .whereType<ForagingSpot>()
+        .where((s) => !s.isDeleted)
+        .toList();
+  }
+
+  /// Получить места сбора по категории
+  List<ForagingSpot> getForagingSpotsByCategory(ForagingCategory category) {
+    return _objects
+        .whereType<ForagingSpot>()
+        .where((s) => s.category == category && !s.isDeleted)
+        .toList();
+  }
+
+  /// Получить места сбора в сезон
+  List<ForagingSpot> getForagingSpotsInSeason() {
+    return _objects
+        .whereType<ForagingSpot>()
+        .where((s) => s.isInSeason && !s.isDeleted)
+        .toList();
+  }
+
   /// Добавить "Интересно" к заметке
   Future<void> addInterestToNote(String noteId, String userId) async {
     await _storage.addInterest(noteId: noteId, userId: userId);

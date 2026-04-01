@@ -5,6 +5,7 @@ enum MapObjectType {
   creature('creature', 'Существо', '🦊'),
   interestNote('interest_note', 'Заметка', '📍'),
   reminderCharacter('reminder_character', 'Напоминалка', '🔔'),
+  foragingSpot('foraging_spot', 'Грибы и ягоды', '🍄'),
   checkpoint('checkpoint', 'Контрольная точка', '🏁'),
   event('event', 'Событие', '🎉'),
   ;
@@ -57,6 +58,8 @@ extension MapObjectTypeExtension on MapObjectType {
         return '📍';
       case MapObjectType.reminderCharacter:
         return '🔔';
+      case MapObjectType.foragingSpot:
+        return '🍄';
       case MapObjectType.checkpoint:
         return '🏁';
       case MapObjectType.event:

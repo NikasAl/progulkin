@@ -7,6 +7,7 @@ export 'secret_message.dart';
 export 'creature.dart';
 export 'interest_note.dart';
 export 'reminder_character.dart';
+export 'foraging_spot.dart';
 
 import 'map_object.dart';
 import 'trash_monster.dart';
@@ -14,6 +15,7 @@ import 'secret_message.dart';
 import 'creature.dart';
 import 'interest_note.dart';
 import 'reminder_character.dart';
+import 'foraging_spot.dart';
 
 /// Инициализация фабрики для создания объектов по типу
 /// ВЫЗЫВАТЬ В main.dart ДО ИСПОЛЬЗОВАНИЯ ЛЮБОГО MapObject.fromSyncJson()
@@ -32,6 +34,8 @@ void initMapObjectFactory() {
         return InterestNote.fromSyncJson(json);
       case MapObjectType.reminderCharacter:
         return ReminderCharacter.fromSyncJson(json);
+      case MapObjectType.foragingSpot:
+        return ForagingSpot.fromSyncJson(json);
       default:
         return MapObject.fromJson(json);
     }
