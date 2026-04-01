@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Theme applied to the Android Window while the process is starting when the OS's Dark Mode setting is on -->
-    <!-- Android 12+ (API 31+): НЕ используем Splash Screen API -->
+    <!-- Android 12+ (API 31+) -->
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <!-- Важно: отключаем автоматический splash screen Android 12+ -->
+        <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+        
+        <!-- Используем windowBackground для полноэкранного splash -->
         <item name="android:windowBackground">@drawable/launch_background</item>
         <item name="android:forceDarkAllowed">false</item>
         <item name="android:windowFullscreen">true</item>
