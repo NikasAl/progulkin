@@ -535,6 +535,7 @@ class _WeeklyChartContainer extends StatefulWidget {
 class _WeeklyChartContainerState extends State<_WeeklyChartContainer> {
   /// true = показывать шаги, false = показывать расстояние
   bool _showSteps = false;
+  static const Color _weeklyAccentColor = Colors.green;
   
   @override
   Widget build(BuildContext context) {
@@ -567,7 +568,7 @@ class _WeeklyChartContainerState extends State<_WeeklyChartContainer> {
               Icon(
                 Icons.bar_chart,
                 size: 20,
-                color: Theme.of(context).colorScheme.primary,
+                color: _weeklyAccentColor,
               ),
               const SizedBox(width: 8),
               Text(
@@ -628,7 +629,7 @@ class _WeeklyChartContainerState extends State<_WeeklyChartContainer> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue : Colors.transparent,
+          color: isSelected ? _weeklyAccentColor : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -713,6 +714,7 @@ class _DayColumn extends StatelessWidget {
   final double barHeight;
   final bool isToday;
   final bool showSteps;
+  static const Color _weeklyAccentColor = Colors.green;
   
   const _DayColumn({
     required this.dayName,
@@ -756,7 +758,7 @@ class _DayColumn extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: isToday ? Colors.blue : Colors.grey[600],
+              color: isToday ? _weeklyAccentColor : Colors.grey[600],
             ),
           )
         else
@@ -773,7 +775,10 @@ class _DayColumn extends StatelessWidget {
                 ? LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
-                    colors: [Colors.blue, Colors.blue.withValues(alpha: 0.7)],
+                    colors: [
+                      _weeklyAccentColor,
+                      _weeklyAccentColor.withValues(alpha: 0.7),
+                    ],
                   )
                 : null,
             color: isToday ? null : Colors.grey[300],
@@ -789,7 +794,7 @@ class _DayColumn extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-            color: isToday ? Colors.blue : Colors.grey[600],
+            color: isToday ? _weeklyAccentColor : Colors.grey[600],
           ),
         ),
       ],
