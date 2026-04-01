@@ -678,7 +678,19 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
           spacing: 8,
           runSpacing: 8,
           children: _getItemTypesForCategory(_foragingCategory).map((item) => ChoiceChip(
-            label: Text('${item['emoji']} ${item['name']}'),
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  item['assetPath'] as String,
+                  width: 20,
+                  height: 20,
+                  errorBuilder: (_, __, ___) => Text(item['emoji'] as String),
+                ),
+                const SizedBox(width: 4),
+                Text(item['name'] as String),
+              ],
+            ),
             selected: _foragingItemTypeCode == item['code'],
             onSelected: (selected) {
               if (selected) setState(() => _foragingItemTypeCode = item['code'] as String);
@@ -792,24 +804,28 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
           'code': m.code,
           'name': m.name,
           'emoji': m.emoji,
+          'assetPath': m.assetPath,
         }).toList();
       case ForagingCategory.berry:
         return BerryType.values.map((b) => {
           'code': b.code,
           'name': b.name,
           'emoji': b.emoji,
+          'assetPath': b.assetPath,
         }).toList();
       case ForagingCategory.nut:
         return NutType.values.map((n) => {
           'code': n.code,
           'name': n.name,
           'emoji': n.emoji,
+          'assetPath': n.assetPath,
         }).toList();
       case ForagingCategory.herb:
         return HerbType.values.map((h) => {
           'code': h.code,
           'name': h.name,
           'emoji': h.emoji,
+          'assetPath': h.assetPath,
         }).toList();
     }
   }

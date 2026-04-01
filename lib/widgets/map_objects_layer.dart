@@ -131,6 +131,26 @@ class _MarkerWidget extends StatelessWidget {
       );
     }
 
+    // Для мест сбора используем картинки
+    if (object.type == MapObjectType.foragingSpot) {
+      final spot = object as ForagingSpot;
+      return ClipOval(
+        child: Image.asset(
+          spot.itemTypeAssetPath,
+          width: _getEmojiSize() * 1.5,
+          height: _getEmojiSize() * 1.5,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            // Fallback на эмодзи если картинка не загрузилась
+            return Text(
+              spot.itemTypeEmoji,
+              style: TextStyle(fontSize: _getEmojiSize()),
+            );
+          },
+        ),
+      );
+    }
+
     // Для существ тоже можно добавить картинки позже
     if (object.type == MapObjectType.creature) {
       final creature = object as Creature;
@@ -194,6 +214,14 @@ class _MarkerWidget extends StatelessWidget {
 
       case MapObjectType.reminderCharacter:
         return Colors.cyan.withOpacity(0.8);
+
+      case MapObjectType.foragingSpot:
+        final spot = object as ForagingSpot;
+        // Цвет в зависимости от сезона
+        if (spot.isInSeason) {
+          return Colors.green.withOpacity(0.8);
+        }
+        return Colors.brown.withOpacity(0.8);
 
       default:
         return Colors.blue.withOpacity(0.8);
@@ -264,6 +292,11 @@ class _MarkerWidget extends StatelessWidget {
     if (object.type == MapObjectType.reminderCharacter) {
       return true;
     }
+    // Для мест сбора показываем если есть фото или верифицировано
+    if (object.type == MapObjectType.foragingSpot) {
+      final spot = object as ForagingSpot;
+      return spot.photoIds.isNotEmpty || spot.isVerified;
+    }
     return false;
   }
 }
@@ -314,6 +347,20 @@ class _StatusBadge extends StatelessWidget {
       } else {
         icon = Icons.notifications_active;
         color = Colors.cyan;
+      }
+    } else if (object.type == MapObjectType.foragingSpot) {
+      final spot = object as ForagingSpot;
+      if (spot.isVerified && spot.photoIds.isNotEmpty) {
+        icon = Icons.verified;
+        color = Colors.green;
+      } else if (spot.isVerified) {
+        icon = Icons.verified;
+        color = Colors.green;
+      } else if (spot.photoIds.isNotEmpty) {
+        icon = Icons.photo_camera;
+        color = Colors.blue;
+      } else {
+        return const SizedBox.shrink();
       }
     } else {
       return const SizedBox.shrink();
