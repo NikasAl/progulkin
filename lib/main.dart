@@ -6,6 +6,7 @@ import 'providers/walk_provider.dart';
 import 'providers/pedometer_provider.dart';
 import 'providers/map_object_provider.dart';
 import 'providers/chat_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
 import 'models/map_objects/map_objects.dart'; // Инициализация фабрики объектов
 
@@ -35,37 +36,42 @@ class ProgulkinApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => WalkProvider()),
         ChangeNotifierProvider(create: (_) => PedometerProvider()),
         ChangeNotifierProvider(create: (_) => MapObjectProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
-      child: MaterialApp(
-        title: 'Прогулкин',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF4CAF50),
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 0,
-          ),
-          floatingActionButtonTheme: const FloatingActionButtonThemeData(
-            elevation: 4,
-          ),
-        ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF4CAF50),
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-        ),
-        themeMode: ThemeMode.system,
-        home: const HomeScreen(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Прогулкин',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: const Color(0xFF4CAF50),
+                brightness: Brightness.light,
+              ),
+              useMaterial3: true,
+              appBarTheme: const AppBarTheme(
+                centerTitle: true,
+                elevation: 0,
+              ),
+              floatingActionButtonTheme: const FloatingActionButtonThemeData(
+                elevation: 4,
+              ),
+            ),
+            darkTheme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: const Color(0xFF4CAF50),
+                brightness: Brightness.dark,
+              ),
+              useMaterial3: true,
+            ),
+            themeMode: themeProvider.themeMode,
+            home: const HomeScreen(),
+          );
+        },
       ),
     );
   }

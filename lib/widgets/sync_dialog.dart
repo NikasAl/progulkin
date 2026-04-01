@@ -237,16 +237,33 @@ class _SyncDialogState extends State<SyncDialog> {
                 children: [
                   Chip(
                     label: Text('Всего: ${_exportStats!['total']}'),
-                    backgroundColor: Colors.blue.shade100,
+                    backgroundColor: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).colorScheme.primaryContainer
+                        : Colors.blue.shade100,
+                    labelStyle: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).colorScheme.onPrimaryContainer
+                          : Colors.blue.shade800,
+                    ),
                   ),
                   Chip(
                     label: Text('Активных: ${_exportStats!['active']}'),
-                    backgroundColor: Colors.green.shade100,
+                    backgroundColor: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).colorScheme.secondaryContainer
+                        : Colors.green.shade100,
+                    labelStyle: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).colorScheme.onSecondaryContainer
+                          : Colors.green.shade800,
+                    ),
                   ),
                   if (_exportStats!['deleted'] > 0)
                     Chip(
                       label: Text('Удалённых: ${_exportStats!['deleted']}'),
-                      backgroundColor: Colors.grey.shade300,
+                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      labelStyle: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                 ],
               ),
@@ -258,7 +275,7 @@ class _SyncDialogState extends State<SyncDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -283,7 +300,7 @@ class _SyncDialogState extends State<SyncDialog> {
                     Expanded(
                       child: Text(
                         _statusMessage!,
-                        style: const TextStyle(fontSize: 14),
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
                   ],
@@ -296,7 +313,9 @@ class _SyncDialogState extends State<SyncDialog> {
             if (_exportResult?.success == true) ...[
               Text(
                 'Размер файла: ${_exportResult!.fileSizeFormatted}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 8),
             ],

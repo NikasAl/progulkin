@@ -6,6 +6,7 @@ import '../services/user_id_service.dart';
 import '../models/walk.dart';
 import '../providers/walk_provider.dart';
 import '../providers/map_object_provider.dart';
+import '../providers/theme_provider.dart';
 import 'storage_screen.dart';
 import 'route_planning_screen.dart';
 import 'profile_screen.dart';
@@ -404,6 +405,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
           ],
+          const Divider(height: 32),
+
+          // Секция внешнего вида
+          _buildSectionHeader('Внешний вид'),
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, child) {
+              return Card(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: Icon(themeProvider.themeModeIcon),
+                      title: const Text('Тема приложения'),
+                      subtitle: Text(themeProvider.themeModeName),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _showThemeSelector(themeProvider),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           const Divider(height: 32),
 
           // Секция управления данными
@@ -1085,6 +1107,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Показать диалог выбора темы
+  void _showThemeSelector(ThemeProvider themeProvider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Тема приложения'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildThemeOption(
+              themeProvider,
+              ThemeMode.system,
+              Icons.brightness_auto,
+              'Авто',
+              'Следовать настройкам системы',
+            ),
+            _buildThemeOption(
+              themeProvider,
+              ThemeMode.light,
+              Icons.light_mode,
+              'Светлая',
+              'Всегда светлая тема',
+            ),
+            _buildThemeOption(
+              themeProvider,
+              ThemeMode.dark,
+              Icons.dark_mode,
+              'Тёмная',
+              'Всегда тёмная тема',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрыть'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThemeOption(
+    ThemeProvider themeProvider,
+    ThemeMode mode,
+    IconData icon,
+    String title,
+    String subtitle,
+  ) {
+    final isSelected = themeProvider.themeMode == mode;
+    
+    return RadioListTile<ThemeMode>(
+      value: mode,
+      groupValue: themeProvider.themeMode,
+      onChanged: (value) {
+        if (value != null) {
+          themeProvider.setThemeMode(value);
+          Navigator.pop(context);
+        }
+      },
+      title: Row(
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: 12),
+          Text(title),
+        ],
+      ),
+      subtitle: Text(subtitle),
+      secondary: isSelected 
+          ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
+          : null,
     );
   }
 }
