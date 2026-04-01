@@ -6,6 +6,7 @@ import '../models/contact_profile.dart';
 import '../services/p2p/p2p.dart';
 import '../services/map_object_export_service.dart';
 import '../services/creature_service.dart';
+import '../services/interest_notification_service.dart';
 
 /// Провайдер для управления объектами на карте
 class MapObjectProvider extends ChangeNotifier {
@@ -14,6 +15,7 @@ class MapObjectProvider extends ChangeNotifier {
   final MapObjectExportService _exportService = MapObjectExportService();
   final Uuid _uuid = const Uuid();
   final CreatureService _creatureService = CreatureService();
+  final InterestNotificationService _notificationService = InterestNotificationService();
 
   /// Доступ к хранилищу для прямого использования
   MapObjectStorage get storage => _storage;
@@ -88,6 +90,9 @@ class MapObjectProvider extends ChangeNotifier {
     try {
       // Загружаем объекты из локального хранилища
       _objects = await _storage.getAllObjects();
+
+      // Инициализируем сервис уведомлений
+      await _notificationService.init();
 
       // Подписываемся на новые объекты от P2P
       _newObjectSubscription = _p2pService.newObjectStream.listen((MapObject object) {
@@ -419,6 +424,15 @@ class MapObjectProvider extends ChangeNotifier {
     final updated = obj.addInterest(userId);
     await _storage.updateObject(updated);
     await _broadcastUpdate(updated);
+    
+    // Отправляем уведомление автору
+    await _notificationService.notifyAuthorAboutInterest(
+      noteId: noteId,
+      noteTitle: updated.title,
+      authorId: updated.ownerId,
+      interestedUserId: userId,
+      interestedUserName: 'Кто-то', // TODO: Получить имя пользователя
+    );
     
     // Обновляем локальный список
     final index = _objects.indexWhere((o) => o.id == noteId);
@@ -888,6 +902,56 @@ class MapObjectProvider extends ChangeNotifier {
     }
   }
 
+  // ==================== Модерация фото ====================
+
+  /// Проголосовать за фото (подтвердить)
+  Future<void> confirmPhoto(String photoId, String userId) async {
+    await _storage.votePhoto(photoId: photoId, userId: userId, vote: 1);
+    notifyListeners();
+  }
+
+  /// Пожаловаться на фото
+  Future<void> complainPhoto(String photoId, String userId) async {
+    await _storage.votePhoto(photoId: photoId, userId: userId, vote: -1);
+    notifyListeners();
+  }
+
+  /// Получить статистику голосов за фото
+  Future<Map<String, int>> getPhotoVoteStats(String photoId) async {
+    return await _storage.getPhotoVoteStats(photoId);
+  }
+
+  /// Получить голос пользователя за фото
+  Future<int?> getUserPhotoVote(String photoId, String userId) async {
+    return await _storage.getUserPhotoVote(photoId, userId);
+  }
+
+  /// Получить фото на модерации
+  Future<List<Map<String, dynamic>>> getPhotosForModeration() async {
+    return await _storage.getPhotosForModeration();
+  }
+
+  // ==================== Уведомления ====================
+
+  /// Получить непрочитанные уведомления
+  Future<List<InterestNotification>> getUnreadNotifications() async {
+    return await _notificationService.getUnreadNotifications();
+  }
+
+  /// Получить количество непрочитанных уведомлений
+  Future<int> getUnreadNotificationCount() async {
+    return await _notificationService.getUnreadCount();
+  }
+
+  /// Отметить уведомление как прочитанное
+  Future<void> markNotificationRead(String notificationId) async {
+    await _notificationService.markAsRead(notificationId);
+    notifyListeners();
+  }
+
+  /// Stream уведомлений
+  Stream<InterestNotification> get notificationStream => _notificationService.notificationStream;
+
   @override
   void dispose() {
     _objectsSubscription?.cancel();
@@ -895,6 +959,7 @@ class MapObjectProvider extends ChangeNotifier {
     _syncSubscription?.cancel();
     _storage.dispose();
     _p2pService.dispose();
+    _notificationService.dispose();
     super.dispose();
   }
 }

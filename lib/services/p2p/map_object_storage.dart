@@ -27,7 +27,7 @@ class MapObjectStorage {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (db, version) async {
         await _createTables(db);
       },
@@ -37,6 +37,9 @@ class MapObjectStorage {
         }
         if (oldVersion < 3) {
           await _createV3Tables(db);
+        }
+        if (oldVersion < 4) {
+          await _createV4Tables(db);
         }
       },
     );
@@ -155,6 +158,37 @@ class MapObjectStorage {
     } catch (e) {
       // Индекс уже существует
     }
+  }
+
+  /// Создать таблицы версии 4 (голосование за фото)
+  Future<void> _createV4Tables(Database db) async {
+    // Таблица голосов за фото
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS photo_votes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        photo_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        vote INTEGER NOT NULL,
+        timestamp TEXT NOT NULL,
+        UNIQUE(photo_id, user_id)
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_photo_vote_photo ON photo_votes(photo_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_photo_vote_user ON photo_votes(user_id)');
+
+    // Таблица уведомлений
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS notifications (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT,
+        data TEXT,
+        read INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_notification_read ON notifications(read)');
   }
 
   /// Сохранить объект
@@ -398,6 +432,157 @@ class MapObjectStorage {
   Future<void> deletePhoto(String id) async {
     final db = await database;
     await db.delete('photos', where: 'id = ?', whereArgs: [id]);
+    // Удаляем также голоса за это фото
+    await db.delete('photo_votes', where: 'photo_id = ?', whereArgs: [id]);
+  }
+
+  // ==================== PHOTO VOTE METHODS ====================
+
+  /// Проголосовать за фото (+1 = подтвердить, -1 = жалоба)
+  Future<void> votePhoto({
+    required String photoId,
+    required String userId,
+    required int vote,
+  }) async {
+    final db = await database;
+    await db.insert(
+      'photo_votes',
+      {
+        'photo_id': photoId,
+        'user_id': userId,
+        'vote': vote,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    // Пересчитываем статус фото
+    await _updatePhotoStatusByVotes(photoId);
+  }
+
+  /// Получить голос пользователя за фото
+  Future<int?> getUserPhotoVote(String photoId, String userId) async {
+    final db = await database;
+    final results = await db.query(
+      'photo_votes',
+      where: 'photo_id = ? AND user_id = ?',
+      whereArgs: [photoId, userId],
+    );
+    if (results.isEmpty) return null;
+    return results.first['vote'] as int;
+  }
+
+  /// Получить статистику голосов за фото
+  Future<Map<String, int>> getPhotoVoteStats(String photoId) async {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT 
+        SUM(CASE WHEN vote > 0 THEN 1 ELSE 0 END) as confirms,
+        SUM(CASE WHEN vote < 0 THEN 1 ELSE 0 END) as complaints
+      FROM photo_votes
+      WHERE photo_id = ?
+    ''', [photoId]);
+
+    if (results.isEmpty) {
+      return {'confirms': 0, 'complaints': 0};
+    }
+
+    return {
+      'confirms': (results.first['confirms'] as int?) ?? 0,
+      'complaints': (results.first['complaints'] as int?) ?? 0,
+    };
+  }
+
+  /// Обновить статус фото на основе голосов
+  Future<void> _updatePhotoStatusByVotes(String photoId) async {
+    final stats = await getPhotoVoteStats(photoId);
+    final confirms = stats['confirms'] ?? 0;
+    final complaints = stats['complaints'] ?? 0;
+
+    String newStatus;
+    // Автоподтверждение при 3+ подтверждениях
+    if (confirms >= 3 && confirms > complaints) {
+      newStatus = 'confirmed';
+    }
+    // Автоскрытие при 3+ жалобах
+    else if (complaints >= 3 && complaints > confirms) {
+      newStatus = 'hidden';
+    } else {
+      newStatus = 'pending';
+    }
+
+    await updatePhotoStatus(photoId, newStatus);
+  }
+
+  /// Получить фото со статусом
+  Future<List<Map<String, dynamic>>> getPhotosByStatus(String status) async {
+    final db = await database;
+    return await db.query(
+      'photos',
+      where: 'status = ?',
+      whereArgs: [status],
+    );
+  }
+
+  /// Получить все фото на модерацию (pending)
+  Future<List<Map<String, dynamic>>> getPhotosForModeration() async {
+    return await getPhotosByStatus('pending');
+  }
+
+  // ==================== NOTIFICATION METHODS ====================
+
+  /// Сохранить уведомление
+  Future<void> saveNotification({
+    required String id,
+    required String type,
+    required String title,
+    String? body,
+    Map<String, dynamic>? data,
+  }) async {
+    final db = await database;
+    await db.insert(
+      'notifications',
+      {
+        'id': id,
+        'type': type,
+        'title': title,
+        'body': body,
+        'data': data != null ? jsonEncode(data) : null,
+        'read': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Получить непрочитанные уведомления
+  Future<List<Map<String, dynamic>>> getUnreadNotifications() async {
+    final db = await database;
+    return await db.query(
+      'notifications',
+      where: 'read = 0',
+      orderBy: 'created_at DESC',
+    );
+  }
+
+  /// Отметить уведомление как прочитанное
+  Future<void> markNotificationRead(String id) async {
+    final db = await database;
+    await db.update(
+      'notifications',
+      {'read': 1},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Получить количество непрочитанных уведомлений
+  Future<int> getUnreadNotificationCount() async {
+    final db = await database;
+    final results = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM notifications WHERE read = 0',
+    );
+    return (results.first['count'] as int?) ?? 0;
   }
 
   // ==================== INTEREST METHODS ====================

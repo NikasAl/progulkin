@@ -21,6 +21,8 @@ class ObjectDetailsSheet extends StatefulWidget {
   // Управление напоминаниями
   final void Function(String reminderId)? onReminderToggle;
   final void Function(String reminderId, Duration duration)? onReminderSnooze;
+  // Модерация фото
+  final void Function(String photoId, String userId, bool isConfirm)? onPhotoVote;
 
   const ObjectDetailsSheet({
     super.key,
@@ -36,6 +38,7 @@ class ObjectDetailsSheet extends StatefulWidget {
     this.onContactAuthor,
     this.onReminderToggle,
     this.onReminderSnooze,
+    this.onPhotoVote,
   });
 
   @override
@@ -45,6 +48,10 @@ class ObjectDetailsSheet extends StatefulWidget {
 class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
   final MapObjectStorage _storage = MapObjectStorage();
   List<Uint8List> _photos = [];
+  List<String> _photoIds = [];
+  List<String> _photoStatuses = [];
+  List<Map<String, int>> _photoVoteStats = [];
+  List<int?> _userPhotoVotes = [];
   bool _isLoadingPhotos = false;
   bool _isInterested = false;
 
@@ -70,17 +77,34 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
       if (photoIds.isNotEmpty) {
         setState(() => _isLoadingPhotos = true);
 
-        // Загружаем фото
+        // Загружаем фото и статистику модерации
         final photos = <Uint8List>[];
+        final photoStatuses = <String>[];
+        final photoVoteStats = <Map<String, int>>[];
+        final userPhotoVotes = <int?>[];
+
         for (final photoId in photoIds) {
           final photoData = await _storage.getPhoto(photoId);
           if (photoData != null && photoData['webp_data'] != null) {
             photos.add(photoData['webp_data'] as Uint8List);
+            photoStatuses.add(photoData['status'] as String? ?? 'pending');
+            
+            // Загружаем статистику голосов
+            final stats = await _storage.getPhotoVoteStats(photoId);
+            photoVoteStats.add(stats);
+            
+            // Загружаем голос пользователя
+            final userVote = await _storage.getUserPhotoVote(photoId, widget.userId);
+            userPhotoVotes.add(userVote);
           }
         }
 
         setState(() {
           _photos = photos;
+          _photoIds = photoIds;
+          _photoStatuses = photoStatuses;
+          _photoVoteStats = photoVoteStats;
+          _userPhotoVotes = userPhotoVotes;
           _isLoadingPhotos = false;
         });
       }
@@ -642,7 +666,7 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
     return '${duration.inMinutes} мин';
   }
 
-  /// Фото-галерея
+  /// Фото-галерея с модерацией
   Widget _buildPhotoGallery(BuildContext context) {
     if (_isLoadingPhotos) {
       return const Center(
@@ -662,39 +686,206 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
       children: [
         const SizedBox(height: 8),
         SizedBox(
-          height: 120,
+          height: 150,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: _photos.length,
             itemBuilder: (context, index) {
-              return GestureDetector(
-                onTap: () => _showFullScreenPhoto(context, index),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(
-                      _photos[index],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.broken_image, color: Colors.grey),
-                      ),
-                    ),
-                  ),
-                ),
-              );
+              return _buildPhotoCard(context, index);
             },
           ),
         ),
         const SizedBox(height: 16),
       ],
+    );
+  }
+
+  /// Карточка фото с кнопками модерации
+  Widget _buildPhotoCard(BuildContext context, int index) {
+    final status = _photoStatuses.length > index ? _photoStatuses[index] : 'pending';
+    final stats = _photoVoteStats.length > index ? _photoVoteStats[index] : {'confirms': 0, 'complaints': 0};
+    final userVote = _userPhotoVotes.length > index ? _userPhotoVotes[index] : null;
+    final photoId = _photoIds.length > index ? _photoIds[index] : '';
+
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+
+    switch (status) {
+      case 'confirmed':
+        statusColor = Colors.green;
+        statusIcon = Icons.verified;
+        statusText = 'Проверено';
+        break;
+      case 'hidden':
+        statusColor = Colors.red;
+        statusIcon = Icons.hide_source;
+        statusText = 'Скрыто';
+        break;
+      default:
+        statusColor = Colors.orange;
+        statusIcon = Icons.pending;
+        statusText = 'На проверке';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      width: 140,
+      child: Column(
+        children: [
+          // Фото
+          Expanded(
+            child: Stack(
+              children: [
+                GestureDetector(
+                  onTap: () => _showFullScreenPhoto(context, index),
+                  child: Container(
+                    width: 140,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: status == 'hidden' ? Colors.red.withOpacity(0.5) : Colors.grey[300]!,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: status == 'hidden'
+                          ? Container(
+                              color: Colors.grey[300],
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.hide_source, size: 32, color: Colors.grey[500]),
+                                  Text('Скрыто', style: TextStyle(color: Colors.grey[500])),
+                                ],
+                              ),
+                            )
+                          : Image.memory(
+                              _photos[index],
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.broken_image, color: Colors.grey),
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                // Статус модерации
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(statusIcon, size: 10, color: Colors.white),
+                        const SizedBox(width: 2),
+                        Text(
+                          statusText,
+                          style: const TextStyle(color: Colors.white, fontSize: 8),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Кнопки модерации (только для pending фото и если не автор)
+          if (status == 'pending' && widget.object.ownerId != widget.userId) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Подтвердить
+                _buildVoteButton(
+                  icon: Icons.thumb_up,
+                  label: '${stats['confirms'] ?? 0}',
+                  isActive: userVote != null && userVote > 0,
+                  color: Colors.green,
+                  onTap: widget.onPhotoVote != null
+                      ? () => widget.onPhotoVote!(photoId, widget.userId, true)
+                      : null,
+                ),
+                // Пожаловаться
+                _buildVoteButton(
+                  icon: Icons.thumb_down,
+                  label: '${stats['complaints'] ?? 0}',
+                  isActive: userVote != null && userVote < 0,
+                  color: Colors.red,
+                  onTap: widget.onPhotoVote != null
+                      ? () => _showComplaintDialog(photoId)
+                      : null,
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Кнопка голосования
+  Widget _buildVoteButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive ? color.withOpacity(0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: color.withOpacity(isActive ? 0.5 : 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 2),
+            Text(label, style: TextStyle(fontSize: 10, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Диалог жалобы на фото
+  void _showComplaintDialog(String photoId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Пожаловаться на фото?'),
+        content: const Text(
+          'Если фото не соответствует содержимому или нарушает правила, '
+          'мы его скроем после проверки.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onPhotoVote?.call(photoId, widget.userId, false);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Пожаловаться'),
+          ),
+        ],
+      ),
     );
   }
 
