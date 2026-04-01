@@ -907,11 +907,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           Row(
                             children: [
-                              Text(
-                                user.name,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                              Expanded(
+                                child: Text(
+                                  user.name,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               if (isDefaultName) ...[
@@ -947,7 +950,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
 
                 const SizedBox(height: 16),
-
+                
                 // ID пользователя
                 Container(
                   padding: const EdgeInsets.all(8),
