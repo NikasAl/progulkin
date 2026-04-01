@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../../models/map_objects/map_objects.dart';
@@ -75,6 +76,7 @@ class MapObjectStorage {
 
     await _createV2Tables(db);
     await _createV3Tables(db);
+    await _createV4Tables(db);
   }
 
   /// Создать таблицы версии 2 (фото, интересы, сообщения)
@@ -433,7 +435,12 @@ class MapObjectStorage {
     final db = await database;
     await db.delete('photos', where: 'id = ?', whereArgs: [id]);
     // Удаляем также голоса за это фото
-    await db.delete('photo_votes', where: 'photo_id = ?', whereArgs: [id]);
+    try {
+      await db.delete('photo_votes', where: 'photo_id = ?', whereArgs: [id]);
+    } catch (e) {
+      // Таблица может отсутствовать при миграции
+      debugPrint('⚠️ Ошибка удаления голосов фото: $e');
+    }
   }
 
   // ==================== PHOTO VOTE METHODS ====================
@@ -463,34 +470,46 @@ class MapObjectStorage {
   /// Получить голос пользователя за фото
   Future<int?> getUserPhotoVote(String photoId, String userId) async {
     final db = await database;
-    final results = await db.query(
-      'photo_votes',
-      where: 'photo_id = ? AND user_id = ?',
-      whereArgs: [photoId, userId],
-    );
-    if (results.isEmpty) return null;
-    return results.first['vote'] as int;
+    try {
+      final results = await db.query(
+        'photo_votes',
+        where: 'photo_id = ? AND user_id = ?',
+        whereArgs: [photoId, userId],
+      );
+      if (results.isEmpty) return null;
+      return results.first['vote'] as int;
+    } catch (e) {
+      // Таблица может отсутствовать при миграции
+      debugPrint('⚠️ Ошибка getUserPhotoVote: $e');
+      return null;
+    }
   }
 
   /// Получить статистику голосов за фото
   Future<Map<String, int>> getPhotoVoteStats(String photoId) async {
     final db = await database;
-    final results = await db.rawQuery('''
-      SELECT 
-        SUM(CASE WHEN vote > 0 THEN 1 ELSE 0 END) as confirms,
-        SUM(CASE WHEN vote < 0 THEN 1 ELSE 0 END) as complaints
-      FROM photo_votes
-      WHERE photo_id = ?
-    ''', [photoId]);
+    try {
+      final results = await db.rawQuery('''
+        SELECT 
+          SUM(CASE WHEN vote > 0 THEN 1 ELSE 0 END) as confirms,
+          SUM(CASE WHEN vote < 0 THEN 1 ELSE 0 END) as complaints
+        FROM photo_votes
+        WHERE photo_id = ?
+      ''', [photoId]);
 
-    if (results.isEmpty) {
+      if (results.isEmpty) {
+        return {'confirms': 0, 'complaints': 0};
+      }
+
+      return {
+        'confirms': (results.first['confirms'] as int?) ?? 0,
+        'complaints': (results.first['complaints'] as int?) ?? 0,
+      };
+    } catch (e) {
+      // Таблица может отсутствовать при миграции
+      debugPrint('⚠️ Ошибка getPhotoVoteStats: $e');
       return {'confirms': 0, 'complaints': 0};
     }
-
-    return {
-      'confirms': (results.first['confirms'] as int?) ?? 0,
-      'complaints': (results.first['complaints'] as int?) ?? 0,
-    };
   }
 
   /// Обновить статус фото на основе голосов

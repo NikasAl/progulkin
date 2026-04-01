@@ -290,7 +290,7 @@ class SyncService {
       }
 
       // Проверяем версию
-      final manifestJson = jsonDecode(String.fromCharCodes(manifestFile.content))
+      final manifestJson = jsonDecode(utf8.decode(manifestFile.content))
           as Map<String, dynamic>;
       final version = manifestJson['formatVersion'] as int? ?? 1;
 
@@ -302,7 +302,7 @@ class SyncService {
       }
 
       // Парсим объекты
-      final objectsJson = jsonDecode(String.fromCharCodes(objectsFile.content)) as List;
+      final objectsJson = jsonDecode(utf8.decode(objectsFile.content)) as List;
       final remoteObjects = objectsJson.map((json) {
         return MapObject.fromSyncJson(json as Map<String, dynamic>);
       }).toList();
@@ -389,7 +389,7 @@ class SyncService {
 
       for (final file in archive) {
         if (file.name == 'preview.json') {
-          final previewJson = String.fromCharCodes(file.content);
+          final previewJson = utf8.decode(file.content);
           return jsonDecode(previewJson) as Map<String, dynamic>;
         }
       }
