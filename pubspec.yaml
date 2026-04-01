@@ -65,4 +65,5 @@ flutter:
   assets:
     - assets/icons/
     - assets/icons/monsters/
+    - assets/icons/foraging/
     - assets/splash_icon.webp

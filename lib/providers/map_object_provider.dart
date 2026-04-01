@@ -426,6 +426,7 @@ class MapObjectProvider extends ChangeNotifier {
     required ForagingQuantity quantity,
     ForagingSeason season = ForagingSeason.summer,
     String notes = '',
+    List<String>? photoIds,
   }) async {
     final spot = ForagingSpot(
       id: _uuid.v4(),
@@ -439,6 +440,7 @@ class MapObjectProvider extends ChangeNotifier {
       quantity: quantity,
       season: season,
       notes: notes,
+      photoIds: photoIds,
     );
 
     await _saveAndBroadcast(spot);

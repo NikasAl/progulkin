@@ -2,17 +2,18 @@ import 'map_object.dart';
 
 /// Категоря находки (грибы или ягоды)
 enum ForagingCategory {
-  mushroom('mushroom', 'Грибы', '🍄'),
-  berry('berry', 'Ягоды', '🫐'),
-  nut('nut', 'Орехи', '🥜'),
-  herb('herb', 'Травы', '🌿'),
+  mushroom('mushroom', 'Грибы', '🍄', 'assets/icons/foraging/category_mushroom.png'),
+  berry('berry', 'Ягоды', '🫐', 'assets/icons/foraging/category_berry.png'),
+  nut('nut', 'Орехи', '🥜', 'assets/icons/foraging/category_nut.png'),
+  herb('herb', 'Травы', '🌿', 'assets/icons/foraging/category_herb.png'),
   ;
 
   final String code;
   final String name;
   final String emoji;
+  final String assetPath;
 
-  const ForagingCategory(this.code, this.name, this.emoji);
+  const ForagingCategory(this.code, this.name, this.emoji, this.assetPath);
 
   static ForagingCategory fromCode(String code) {
     return ForagingCategory.values.firstWhere(
@@ -24,27 +25,28 @@ enum ForagingCategory {
 
 /// Тип грибов
 enum MushroomType {
-  white('white', 'Белый гриб', '🍄', true),
-  boletus('boletus', 'Подберёзовик', '🍄', true),
-  orangeCap('orange_cap', 'Подосиновик', '🍄', true),
-  chanterelle('chanterelle', 'Лисичка', '🧡', true),
-  honeyFungus('honey_fungus', 'Опёнок', '🍄', true),
-  russula('russula', 'Сыроежка', '🍄', true),
-  milkMushroom('milk_mushroom', 'Груздь', '🍄', true),
-  saffronMilkCap('saffron_milk_cap', 'Рыжик', '🧡', true),
-  morel('morel', 'Сморчок', '🍄', true),
-  oyster('oyster', 'Вешенка', '🍄', true),
-  champignon('champignon', 'Шампиньон', '🍄', true),
-  porcini('porcini', 'Боровик', '🍄', true),
-  otherMushroom('other_mushroom', 'Другой гриб', '🍄', null),
+  white('white', 'Белый гриб', '🍄', true, 'assets/icons/foraging/mushroom_white.png'),
+  boletus('boletus', 'Подберёзовик', '🍄', true, 'assets/icons/foraging/mushroom_boletus.png'),
+  orangeCap('orange_cap', 'Подосиновик', '🍄', true, 'assets/icons/foraging/mushroom_orange_cap.png'),
+  chanterelle('chanterelle', 'Лисичка', '🧡', true, 'assets/icons/foraging/mushroom_chanterelle.png'),
+  honeyFungus('honey_fungus', 'Опёнок', '🍄', true, 'assets/icons/foraging/mushroom_honey_fungus.png'),
+  russula('russula', 'Сыроежка', '🍄', true, 'assets/icons/foraging/mushroom_russula.png'),
+  milkMushroom('milk_mushroom', 'Груздь', '🍄', true, 'assets/icons/foraging/mushroom_milk_mushroom.png'),
+  saffronMilkCap('saffron_milk_cap', 'Рыжик', '🧡', true, 'assets/icons/foraging/mushroom_saffron_milk_cap.png'),
+  morel('morel', 'Сморчок', '🍄', true, 'assets/icons/foraging/mushroom_morel.png'),
+  oyster('oyster', 'Вешенка', '🍄', true, 'assets/icons/foraging/mushroom_oyster.png'),
+  champignon('champignon', 'Шампиньон', '🍄', true, 'assets/icons/foraging/mushroom_champignon.png'),
+  porcini('porcini', 'Боровик', '🍄', true, 'assets/icons/foraging/mushroom_porcini.png'),
+  otherMushroom('other_mushroom', 'Другой гриб', '🍄', null, 'assets/icons/foraging/mushroom_other.png'),
   ;
 
   final String code;
   final String name;
   final String emoji;
   final bool? edible; // null = неизвестно
+  final String assetPath;
 
-  const MushroomType(this.code, this.name, this.emoji, this.edible);
+  const MushroomType(this.code, this.name, this.emoji, this.edible, this.assetPath);
 
   static MushroomType fromCode(String code) {
     return MushroomType.values.firstWhere(
@@ -56,27 +58,28 @@ enum MushroomType {
 
 /// Тип ягод
 enum BerryType {
-  blueberry('blueberry', 'Черника', '🫐', true),
-  lingonberry('lingonberry', 'Брусника', '🔴', true),
-  cranberry('cranberry', 'Клюква', '🔴', true),
-  cloudberry('cloudberry', 'Морошка', '🟡', true),
-  strawberry('strawberry', 'Земляника', '🍓', true),
-  raspberry('raspberry', 'Малина', '🟥', true),
-  currant('currant', 'Смородина', '⚫', true),
-  gooseberry('gooseberry', 'Крыжовник', '🟢', true),
-  rowan('rowan', 'Рябина', '🟠', true),
-  rosehip('rosehip', 'Шиповник', '🔴', true),
-  hawthorn('hawthorn', 'Боярышник', '🔴', true),
-  juniper('juniper', 'Можжевельник', '🟤', true),
-  otherBerry('other_berry', 'Другая ягода', '🫐', null),
+  blueberry('blueberry', 'Черника', '🫐', true, 'assets/icons/foraging/berry_blueberry.png'),
+  lingonberry('lingonberry', 'Брусника', '🔴', true, 'assets/icons/foraging/berry_lingonberry.png'),
+  cranberry('cranberry', 'Клюква', '🔴', true, 'assets/icons/foraging/berry_cranberry.png'),
+  cloudberry('cloudberry', 'Морошка', '🟡', true, 'assets/icons/foraging/berry_cloudberry.png'),
+  strawberry('strawberry', 'Земляника', '🍓', true, 'assets/icons/foraging/berry_strawberry.png'),
+  raspberry('raspberry', 'Малина', '🟥', true, 'assets/icons/foraging/berry_raspberry.png'),
+  currant('currant', 'Смородина', '⚫', true, 'assets/icons/foraging/berry_currant.png'),
+  gooseberry('gooseberry', 'Крыжовник', '🟢', true, 'assets/icons/foraging/berry_gooseberry.png'),
+  rowan('rowan', 'Рябина', '🟠', true, 'assets/icons/foraging/berry_rowan.png'),
+  rosehip('rosehip', 'Шиповник', '🔴', true, 'assets/icons/foraging/berry_rosehip.png'),
+  hawthorn('hawthorn', 'Боярышник', '🔴', true, 'assets/icons/foraging/berry_hawthorn.png'),
+  juniper('juniper', 'Можжевельник', '🟤', true, 'assets/icons/foraging/berry_juniper.png'),
+  otherBerry('other_berry', 'Другая ягода', '🫐', null, 'assets/icons/foraging/berry_other.png'),
   ;
 
   final String code;
   final String name;
   final String emoji;
   final bool? edible; // null = неизвестно
+  final String assetPath;
 
-  const BerryType(this.code, this.name, this.emoji, this.edible);
+  const BerryType(this.code, this.name, this.emoji, this.edible, this.assetPath);
 
   static BerryType fromCode(String code) {
     return BerryType.values.firstWhere(
@@ -88,19 +91,20 @@ enum BerryType {
 
 /// Тип орехов
 enum NutType {
-  hazelnut('hazelnut', 'Лещина (фундук)', '🥜', true),
-  pineNut('pine_nut', 'Кедровый орех', '🥜', true),
-  walnut('walnut', 'Грецкий орех', '🥜', true),
-  acorn('acorn', 'Жёлудь', '🟤', false),
-  otherNut('other_nut', 'Другой орех', '🥜', null),
+  hazelnut('hazelnut', 'Лещина (фундук)', '🥜', true, 'assets/icons/foraging/nut_hazelnut.png'),
+  pineNut('pine_nut', 'Кедровый орех', '🥜', true, 'assets/icons/foraging/nut_pine_nut.png'),
+  walnut('walnut', 'Грецкий орех', '🥜', true, 'assets/icons/foraging/nut_walnut.png'),
+  acorn('acorn', 'Жёлудь', '🟤', false, 'assets/icons/foraging/nut_acorn.png'),
+  otherNut('other_nut', 'Другой орех', '🥜', null, 'assets/icons/foraging/nut_other.png'),
   ;
 
   final String code;
   final String name;
   final String emoji;
   final bool? edible;
+  final String assetPath;
 
-  const NutType(this.code, this.name, this.emoji, this.edible);
+  const NutType(this.code, this.name, this.emoji, this.edible, this.assetPath);
 
   static NutType fromCode(String code) {
     return NutType.values.firstWhere(
@@ -112,25 +116,26 @@ enum NutType {
 
 /// Тип трав
 enum HerbType {
-  nettle('nettle', 'Крапива', '🌿', true),
-  dandelion('dandelion', 'Одуванчик', '🌼', true),
-  sorrel('sorrel', 'Щавель', '🌿', true),
-  wildGarlic('wild_garlic', 'Черемша', '🌿', true),
-  mint('mint', 'Мята', '🌿', true),
-  chamomile('chamomile', 'Ромашка', '🌼', true),
-  stJohnsWort('st_johns_wort', 'Зверобой', '🌿', true),
-  thyme('thyme', 'Чабрец', '🌿', true),
-  yarrow('yarrow', 'Тысячелистник', '🌿', true),
-  plantain('plantain', 'Подорожник', '🌿', true),
-  otherHerb('other_herb', 'Другая трава', '🌿', null),
+  nettle('nettle', 'Крапива', '🌿', true, 'assets/icons/foraging/herb_nettle.png'),
+  dandelion('dandelion', 'Одуванчик', '🌼', true, 'assets/icons/foraging/herb_dandelion.png'),
+  sorrel('sorrel', 'Щавель', '🌿', true, 'assets/icons/foraging/herb_sorrel.png'),
+  wildGarlic('wild_garlic', 'Черемша', '🌿', true, 'assets/icons/foraging/herb_wild_garlic.png'),
+  mint('mint', 'Мята', '🌿', true, 'assets/icons/foraging/herb_mint.png'),
+  chamomile('chamomile', 'Ромашка', '🌼', true, 'assets/icons/foraging/herb_chamomile.png'),
+  stJohnsWort('st_johns_wort', 'Зверобой', '🌿', true, 'assets/icons/foraging/herb_st_johns_wort.png'),
+  thyme('thyme', 'Чабрец', '🌿', true, 'assets/icons/foraging/herb_thyme.png'),
+  yarrow('yarrow', 'Тысячелистник', '🌿', true, 'assets/icons/foraging/herb_yarrow.png'),
+  plantain('plantain', 'Подорожник', '🌿', true, 'assets/icons/foraging/herb_plantain.png'),
+  otherHerb('other_herb', 'Другая трава', '🌿', null, 'assets/icons/foraging/herb_other.png'),
   ;
 
   final String code;
   final String name;
   final String emoji;
   final bool? edible;
+  final String assetPath;
 
-  const HerbType(this.code, this.name, this.emoji, this.edible);
+  const HerbType(this.code, this.name, this.emoji, this.edible, this.assetPath);
 
   static HerbType fromCode(String code) {
     return HerbType.values.firstWhere(
@@ -204,6 +209,7 @@ class ForagingSpot extends MapObject {
   final ForagingQuantity quantity;
   final ForagingSeason season;
   final String notes;        // Заметки пользователя
+  final List<String> photoIds; // ID фото в хранилище
   final bool isVerified;     // Подтверждено другими пользователями
   final int harvestCount;    // Сколько раз собирали здесь
   final DateTime? lastHarvest; // Последний сбор
@@ -225,6 +231,7 @@ class ForagingSpot extends MapObject {
     required this.quantity,
     this.season = ForagingSeason.summer,
     this.notes = '',
+    List<String>? photoIds,
     this.isVerified = false,
     this.harvestCount = 0,
     this.lastHarvest,
@@ -234,7 +241,7 @@ class ForagingSpot extends MapObject {
     super.denies,
     super.views,
     super.version,
-  }) : super(type: MapObjectType.foragingSpot);
+  }) : photoIds = photoIds ?? [], super(type: MapObjectType.foragingSpot);
 
   /// Получить название типа находки
   String get itemTypeName {
@@ -261,6 +268,20 @@ class ForagingSpot extends MapObject {
         return NutType.fromCode(itemTypeCode).emoji;
       case ForagingCategory.herb:
         return HerbType.fromCode(itemTypeCode).emoji;
+    }
+  }
+
+  /// Получить путь к иконке типа
+  String get itemTypeAssetPath {
+    switch (category) {
+      case ForagingCategory.mushroom:
+        return MushroomType.fromCode(itemTypeCode).assetPath;
+      case ForagingCategory.berry:
+        return BerryType.fromCode(itemTypeCode).assetPath;
+      case ForagingCategory.nut:
+        return NutType.fromCode(itemTypeCode).assetPath;
+      case ForagingCategory.herb:
+        return HerbType.fromCode(itemTypeCode).assetPath;
     }
   }
 
@@ -306,6 +327,7 @@ class ForagingSpot extends MapObject {
       quantity: quantity,
       season: season,
       notes: notes,
+      photoIds: photoIds,
       isVerified: isVerified,
       harvestCount: harvestCount + 1,
       lastHarvest: DateTime.now(),
@@ -336,6 +358,7 @@ class ForagingSpot extends MapObject {
       quantity: quantity,
       season: season,
       notes: notes,
+      photoIds: photoIds,
       isVerified: true,
       harvestCount: harvestCount,
       lastHarvest: lastHarvest,
@@ -357,6 +380,7 @@ class ForagingSpot extends MapObject {
       'quantity': quantity.code,
       'season': season.code,
       'notes': notes,
+      'photoIds': photoIds,
       'isVerified': isVerified,
       'harvestCount': harvestCount,
       'lastHarvest': lastHarvest?.toIso8601String(),
@@ -389,6 +413,7 @@ class ForagingSpot extends MapObject {
       quantity: ForagingQuantity.fromCode(json['quantity'] as String? ?? 'some'),
       season: ForagingSeason.fromCode(json['season'] as String? ?? 'summer'),
       notes: json['notes'] as String? ?? '',
+      photoIds: (json['photoIds'] as List?)?.map((e) => e as String).toList(),
       isVerified: json['isVerified'] as bool? ?? false,
       harvestCount: json['harvestCount'] as int? ?? 0,
       lastHarvest: json['lastHarvest'] != null

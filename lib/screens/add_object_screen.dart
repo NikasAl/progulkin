@@ -742,6 +742,25 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
 
         const SizedBox(height: UIConstants.sectionSpacing),
 
+        // Фото
+        PhotoCaptureWidget(
+          targetLatitude: widget.latitude,
+          targetLongitude: widget.longitude,
+          photos: _photos,
+          onPhotoAdded: (photo) {
+            setState(() {
+              _photos.add(photo);
+            });
+          },
+          onPhotoRemoved: (index) {
+            setState(() {
+              _photos.removeAt(index);
+            });
+          },
+        ),
+
+        const SizedBox(height: UIConstants.sectionSpacing),
+
         // Предупреждение о безопасности
         Card(
           color: Theme.of(context).colorScheme.errorContainer,
@@ -923,6 +942,18 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
 
         case 4:
           // Создаём место сбора
+          // Сначала сохраняем фото
+          final foragingStorage = mapObjectProvider.storage;
+          final foragingPhotoIds = <String>[];
+          for (final photo in _photos) {
+            await foragingStorage.savePhoto(
+              id: photo.id,
+              webpData: photo.bytes.toList(),
+              status: 'confirmed',
+            );
+            foragingPhotoIds.add(photo.id);
+          }
+
           await mapObjectProvider.createForagingSpot(
             latitude: widget.latitude,
             longitude: widget.longitude,
@@ -934,6 +965,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
             quantity: _foragingQuantity,
             season: _foragingSeason,
             notes: _foragingNotesController.text,
+            photoIds: foragingPhotoIds,
           );
           break;
       }
