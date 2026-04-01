@@ -10,6 +10,14 @@
         android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
     <uses-permission
         android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <!-- Для сохранения в Downloads на Android 9 и ниже -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"/>
+    <!-- Для чтения файлов на Android 9 и ниже -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission
@@ -45,6 +53,47 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            
+            <!-- Открытие .progulkin файлов из файлового менеджера -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:mimeType="application/octet-stream"/>
+                <data android:pathPattern=".*\\.progulkin"/>
+            </intent-filter>
+            
+            <!-- Открытие .progulkin файлов по схеме file:// -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="file"/>
+                <data android:mimeType="*/*"/>
+                <data android:pathPattern=".*\\.progulkin"/>
+            </intent-filter>
+            
+            <!-- Открытие .progulkin файлов по схеме content:// -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="content"/>
+                <data android:mimeType="application/octet-stream"/>
+                <data android:pathPattern=".*\\.progulkin"/>
+            </intent-filter>
+            
+            <!-- Приём файлов через "Поделиться" -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/octet-stream"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/zip"/>
             </intent-filter>
         </activity>
         <meta-data

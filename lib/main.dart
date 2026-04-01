@@ -7,8 +7,13 @@ import 'providers/pedometer_provider.dart';
 import 'providers/map_object_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/theme_provider.dart';
+import 'services/incoming_file_service.dart';
+import 'services/sync_service.dart';
 import 'screens/home_screen.dart';
 import 'models/map_objects/map_objects.dart'; // Инициализация фабрики объектов
+
+/// Глобальный ключ навигатора для показа диалогов из сервиса
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +24,14 @@ void main() async {
   // Инициализация локали для форматирования дат
   await initializeDateFormatting('ru_RU', null);
   
+  // Инициализация сервиса входящих файлов
+  IncomingFileService().init();
+  
+  // Настраиваем callback для показа результата импорта
+  IncomingFileService().onFileReceived = (result) {
+    _showImportResult(result);
+  };
+  
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -27,6 +40,35 @@ void main() async {
   );
   
   runApp(const ProgulkinApp());
+}
+
+/// Показать результат импорта файла
+void _showImportResult(ZipImportResult result) {
+  final context = navigatorKey.currentContext;
+  if (context == null) return;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Row(
+        children: [
+          Icon(
+            result.success ? Icons.check_circle : Icons.error,
+            color: result.success ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 8),
+          Text(result.success ? 'Импорт завершён' : 'Ошибка импорта'),
+        ],
+      ),
+      content: Text(result.success ? result.summary : (result.error ?? 'Неизвестная ошибка')),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
 }
 
 class ProgulkinApp extends StatelessWidget {
@@ -45,6 +87,7 @@ class ProgulkinApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
           return MaterialApp(
+            navigatorKey: navigatorKey,
             title: 'Прогулкин',
             debugShowCheckedModeBanner: false,
             theme: ThemeData(

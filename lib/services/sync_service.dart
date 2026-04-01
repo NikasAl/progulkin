@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:archive/archive.dart';
+import 'package:flutter/services.dart';
 import '../models/map_objects/map_objects.dart';
 import 'p2p/map_object_storage.dart';
 import 'merge_engine.dart';
@@ -428,11 +429,37 @@ class SyncService {
     };
   }
 
-  /// Сгенерировать путь для экспорта
+  /// Сгенерировать путь для экспорта (в папку Downloads)
   Future<String> _generateExportPath() async {
-    final directory = await getApplicationDocumentsDirectory();
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-    return '${directory.path}/progulkin_export_$timestamp.$fileExtension';
+    final fileName = 'progulkin_export_$timestamp.$fileExtension';
+    
+    // Пытаемся сохранить в Downloads на Android
+    if (Platform.isAndroid) {
+      try {
+        // На Android 10+ используем MediaStore через MethodChannel
+        // На более старых - прямой путь к Downloads
+        final directory = Directory('/storage/emulated/0/Download');
+        if (await directory.exists()) {
+          final filePath = '${directory.path}/$fileName';
+          // Проверяем, можем ли записать
+          try {
+            final testFile = File('${directory.path}/.test_write');
+            await testFile.writeAsString('test');
+            await testFile.delete();
+            return filePath;
+          } catch (e) {
+            debugPrint('⚠️ Нет доступа к Downloads: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Ошибка доступа к Downloads: $e');
+      }
+    }
+    
+    // Fallback - папка приложения
+    final directory = await getApplicationDocumentsDirectory();
+    return '${directory.path}/$fileName';
   }
 
   /// Получить ID устройства
