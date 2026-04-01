@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'sync_service.dart';
 
@@ -21,7 +22,7 @@ class IncomingFileService {
     _channel.setMethodCallHandler(_handleMethodCall);
     
     // Отложенная проверка начального файла (после построения UI)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
       _checkInitialFile();
     });
   }
