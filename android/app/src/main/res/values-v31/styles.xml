@@ -1,16 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Theme applied to the Android Window while the process is starting -->
-    <!-- Android 12+ (API 31+) Splash Screen API -->
+    <!-- Android 12+ (API 31+): НЕ используем Splash Screen API -->
+    <!-- Важно: не добавляем windowSplashScreen* атрибуты -->
+    <!-- Тогда система будет использовать windowBackground -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <!-- Устанавливаем наш splash screen как фон -->
-        <item name="android:windowSplashScreenBackground">@drawable/splash_background</item>
-        
-        <!-- Отключаем анимацию иконки - используем прозрачную иконку -->
-        <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
-        <item name="android:windowSplashScreenAnimationDuration">0</item>
-        
-        <!-- Стандартные настройки -->
         <item name="android:windowBackground">@drawable/launch_background</item>
         <item name="android:forceDarkAllowed">false</item>
         <item name="android:windowFullscreen">true</item>
@@ -18,7 +12,6 @@
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
     
-    <!-- Theme applied to the Android Window as soon as the process has started. -->
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
