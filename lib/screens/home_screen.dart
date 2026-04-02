@@ -520,46 +520,51 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Компактные кнопки в ряд
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildIconButton(
-                        icon: Icons.history,
-                        tooltip: 'История',
-                        onTap: () => _openHistory(context),
-                      ),
-                      const SizedBox(width: 16),
-                      _buildIconButton(
-                        icon: Icons.settings,
-                        tooltip: 'Настройки',
-                        onTap: () => _openSettings(context),
-                      ),
-                      const SizedBox(width: 16),
-                      _buildIconButton(
-                        icon: Icons.pets,
-                        tooltip: 'Коллекция',
-                        onTap: () => _openCreatureCollection(context),
-                      ),
-                      const SizedBox(width: 16),
-                      _buildIconButton(
-                        icon: Icons.chat,
-                        tooltip: 'Сообщения',
-                        onTap: () => _openChatList(context),
-                      ),
-                      const SizedBox(width: 16),
-                      _buildIconButton(
-                        icon: Icons.my_location,
-                        tooltip: 'Моё местоположение',
-                        onTap: _moveToCurrentLocation,
-                      ),
-                      const SizedBox(width: 16),
-                      _buildIconButton(
-                        icon: Icons.info_outline,
-                        tooltip: 'О приложении',
-                        onTap: () => _openAboutApp(context),
-                      ),
-                    ],
+                  // Горизонтально прокручиваемые кнопки
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildIconButton(
+                          icon: Icons.history,
+                          tooltip: 'История',
+                          onTap: () => _openHistory(context),
+                        ),
+                        const SizedBox(width: 12),
+                        _buildIconButton(
+                          icon: Icons.settings,
+                          tooltip: 'Настройки',
+                          onTap: () => _openSettings(context),
+                        ),
+                        const SizedBox(width: 12),
+                        _buildIconButton(
+                          icon: Icons.pets,
+                          tooltip: 'Коллекция',
+                          onTap: () => _openCreatureCollection(context),
+                        ),
+                        const SizedBox(width: 12),
+                        _buildIconButton(
+                          icon: Icons.chat,
+                          tooltip: 'Сообщения',
+                          onTap: () => _openChatList(context),
+                        ),
+                        const SizedBox(width: 12),
+                        _buildIconButton(
+                          icon: Icons.my_location,
+                          tooltip: 'Моё местоположение',
+                          onTap: _moveToCurrentLocation,
+                        ),
+                        const SizedBox(width: 12),
+                        _buildIconButton(
+                          icon: Icons.info_outline,
+                          tooltip: 'О приложении',
+                          onTap: () => _openAboutApp(context),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _buildMainButton(walkProvider, pedometerProvider),

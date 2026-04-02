@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Экран "О приложении" с информацией и картинками
+/// Экран "О приложении" с полноэкранными картинками и текстом
 class AboutAppScreen extends StatefulWidget {
   const AboutAppScreen({super.key});
 
@@ -89,9 +89,29 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
             },
           ),
 
+          // Затемнение сверху для статус-бара
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 80,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.5),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           // Индикатор страниц
           Positioned(
-            bottom: 100,
+            bottom: 140,
             left: 0,
             right: 0,
             child: _buildPageIndicator(),
@@ -99,9 +119,9 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
 
           // Кнопки навигации
           Positioned(
-            bottom: 30,
-            left: 16,
-            right: 16,
+            bottom: 40,
+            left: 20,
+            right: 20,
             child: _buildNavigationButtons(),
           ),
 
@@ -112,6 +132,14 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
               right: 16,
               child: TextButton(
                 onPressed: () => _finish(),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.black.withOpacity(0.3),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
                 child: const Text('Пропустить'),
               ),
             ),
@@ -121,78 +149,122 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
   }
 
   Widget _buildPage(_PageContent page) {
-    return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Картинка
-              Expanded(
-                flex: 2,
-                child: Container(
-                  constraints: const BoxConstraints(maxHeight: 300),
-                  child: Image.asset(
-                    page.image,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.directions_walk,
-                          size: 80,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      );
-                    },
-                  ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Полноэкранная картинка на фоне
+        Image.asset(
+          page.image,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.indigo[900]!,
+                    Colors.purple[800]!,
+                    Colors.deepPurple[700]!,
+                  ],
                 ),
               ),
+            );
+          },
+        ),
 
-              const SizedBox(height: 40),
-
-              // Заголовок
-              Text(
-                page.title,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                textAlign: TextAlign.center,
+        // Градиентное затемнение снизу для текста
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            height: 400,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.7),
+                  Colors.black.withOpacity(0.95),
+                ],
+                stops: const [0.0, 0.5, 1.0],
               ),
-
-              const SizedBox(height: 8),
-
-              // Подзаголовок
-              Text(
-                page.subtitle,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 24),
-
-              // Текст
-              Text(
-                page.text,
-                style: Theme.of(context).textTheme.bodyLarge,
-                textAlign: TextAlign.center,
-              ),
-
-              const Spacer(),
-            ],
+            ),
           ),
         ),
-      ),
+
+        // Контент
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Заголовок
+                Text(
+                  page.title,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 10,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 8),
+
+                // Подзаголовок
+                Text(
+                  page.subtitle,
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.white.withOpacity(0.8),
+                    shadows: const [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 8,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 20),
+
+                // Текст
+                Text(
+                  page.text,
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.5,
+                    color: Colors.white.withOpacity(0.9),
+                    shadows: const [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 6,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 200), // Место для кнопок
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -200,16 +272,23 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(_pages.length, (index) {
+        final isActive = _currentPage == index;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: _currentPage == index ? 24 : 8,
+          width: isActive ? 24 : 8,
           height: 8,
           decoration: BoxDecoration(
-            color: _currentPage == index
-                ? Theme.of(context).colorScheme.primary
-                : Colors.grey[300],
+            color: isActive ? Colors.white : Colors.white.withOpacity(0.4),
             borderRadius: BorderRadius.circular(4),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 4,
+                    ),
+                  ]
+                : null,
           ),
         );
       }),
@@ -225,12 +304,13 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
         child: ElevatedButton(
           onPressed: () => _finish(),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black87,
+            padding: const EdgeInsets.symmetric(vertical: 18),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(30),
             ),
+            elevation: 8,
           ),
           child: const Text(
             'Начать прогулки!',
@@ -244,17 +324,19 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
       children: [
         if (_currentPage > 0)
           Expanded(
-            child: OutlinedButton(
+            child: TextButton(
               onPressed: () {
                 _pageController.previousPage(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeInOut,
                 );
               },
-              style: OutlinedButton.styleFrom(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.white.withOpacity(0.15),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(30),
                 ),
               ),
               child: const Text('Назад'),
@@ -271,12 +353,13 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black87,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(30),
               ),
+              elevation: 8,
             ),
             child: const Text('Далее'),
           ),
