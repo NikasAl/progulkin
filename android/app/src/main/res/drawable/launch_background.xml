@@ -3,7 +3,7 @@
 <!-- Показывает полноэкранную картинку splash -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
-        <bitmap 
+        <bitmap
             android:gravity="fill"
             android:src="@drawable/splash"/>
     </item>
