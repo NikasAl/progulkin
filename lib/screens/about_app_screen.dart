@@ -15,52 +15,57 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
 
   final List<_PageContent> _pages = [
     _PageContent(
-      image: 'assets/splash_icon.webp',
+      image: 'assets/splash_intro.webp',
       title: 'Прогулкин',
       subtitle: 'Трекер прогулок',
-      text: 'Добро пожаловать в Прогулкин! Это приложение поможет вам отслеживать ваши прогулки, '
+      text: 'Добро пожаловать! Это приложение поможет вам отслеживать ваши прогулки, '
           'исследовать окрестности и делать прогулки более интересными и полезными. '
           'Записывайте маршруты, считайте шаги и открывайте новые места!',
     ),
     _PageContent(
-      image: 'assets/splash_icon.webp',
-      title: '🚶 Запись прогулок',
+      image: 'assets/splash_record.webp',
+      title: 'Запись',
       subtitle: 'Отслеживайте свой путь',
       text: 'Нажмите "Начать прогулку" и приложение начнёт записывать ваш маршрут. '
           'Вы увидите пройденное расстояние, время, скорость и количество шагов. '
           'GPS-трек сохраняется и его можно просмотреть в истории прогулок.',
     ),
     _PageContent(
-      image: 'assets/splash_icon.webp',
-      title: '👹 Мусорные монстры',
+      image: 'assets/splash_monstr.webp',
+      title: '👹 Монстры',
       subtitle: 'Убирайте территорию',
-      text: 'На карте появляются мусорные монстры — отметьте место где нужно убрать мусор. '
-          'Другие пользователи могут подтвердить или убрать монстра, получая очки репутации. '
+      text: 'Отмечайте места, где нужно убрать мусор. На карте появляются мусорные монстры. '
+          'Другие пользователи или вы сами могут убрать монстра, получая очки репутации. '
           'Вместе мы делаем мир чище!',
     ),
     _PageContent(
-      image: 'assets/splash_icon.webp',
-      title: '🦊 Лесные существа',
+      image: 'assets/splash_creature.webp',
+      title: '🦊 Существа',
       subtitle: 'Собирайте коллекцию',
-      text: 'Во время прогулок на карте появляются лесные существа — лисички, зайчики, ёжики и другие! '
-          'Поймайте их, чтобы пополнить свою коллекцию. Редкие существа встречаются реже '
-          'и приносят больше очков.',
+      text: 'Во время прогулок на карте появляются мифические существа — Лейшии, Баба-яга, Домовой и другие! '
+          'Приручите их, чтобы пополнить коллекцию. Делитесь с ними угощением.',
     ),
     _PageContent(
-      image: 'assets/splash_icon.webp',
-      title: '🍄 Грибы и ягоды',
+      image: 'assets/splash_berries.webp',
+      title: '🍄 Находки',
       subtitle: 'Отмечайте находки',
       text: 'Нашли грибное место или поляну с ягодами? Отметьте на карте! '
           'Выберите тип находки: грибы, ягоды, орехи или травы. '
-          'Добавьте фото и помогите другим прогульщикам найти вкусные места!',
+          'Добавьте фото и помогите другим путешественникам найти хорошие места!',
+    ),
+    _PageContent(
+      image: 'assets/splash_msgs.webp',
+      title: '💬 Сообщения',
+      subtitle: 'Общайтесь с соседями',
+      text: 'Оставляйте секретные сообщения в любых местах. '
+          'Также можете отметить места, которые вас заинтересовали. И написать другим путешественникам, чьи заметки вам понравились. '
+          'P2P-синхронизация позволяет обмениваться данными напрямую между устройствами. Но можно передать объекты и файлом друзьям.',
     ),
     _PageContent(
       image: 'assets/splash_icon.webp',
-      title: '💬 Сообщения',
-      subtitle: 'Общайтесь с другими',
-      text: 'Оставляйте секретные сообщения в любых местах для других прогульщиков. '
-          'Также можете отметить места, которые вас заинтересовали. '
-          'P2P-синхронизация позволяет обмениваться данными напрямую между устройствами.',
+      title: 'Здоровье',
+      subtitle: 'Движение - жизнь',
+      text: 'Прогулки помогают поддерживать здоровье и улучшают настроение. Ходите больше и поделитесь впечатлениями с друзьями.',
     ),
   ];
 
@@ -111,7 +116,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
 
           // Индикатор страниц
           Positioned(
-            bottom: 140,
+            bottom: 110,
             left: 0,
             right: 0,
             child: _buildPageIndicator(),
@@ -173,28 +178,6 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
           },
         ),
 
-        // Градиентное затемнение снизу для текста
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            height: 400,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.7),
-                  Colors.black.withOpacity(0.95),
-                ],
-                stops: const [0.0, 0.5, 1.0],
-              ),
-            ),
-          ),
-        ),
-
         // Контент
         SafeArea(
           child: Padding(
@@ -202,64 +185,76 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // Заголовок
-                Text(
-                  page.title,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black54,
-                        blurRadius: 10,
-                        offset: Offset(0, 2),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.55),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      // Заголовок
+                      Text(
+                        page.title,
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black54,
+                              blurRadius: 10,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Подзаголовок
+                      Text(
+                        page.subtitle,
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.white.withOpacity(0.8),
+                          shadows: const [
+                            Shadow(
+                              color: Colors.black54,
+                              blurRadius: 8,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Текст
+                      Text(
+                        page.text,
+                        style: TextStyle(
+                          fontSize: 16,
+                          height: 1.5,
+                          color: Colors.white.withOpacity(0.9),
+                          shadows: const [
+                            Shadow(
+                              color: Colors.black54,
+                              blurRadius: 6,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
-                  textAlign: TextAlign.center,
                 ),
 
-                const SizedBox(height: 8),
-
-                // Подзаголовок
-                Text(
-                  page.subtitle,
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white.withOpacity(0.8),
-                    shadows: const [
-                      Shadow(
-                        color: Colors.black54,
-                        blurRadius: 8,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 20),
-
-                // Текст
-                Text(
-                  page.text,
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
-                    color: Colors.white.withOpacity(0.9),
-                    shadows: const [
-                      Shadow(
-                        color: Colors.black54,
-                        blurRadius: 6,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 200), // Место для кнопок
+                const SizedBox(height: 85), // Место для индикатора и кнопок
               ],
             ),
           ),
