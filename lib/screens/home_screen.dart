@@ -239,26 +239,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           // Нижняя панель управления
           _buildBottomControls(),
           
-          // FAB для добавления объектов
+          // Кнопки фильтра и добавления объектов (выровнены и подняты над нижней панелью)
           Positioned(
             right: 16,
-            bottom: 140,
-            child: FloatingActionButton(
-              mini: true,
-              onPressed: _openAddObject,
-              backgroundColor: Theme.of(context).colorScheme.secondary,
-              child: const Icon(Icons.add_location_alt, size: 24),
-            ),
-          ),
-          
-          // Кнопка фильтров
-          Positioned(
-            right: 16,
-            bottom: 190,
-            child: FilterToggleButton(
-              mini: true,
-              onTap: () => setState(() => _showFilters = !_showFilters),
-              activeFilters: _getActiveFiltersCount(),
+            bottom: 170,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: FilterToggleButton(
+                    mini: true,
+                    onTap: () => setState(() => _showFilters = !_showFilters),
+                    activeFilters: _getActiveFiltersCount(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: FloatingActionButton(
+                    mini: true,
+                    onPressed: _openAddObject,
+                    backgroundColor: Theme.of(context).colorScheme.secondary,
+                    child: const Icon(Icons.add_location_alt, size: 22),
+                  ),
+                ),
+              ],
             ),
           ),
           

@@ -17,7 +17,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           children: [
             _SectionHeader('Политика конфиденциальности приложения «Прогулкин»'),
             SizedBox(height: 8),
-            _DateText('Последнее обновление: 1 апреля 2026 г.'),
+            _DateText('Последнее обновление: 2 апреля 2026 г.'),
             SizedBox(height: 24),
 
             _SectionHeader('1. Общие положения'),
@@ -50,8 +50,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
             _BulletItem('Настройки приложения'),
             SizedBox(height: 12),
             _BodyText(
-              'Все эти данные хранятся исключительно на вашем устройстве и не передаются '
-              'на внешние серверы.',
+              'Все эти данные хранятся на вашем устройстве, не передаются '
+              'на внешние серверы. Но объекты карты могут быть синхронизированы с соседними устройствами через P2P-синхронизацию.',
             ),
             SizedBox(height: 24),
 
@@ -238,8 +238,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
             SizedBox(height: 12),
             _ContactItem(
               icon: Icons.code,
-              title: 'GitHub',
-              value: 'github.com/NikasAl/progulkin',
+              title: 'E-mail',
+              value: 'nikita_avdonin@mail.ru',
             ),
             SizedBox(height: 24),
 
