@@ -16,7 +16,8 @@ class AppConstants {
   static const double cleaningRadius = 100.0;
 
   /// Радиус ловли существ (метры)
-  static const double catchingRadius = 50.0;
+  /// Ограничен точностью GPS ~20-30м
+  static const double catchingRadius = 25.0;
 
   /// Радиус уведомлений о близлежащих объектах (метры)
   static const double nearbyAlertRadius = 100.0;

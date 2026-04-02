@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/map_objects/map_objects.dart';
 import '../providers/map_object_provider.dart';
@@ -139,85 +140,102 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
     final trashCount = objects.where((o) => o.type == MapObjectType.trashMonster).length;
     final secretCount = objects.where((o) => o.type == MapObjectType.secretMessage).length;
     final creatureCount = objects.where((o) => o.type == MapObjectType.creature).length;
-    
+
+    // Воспроизводим звук при показе
+    _playNotificationSound();
+
     return AnimatedBuilder(
       animation: _pulseAnimation,
       builder: (context, child) {
-        return Transform.scale(
-          scale: _pulseAnimation.value,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).colorScheme.primaryContainer,
-                  Theme.of(context).colorScheme.secondaryContainer,
-                ],
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            // Ограничиваем ширину уведомления
+            final maxWidth = constraints.maxWidth > 400 ? 400.0 : constraints.maxWidth;
+            return Center(
+              child: SizedBox(
+                width: maxWidth,
+                child: Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.primaryContainer,
+                          Theme.of(context).colorScheme.secondaryContainer,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Иконка
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.near_me,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            size: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+
+                        // Текст
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Рядом с вами!',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                              Text(
+                                _buildObjectsText(trashCount, secretCount, creatureCount),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(width: 12),
+
+                        // Эмодзи объектов
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (trashCount > 0) Text('👹', style: const TextStyle(fontSize: 18)),
+                            if (secretCount > 0) Text('📜', style: const TextStyle(fontSize: 18)),
+                            if (creatureCount > 0) Text('🦊', style: const TextStyle(fontSize: 18)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Иконка
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.near_me,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    size: 16,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                
-                // Текст
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Рядом с вами!',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    Text(
-                      _buildObjectsText(trashCount, secretCount, creatureCount),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(width: 12),
-                
-                // Эмодзи объектов
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (trashCount > 0) Text('👹', style: const TextStyle(fontSize: 18)),
-                    if (secretCount > 0) Text('📜', style: const TextStyle(fontSize: 18)),
-                    if (creatureCount > 0) Text('🦊', style: const TextStyle(fontSize: 18)),
-                  ],
-                ),
-              ],
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -225,24 +243,38 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
 
   String _buildObjectsText(int trash, int secrets, int creatures) {
     final parts = <String>[];
-    if (trash > 0) parts.add('$trash монстр${_pluralize(trash, '', 'а', 'ов')}');
-    if (secrets > 0) parts.add('$secrets секрет${_pluralize(secrets, '', 'а', 'ов')}');
-    if (creatures > 0) parts.add('$creatures существо${_pluralize(creatures, '', 'а', '')}');
-    
+    if (trash > 0) parts.add(_pluralizeWord(trash, 'монстр', 'монстра', 'монстров'));
+    if (secrets > 0) parts.add(_pluralizeWord(secrets, 'секрет', 'секрета', 'секретов'));
+    if (creatures > 0) parts.add(_pluralizeWord(creatures, 'существо', 'существа', 'существ'));
+
     if (parts.isEmpty) return '';
     if (parts.length == 1) return parts.first;
     if (parts.length == 2) return '${parts[0]} и ${parts[1]}';
     return '${parts[0]}, ${parts[1]} и ${parts[2]}';
   }
 
-  String _pluralize(int count, String one, String few, String many) {
+  /// Правильное склонение слов с числительными
+  String _pluralizeWord(int count, String one, String few, String many) {
     final mod10 = count % 10;
     final mod100 = count % 100;
-    
-    if (mod100 >= 11 && mod100 <= 19) return many;
-    if (mod10 == 1) return one;
-    if (mod10 >= 2 && mod10 <= 4) return few;
-    return many;
+
+    String word;
+    if (mod100 >= 11 && mod100 <= 19) {
+      word = many;
+    } else if (mod10 == 1) {
+      word = one;
+    } else if (mod10 >= 2 && mod10 <= 4) {
+      word = few;
+    } else {
+      word = many;
+    }
+
+    return '$count $word';
+  }
+
+  /// Воспроизвести звук уведомления
+  void _playNotificationSound() {
+    SystemSound.play(SystemSoundType.click);
   }
 }
 
