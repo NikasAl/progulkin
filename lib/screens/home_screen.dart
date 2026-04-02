@@ -23,6 +23,7 @@ import 'settings_screen.dart';
 import 'add_object_screen.dart';
 import 'creature_collection_screen.dart';
 import 'chat_list_screen.dart';
+import 'about_app_screen.dart';
 
 /// Главный экран с картой OpenStreetMap
 class HomeScreen extends StatefulWidget {
@@ -164,11 +165,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _currentHeading = point.heading;
         _currentSpeed = point.speed;
       });
-      
+
       // Обновляем позицию для MapObjectProvider
       final mapObjectProvider = context.read<MapObjectProvider>();
       mapObjectProvider.updateUserPosition(point.latitude, point.longitude);
     });
+
+    // Показываем вводный экран при первом запуске
+    if (await shouldShowIntro() && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AboutAppScreen()),
+      );
+    }
   }
   
   /// Инициализация объектов карты (вызывается при первом отображении карты)
@@ -544,6 +553,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         tooltip: 'Моё местоположение',
                         onTap: _moveToCurrentLocation,
                       ),
+                      const SizedBox(width: 16),
+                      _buildIconButton(
+                        icon: Icons.info_outline,
+                        tooltip: 'О приложении',
+                        onTap: () => _openAboutApp(context),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -809,7 +824,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       MaterialPageRoute(builder: (context) => const ChatListScreen()),
     );
   }
-  
+
+  /// Открыть экран "О приложении"
+  void _openAboutApp(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AboutAppScreen()),
+    );
+  }
+
   /// Открыть детали прогулки
   void _openWalkDetail(BuildContext context, walk) {
     Navigator.push(

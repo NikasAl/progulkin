@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launch background для всех версий Android -->
-<!-- Показывает полноэкранную картинку splash -->
+<!-- Launch background для Android 9-11 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/white"/>
     <item>
         <bitmap
-            android:gravity="fill"
-            android:src="@drawable/splash"/>
+            android:gravity="center"
+            android:src="@mipmap/ic_launcher"/>
     </item>
 </layer-list>
