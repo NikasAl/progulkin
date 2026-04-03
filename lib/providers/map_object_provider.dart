@@ -595,6 +595,12 @@ class MapObjectProvider extends ChangeNotifier {
 
     await _storage.updateObject(obj);
     await _broadcastUpdate(obj);
+
+    final index = _objects.indexWhere((o) => o.id == objectId);
+    if (index >= 0) {
+      _objects[index] = obj;
+    }
+    _updateNearbyObjects();
     notifyListeners();
   }
 
@@ -613,6 +619,12 @@ class MapObjectProvider extends ChangeNotifier {
 
     await _storage.updateObject(obj);
     await _broadcastUpdate(obj);
+
+    final index = _objects.indexWhere((o) => o.id == objectId);
+    if (index >= 0) {
+      _objects[index] = obj;
+    }
+    _updateNearbyObjects();
     notifyListeners();
   }
 
@@ -624,6 +636,12 @@ class MapObjectProvider extends ChangeNotifier {
     final cleaned = obj.markAsCleaned(userId);
     await _storage.updateObject(cleaned);
     await _broadcastUpdate(cleaned);
+
+    final index = _objects.indexWhere((o) => o.id == objectId);
+    if (index >= 0) {
+      _objects[index] = cleaned;
+    }
+    _updateNearbyObjects();
     notifyListeners();
   }
 
@@ -635,6 +653,12 @@ class MapObjectProvider extends ChangeNotifier {
     final caught = obj.catchCreature(userId, userName);
     await _storage.updateObject(caught);
     await _broadcastUpdate(caught);
+
+    final index = _objects.indexWhere((o) => o.id == objectId);
+    if (index >= 0) {
+      _objects[index] = caught;
+    }
+    _updateNearbyObjects();
     notifyListeners();
   }
 
