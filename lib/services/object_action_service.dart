@@ -222,22 +222,66 @@ class ObjectActionService {
   // === Утилиты ===
 
   /// Расчёт расстояния между двумя точками (в метрах)
+  /// Использует точную формулу Haversine
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371000;
     final double dLat = _toRadians(lat2 - lat1);
     final double dLon = _toRadians(lon2 - lon1);
 
-    final double a = 0.5 -
-        0.5 * _cos(dLat) +
-        0.5 * _cos(_toRadians(lat1)) *
-            _cos(_toRadians(lat2)) *
-            (1 - _cos(dLon));
+    final double a = _sin(dLat / 2) * _sin(dLat / 2) +
+        _cos(_toRadians(lat1)) * _cos(_toRadians(lat2)) * _sin(dLon / 2) * _sin(dLon / 2);
 
-    return earthRadius * 2 * _asin(_sqrt(a));
+    final double c = 2 * _atan2(_sqrt(a), _sqrt(1 - a));
+
+    return earthRadius * c;
   }
 
   double _toRadians(double degree) => degree * 0.017453292519943295;
-  double _cos(double x) => x.isFinite ? (1 - x * x / 2 + x * x * x * x / 24) : double.nan;
-  double _asin(double x) => x.isFinite && x.abs() <= 1 ? (x * (1 + x * x / 6)) : double.nan;
-  double _sqrt(double x) => x >= 0 ? x * 0.5 + 0.5 * x / (x * 0.5) : double.nan;
+
+  // Точные математические функции для формулы Haversine
+  double _sin(double x) => x.isFinite ? _sinImpl(x) : double.nan;
+  double _cos(double x) => x.isFinite ? _cosImpl(x) : double.nan;
+  double _sqrt(double x) => x >= 0 ? _sqrtImpl(x) : double.nan;
+  double _atan2(double y, double x) => (x.isFinite && y.isFinite) ? _atan2Impl(y, x) : double.nan;
+
+  // Реализации через ряды Тейлора
+  double _sinImpl(double x) {
+    // Нормализуем x в диапазон [-π, π]
+    while (x > 3.14159265359) x -= 2 * 3.14159265359;
+    while (x < -3.14159265359) x += 2 * 3.14159265359;
+    final double x2 = x * x;
+    return x * (1 - x2 / 6 + x2 * x2 / 120 - x2 * x2 * x2 / 5040);
+  }
+
+  double _cosImpl(double x) {
+    while (x > 3.14159265359) x -= 2 * 3.14159265359;
+    while (x < -3.14159265359) x += 2 * 3.14159265359;
+    final double x2 = x * x;
+    return 1 - x2 / 2 + x2 * x2 / 24 - x2 * x2 * x2 / 720;
+  }
+
+  double _sqrtImpl(double x) {
+    if (x == 0) return 0;
+    double guess = x / 2;
+    for (int i = 0; i < 10; i++) {
+      guess = (guess + x / guess) / 2;
+    }
+    return guess;
+  }
+
+  double _atan2Impl(double y, double x) {
+    if (x > 0) return _atanImpl(y / x);
+    if (x < 0) {
+      if (y >= 0) return _atanImpl(y / x) + 3.14159265359;
+      return _atanImpl(y / x) - 3.14159265359;
+    }
+    if (y > 0) return 1.57079632679;
+    if (y < 0) return -1.57079632679;
+    return 0;
+  }
+
+  double _atanImpl(double x) {
+    final double x2 = x * x;
+    return x * (1 - x2 / 3 + x2 * x2 / 5 - x2 * x2 * x2 / 7);
+  }
 }

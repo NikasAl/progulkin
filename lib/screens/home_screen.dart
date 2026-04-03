@@ -159,9 +159,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     // Подписываемся на обновления позиции во время прогулки
     _locationService.positionStream.listen((point) {
+      final walkProvider = context.read<WalkProvider>();
+
       setState(() {
         _currentLocation = LatLng(point.latitude, point.longitude);
-        _routePoints.add(_currentLocation!);
+        // Добавляем точку в маршрут только если прогулка активна (не на паузе)
+        if (walkProvider.isTracking) {
+          _routePoints.add(_currentLocation!);
+        }
         _currentHeading = point.heading;
         _currentSpeed = point.speed;
       });
@@ -329,7 +334,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             polylines: [
               Polyline(
                 points: _routePoints,
-                color: Theme.of(context).colorScheme.primary,
+                color: const Color(0xFF2E7D32), // Тёмно-зелёный, виден на любой карте
                 strokeWidth: 5,
               ),
             ],
@@ -1037,12 +1042,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           
         case MapObjectType.creature:
           final creature = object as Creature;
-          await provider.catchCreature(
+          final success = await provider.catchCreature(
             creature.id,
             userId,
             _userInfo?.name ?? 'Прогульщик',
+            userLat: _currentLocation?.latitude,
+            userLng: _currentLocation?.longitude,
           );
-          return creature;
+          if (success) {
+            return creature;
+          }
+          return null;
           
         default:
           return null;

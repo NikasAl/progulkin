@@ -36,6 +36,10 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
   int _lastObjectCount = -1;
   Set<String> _lastObjectIds = {};
   
+  // Отслеживаем новые объекты для особых уведомлений
+  Set<String> _notifiedCreatureIds = {};
+  bool _initialized = false;
+  
   @override
   void initState() {
     super.initState();
@@ -65,6 +69,17 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
     });
   }
   
+  /// Воспроизвести звук и вибрацию при обнаружении существа
+  void _alertNewCreature(Creature creature) {
+    // Вибрация
+    HapticFeedback.mediumImpact();
+    
+    // Звук
+    SystemSound.play(SystemSoundType.alert);
+    
+    debugPrint('🦊 Обнаружено новое существо: ${creature.creatureType.emoji} ${creature.creatureType.name}');
+  }
+  
   @override
   void dispose() {
     _pulseController.dispose();
@@ -92,6 +107,35 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
         final currentIds = nearbyObjects.map((o) => o.id).toSet();
         final hasChanges = !_setEquals(currentIds, _lastObjectIds);
         
+        // Проверяем, есть ли новые существа
+        final nearbyCreatures = nearbyObjects
+            .whereType<Creature>()
+            .where((c) => c.isWild && c.isAlive)
+            .toList();
+        
+        final newCreatureIds = nearbyCreatures
+            .map((c) => c.id)
+            .where((id) => !_notifiedCreatureIds.contains(id))
+            .toSet();
+        
+        // Уведомляем о новых существах
+        if (newCreatureIds.isNotEmpty && _initialized) {
+          for (final creature in nearbyCreatures) {
+            if (newCreatureIds.contains(creature.id)) {
+              _alertNewCreature(creature);
+              _notifiedCreatureIds.add(creature.id);
+            }
+          }
+        }
+        
+        // Запоминаем все существа которые были рядом
+        for (final creature in nearbyCreatures) {
+          _notifiedCreatureIds.add(creature.id);
+        }
+        
+        // Удаляем из памяти существ, которые больше не рядом
+        _notifiedCreatureIds.removeWhere((id) => !currentIds.contains(id));
+        
         // Обновляем состояние при изменении объектов
         if (hasChanges && currentIds.isNotEmpty) {
           // Отложенное обновление состояния
@@ -101,6 +145,7 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
                 _lastObjectIds = currentIds;
                 _lastObjectCount = nearbyObjects.length;
                 _isVisible = true;
+                _initialized = true;
               });
               _startHideTimer();
             }
@@ -111,6 +156,11 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
         if (_lastObjectCount == -1 && nearbyObjects.isNotEmpty) {
           _lastObjectIds = currentIds;
           _lastObjectCount = nearbyObjects.length;
+          _initialized = true;
+          // Не уведомляем о существах при первом запуске
+          for (final creature in nearbyCreatures) {
+            _notifiedCreatureIds.add(creature.id);
+          }
         }
         
         if (nearbyObjects.isEmpty || !_isVisible) {

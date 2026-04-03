@@ -81,7 +81,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
                             polylines: [
                               Polyline(
                                 points: _routePoints,
-                                color: Theme.of(context).colorScheme.primary,
+                                color: const Color(0xFF2E7D32), // Тёмно-зелёный, виден на любой карте
                                 strokeWidth: 4,
                               ),
                             ],

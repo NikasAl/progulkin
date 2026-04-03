@@ -276,6 +276,8 @@ class MapObjectProvider extends ChangeNotifier {
     required String userId,
     required String userName,
     required int playerLevel,
+    double? userLat,
+    double? userLng,
   }) async {
     final obj = await _storage.getObject(creatureId);
     if (obj == null || obj is! Creature) {
@@ -299,6 +301,21 @@ class MapObjectProvider extends ChangeNotifier {
         chance: 0,
         escaped: false,
       );
+    }
+
+    // Проверка расстояния (25 метров максимум)
+    if (userLat != null && userLng != null) {
+      final distance = calculateDistance(
+        userLat, userLng,
+        obj.latitude, obj.longitude,
+      );
+      if (distance > 25) {
+        return CatchResult.failed(
+          creature: obj,
+          chance: 0,
+          escaped: false,
+        );
+      }
     }
 
     final result = _creatureService.tryCatchCreature(obj, playerLevel);
@@ -646,9 +663,28 @@ class MapObjectProvider extends ChangeNotifier {
   }
 
   /// Поймать существо
-  Future<void> catchCreature(String objectId, String userId, String userName) async {
+  /// [userLat], [userLng] - координаты пользователя для проверки расстояния
+  Future<bool> catchCreature(
+    String objectId,
+    String userId,
+    String userName, {
+    double? userLat,
+    double? userLng,
+  }) async {
     final obj = await _storage.getObject(objectId);
-    if (obj == null || obj is! Creature) return;
+    if (obj == null || obj is! Creature) return false;
+
+    // Проверка расстояния (25 метров максимум)
+    if (userLat != null && userLng != null) {
+      final distance = calculateDistance(
+        userLat, userLng,
+        obj.latitude, obj.longitude,
+      );
+      if (distance > 25) {
+        debugPrint('⚠️ Попытка поймать существо с расстояния ${distance.toInt()}м');
+        return false;
+      }
+    }
 
     final caught = obj.catchCreature(userId, userName);
     await _storage.updateObject(caught);
@@ -660,6 +696,7 @@ class MapObjectProvider extends ChangeNotifier {
     }
     _updateNearbyObjects();
     notifyListeners();
+    return true;
   }
 
   // ==================== Управление напоминаниями ====================
