@@ -54,23 +54,26 @@ class MapObjectProvider extends ChangeNotifier {
   int get minReputation => _minReputation;
   bool get isP2PRunning => _p2pService.isRunning;
 
-  /// Количество объектов по типам
+  /// Количество объектов по типам (только отображаемые на карте)
   Map<MapObjectType, int> get objectCounts {
     final counts = <MapObjectType, int>{};
+    // Используем отфильтрованный список, как и для отображения на карте
+    final filteredObjects = objects;
     for (final type in MapObjectType.values) {
-      counts[type] = _objects.where((o) => o.type == type).length;
+      counts[type] = filteredObjects.where((o) => o.type == type).length;
     }
     return counts;
   }
 
-  /// Статистика
+  /// Статистика (только отображаемые объекты)
   Map<String, int> get stats {
-    int total = _objects.length;
-    int trashMonsters = _objects.where((o) => o.type == MapObjectType.trashMonster).length;
-    int cleaned = _objects.where((o) => o.type == MapObjectType.trashMonster)
+    final filteredObjects = objects;
+    int total = filteredObjects.length;
+    int trashMonsters = filteredObjects.where((o) => o.type == MapObjectType.trashMonster).length;
+    int cleaned = filteredObjects.where((o) => o.type == MapObjectType.trashMonster)
         .where((o) => (o as TrashMonster).isCleaned).length;
-    int secrets = _objects.where((o) => o.type == MapObjectType.secretMessage).length;
-    int creatures = _objects.where((o) => o.type == MapObjectType.creature).length;
+    int secrets = filteredObjects.where((o) => o.type == MapObjectType.secretMessage).length;
+    int creatures = filteredObjects.where((o) => o.type == MapObjectType.creature).length;
 
     return {
       'total': total,
@@ -90,6 +93,9 @@ class MapObjectProvider extends ChangeNotifier {
     try {
       // Загружаем объекты из локального хранилища
       _objects = await _storage.getAllObjects();
+      
+      // Очищаем истёкших диких существ при запуске
+      await _cleanExpiredWildCreatures();
 
       // Инициализируем сервис уведомлений
       await _notificationService.init();
@@ -115,6 +121,64 @@ class MapObjectProvider extends ChangeNotifier {
       debugPrint('❌ Ошибка инициализации MapObjectProvider: $e');
       notifyListeners();
     }
+  }
+
+  /// Очистить истёкших диких существ из базы данных
+  Future<int> _cleanExpiredWildCreatures() async {
+    int removed = 0;
+    final toRemove = <String>[];
+    
+    for (final obj in _objects) {
+      if (obj.type == MapObjectType.creature) {
+        final creature = obj as Creature;
+        // Удаляем только диких истёкших существ
+        if (creature.isWild && creature.isExpired) {
+          toRemove.add(creature.id);
+          removed++;
+        }
+      }
+    }
+    
+    if (removed > 0) {
+      debugPrint('🧹 Очистка: удалено $removed истёкших диких существ');
+      for (final id in toRemove) {
+        await _storage.deleteObject(id);
+        _objects.removeWhere((o) => o.id == id);
+      }
+      notifyListeners();
+    }
+    
+    return removed;
+  }
+
+  /// Очистить всех диких существ (при завершении прогулки)
+  /// Оставляет только пойманных существ пользователя
+  Future<int> cleanAllWildCreatures({String? keepForUserId}) async {
+    int removed = 0;
+    final toRemove = <String>[];
+    
+    for (final obj in _objects) {
+      if (obj.type == MapObjectType.creature) {
+        final creature = obj as Creature;
+        // Удаляем диких существ
+        if (creature.isWild) {
+          toRemove.add(creature.id);
+          removed++;
+        }
+      }
+    }
+    
+    if (removed > 0) {
+      debugPrint('🧹 Очистка после прогулки: удалено $removed диких существ');
+      for (final id in toRemove) {
+        await _storage.deleteObject(id);
+        _objects.removeWhere((o) => o.id == id);
+      }
+      _updateNearbyObjects();
+      notifyListeners();
+    }
+    
+    return removed;
   }
 
   /// Запуск P2P сервиса
@@ -974,9 +1038,12 @@ class MapObjectProvider extends ChangeNotifier {
         if ((obj as TrashMonster).isCleaned) return false;
       }
 
-      // Фильтр истёкших существ
+      // Фильтр существ: показываем только диких (не пойманных)
+      // Пойманные существа доступны только в коллекции
       if (obj.type == MapObjectType.creature) {
-        if ((obj as Creature).isExpired) return false;
+        final creature = obj as Creature;
+        // Не показываем истёкших или пойманных существ на карте
+        if (creature.isExpired || !creature.isWild) return false;
       }
 
       return true;

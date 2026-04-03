@@ -762,6 +762,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Останавливаем спавн существ
     _stopCreatureSpawning();
     
+    // Очищаем диких существ после прогулки
+    final mapObjectProvider = context.read<MapObjectProvider>();
+    await mapObjectProvider.cleanAllWildCreatures();
+    
     final steps = pedometerProvider.getCurrentSteps();
     final success = await walkProvider.stopWalk(steps: steps);
     
