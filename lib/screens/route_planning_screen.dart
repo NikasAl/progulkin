@@ -16,6 +16,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   final MapController _mapController = MapController();
   final TileCacheService _tileCacheService = TileCacheService();
   final LocationService _locationService = LocationService();
+  final Distance _distanceCalculator = Distance();
   
   final List<LatLng> _waypoints = [];
   LatLng? _currentPosition; // Текущая позиция (null пока не получена)
@@ -70,10 +71,13 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
       _waypoints.add(point);
     });
     
+    final distance = _calculateRouteDistance();
+    final distanceText = distance > 0 ? ' • ${_formatDistance(distance)}' : '';
+    
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Точка ${_waypoints.length}: ${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}'),
+        content: Text('Точка ${_waypoints.length}: ${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}$distanceText'),
         duration: const Duration(seconds: 1),
       ),
     );
@@ -91,6 +95,46 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     setState(() {
       _waypoints.clear();
     });
+  }
+  
+  /// Рассчитывает общую длину маршрута в метрах
+  double _calculateRouteDistance() {
+    if (_waypoints.length < 2) return 0;
+    
+    double totalDistance = 0;
+    for (int i = 0; i < _waypoints.length - 1; i++) {
+      totalDistance += _distanceCalculator(_waypoints[i], _waypoints[i + 1]);
+    }
+    return totalDistance;
+  }
+  
+  /// Форматирует расстояние для отображения
+  String _formatDistance(double meters) {
+    if (meters < 1000) {
+      return '${meters.toStringAsFixed(0)} м';
+    } else {
+      final km = meters / 1000;
+      return '${km.toStringAsFixed(2)} км';
+    }
+  }
+  
+  /// Рассчитывает примерное время ходьбы (средняя скорость 5 км/ч)
+  String _estimateWalkTime(double meters) {
+    if (meters < 100) return '< 1 мин';
+    
+    // Средняя скорость ходьбы ~5 км/ч = 83.3 м/мин
+    final minutes = (meters / 83.3).round();
+    
+    if (minutes < 60) {
+      return '~$minutes мин';
+    } else {
+      final hours = minutes ~/ 60;
+      final mins = minutes % 60;
+      if (mins == 0) {
+        return '~$hours ч';
+      }
+      return '~$hours ч $mins мин';
+    }
   }
   
   Future<void> _downloadTiles() async {
@@ -534,11 +578,49 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                     ),
                     if (_waypoints.isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        'Точек маршрута: ${_waypoints.length}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                        ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.route,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Точек: ${_waypoints.length}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          if (_waypoints.length >= 2) ...[
+                            const SizedBox(width: 12),
+                            Icon(
+                              Icons.straighten,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatDistance(_calculateRouteDistance()),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(
+                              Icons.access_time,
+                              size: 16,
+                              color: Colors.orange[700],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _estimateWalkTime(_calculateRouteDistance()),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.orange[700],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                     if (_isDownloading) ...[
