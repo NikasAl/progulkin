@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/map_objects/creature.dart';
-import '../providers/map_object_provider.dart';
+import '../providers/creature_provider.dart';
 import '../services/user_id_service.dart';
 
 /// Экран коллекции пойманных существ
@@ -40,10 +40,10 @@ class _CreatureCollectionScreenState extends State<CreatureCollectionScreen> {
       );
     }
 
-    return Consumer<MapObjectProvider>(
-      builder: (context, provider, child) {
-        final collection = provider.getUserCreatureCollection(_userId!);
-        final stats = provider.getCreatureCollectionStats(_userId!);
+    return Consumer<CreatureProvider>(
+      builder: (context, creatureProvider, child) {
+        final collection = creatureProvider.getUserCreatureCollection(_userId!);
+        final stats = creatureProvider.getCreatureCollectionStats(_userId!);
 
         return Scaffold(
           appBar: AppBar(

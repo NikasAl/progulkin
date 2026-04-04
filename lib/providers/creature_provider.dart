@@ -233,6 +233,11 @@ class CreatureProvider extends ChangeNotifier {
     return removed;
   }
 
+  /// Уведомить об изменении объектов (вызывается извне при обновлении MapObjectProvider)
+  void notifyObjectsChanged() {
+    notifyListeners();
+  }
+
   /// Очистить всех диких существ (при завершении прогулки)
   Future<int> cleanAllWildCreatures(List<MapObject> objects) async {
     int removed = 0;

@@ -128,6 +128,9 @@ class _ProgulkinAppState extends State<ProgulkinApp> {
     // Настраиваем связи между провайдерами
     _wireProviders();
 
+    // Подписываем специализированные провайдеры на изменения MapObjectProvider
+    _mapObjectProvider.addListener(_onMapObjectsChanged);
+
     _providersCreated = true;
   }
 
@@ -204,6 +207,12 @@ class _ProgulkinAppState extends State<ProgulkinApp> {
     _foragingProvider.getNearbyObjects = () => _mapObjectProvider.nearbyObjects;
   }
 
+  /// Callback при изменении объектов в MapObjectProvider
+  void _onMapObjectsChanged() {
+    // Уведомляем специализированные провайдеры об изменениях
+    _creatureProvider.notifyObjectsChanged();
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -237,6 +246,12 @@ class _ProgulkinAppState extends State<ProgulkinApp> {
     );
 
     debugPrint('✅ Провайдеры инициализированы');
+  }
+
+  @override
+  void dispose() {
+    _mapObjectProvider.removeListener(_onMapObjectsChanged);
+    super.dispose();
   }
 
   @override
