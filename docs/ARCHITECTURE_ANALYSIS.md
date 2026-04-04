@@ -661,7 +661,7 @@ MapObjectProvider (Facade)
 9. `212855d` - MapObjectProvider as facade with delegation
 10. `ea81e46` - Fix InterestProvider import and CatchResult.points
 11. `8151874` - Remove fallback implementations (668 lines final)
-12. `d8784e0` - Add commit hash display in settings
+12. `deacb72` - Add commit hash display in settings
 
 ---
 
@@ -680,7 +680,7 @@ scripts/update_version.dart   # Скрипт генерации version.dart
 class AppVersion {
   static const String version = '1.0.0';      // Из pubspec.yaml
   static const int buildNumber = 1;           // Из pubspec.yaml
-  static const String commitHash = 'd8784e0'; // Из git rev-parse --short HEAD
+  static const String commitHash = 'deacb72'; // Из git rev-parse --short HEAD
   
   static String get fullVersion => 'v$version ($commitHash)';
   static String get versionInfo => 'Версия $version\nСборка $buildNumber • $commitHash';
@@ -692,7 +692,7 @@ class AppVersion {
 В настройках приложения отображается:
 - Версия: 1.0.0
 - Номер сборки: 1
-- Хэш коммита: d8784e0
+- Хэш коммита: deacb72
 
 ### Обновление перед сборкой
 
