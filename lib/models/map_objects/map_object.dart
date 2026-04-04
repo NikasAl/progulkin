@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 /// Тип объекта на карте
 enum MapObjectType {
   trashMonster('trash_monster', 'Мусорный монстр', '👹'),
@@ -331,22 +333,20 @@ class MapObject {
 }
 
 /// Расчёт расстояния между точками (в метрах)
+/// Использует формулу гаверсинуса для точного вычисления расстояния на сфере
 double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
   const double earthRadius = 6371000; // метры
   
-  final dLat = _toRadians(lat2 - lat1);
-  final dLon = _toRadians(lon2 - lon1);
+  final double dLat = _toRadians(lat2 - lat1);
+  final double dLon = _toRadians(lon2 - lon1);
   
-  final a = 0.5 -
-      0.5 * _cos(dLat) +
-      0.5 * _cos(_toRadians(lat1)) *
-          _cos(_toRadians(lat2)) *
-          (1 - _cos(dLon));
+  final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.cos(_toRadians(lat1)) * math.cos(_toRadians(lat2)) *
+      math.sin(dLon / 2) * math.sin(dLon / 2);
   
-  return earthRadius * 2 * _asin(_sqrt(a));
+  final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  
+  return earthRadius * c;
 }
 
-double _toRadians(double degree) => degree * 0.017453292519943295;
-double _cos(double x) => x.abs() < 1e-10 ? 1 : (1 - x * x / 2);
-double _asin(double x) => x.abs() < 1e-10 ? x : x + x * x * x / 6;
-double _sqrt(double x) => x < 0 ? 0 : x;
+double _toRadians(double degree) => degree * math.pi / 180;
