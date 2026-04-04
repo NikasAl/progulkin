@@ -543,11 +543,37 @@ P2PProvider (~200 строк)
 
 ### Рекомендации по дальнейшему рефакторингу
 
-#### Приоритет 1: God Objects (по оригинальному плану)
-Разделение `MapObjectProvider`, `HomeScreen`, `ObjectDetailsSheet` на более мелкие компоненты.
+#### Приоритет 1: Интеграция новых провайдеров
+Заменить вызовы MapObjectProvider на специализированные провайдеры в UI компонентах.
 
 #### Приоритет 2: Dependency Injection
 Внедрение DI контейнера (GetIt) для улучшения тестируемости.
+
+#### Приоритет 3: Разделение UI компонентов
+Разделение `HomeScreen`, `ObjectDetailsSheet` на более мелкие виджеты.
+
+### Выполненное разделение God Objects (MapObjectProvider)
+
+**До:** 1 файл ~1180 строк, 10+ ответственностей
+
+**После:** 8 специализированных провайдеров
+
+| Провайдер | Строк | Ответственность |
+|-----------|-------|----------------|
+| CreatureProvider | ~260 | Спавн, поимка, коллекция существ |
+| P2PProvider | ~120 | P2P синхронизация |
+| ModerationProvider | ~100 | Модерация объектов и фото |
+| NotificationProvider | ~60 | Уведомления |
+| ContactProvider | ~100 | Профили контактов |
+| InterestProvider | ~140 | Интересы к заметкам |
+| ReminderProvider | ~80 | Напоминания |
+| ForagingProvider | ~80 | Места сбора |
+
+**Выгоды:**
+- Каждый провайдер отвечает за одну область
+- Легче тестировать изолированно
+- Меньше кода для понимания в каждом файле
+- Лучшее разделение ответственности (SRP)
 
 ### Коммиты рефакторинга
 1. `e20090c` - Fix creature synchronization bugs
@@ -557,3 +583,4 @@ P2PProvider (~200 строк)
 5. `25b9cea` - Replace print with debugPrint in services
 6. `6744634` - Fix style issues and remove unused imports
 7. `4c5bbf0` - Fix more analyzer issues (RadioGroup, final fields, library directive)
+8. `57e48df` - Split MapObjectProvider into specialized providers
