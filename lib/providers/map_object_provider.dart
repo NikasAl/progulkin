@@ -12,6 +12,7 @@ import 'p2p_provider.dart';
 import 'moderation_provider.dart';
 import 'notification_provider.dart';
 import 'contact_provider.dart';
+import 'interest_provider.dart';
 import 'reminder_provider.dart';
 import 'foraging_provider.dart';
 
@@ -484,7 +485,7 @@ class MapObjectProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    return CatchResult.success(creature: caught, chance: 100);
+    return CatchResult.success(creature: caught, chance: 100, points: caught.catchPoints);
   }
 
   /// Получить коллекцию пойманных существ пользователя
