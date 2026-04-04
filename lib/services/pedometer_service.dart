@@ -103,7 +103,7 @@ class PedometerService {
   
   // Мин/макс интервал между шагами в секундах
   double _minStepInterval = 0.4; // сек
-  double _maxStepInterval = 1.8; // сек
+  final double _maxStepInterval = 1.8; // сек
   
   // ========== Конец параметров алгоритма ==========
 

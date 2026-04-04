@@ -35,9 +35,9 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
   // Отслеживаем предыдущее количество объектов
   int _lastObjectCount = -1;
   Set<String> _lastObjectIds = {};
-  
+
   // Отслеживаем новые объекты для особых уведомлений
-  Set<String> _notifiedCreatureIds = {};
+  final Set<String> _notifiedCreatureIds = {};
   bool _initialized = false;
   
   @override

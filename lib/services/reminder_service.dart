@@ -42,7 +42,7 @@ class ReminderService extends ChangeNotifier {
   // Настройки
   bool _notificationsEnabled = true;
   Duration _snoozeDuration = const Duration(minutes: 30);
-  Duration _repeatCooldown = const Duration(minutes: 5);
+  final Duration _repeatCooldown = const Duration(minutes: 5);
 
   bool get notificationsEnabled => _notificationsEnabled;
   Duration get snoozeDuration => _snoozeDuration;

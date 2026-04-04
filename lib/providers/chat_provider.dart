@@ -10,7 +10,7 @@ class ChatProvider extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
 
   List<model.Chat> _chats = [];
-  Map<String, List<model.P2PMessage>> _messagesByChat = {};
+  final Map<String, List<model.P2PMessage>> _messagesByChat = {};
   bool _isLoading = false;
   String? _error;
 

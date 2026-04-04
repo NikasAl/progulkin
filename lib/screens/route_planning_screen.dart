@@ -19,7 +19,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   
   final List<LatLng> _waypoints = [];
   LatLng? _currentPosition; // Текущая позиция (null пока не получена)
-  double _currentZoom = 14.0;
+  final double _currentZoom = 14.0;
   
   bool _isLoading = true;
   bool _isDownloading = false;

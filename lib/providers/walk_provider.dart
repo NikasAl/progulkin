@@ -70,11 +70,11 @@ class WalkProvider extends ChangeNotifier {
     final seconds = d.inSeconds.remainder(60);
     
     if (hours > 0) {
-      return '${hours}ч ${minutes}мин';
+      return '$hoursч $minutesмин';
     } else if (minutes > 0) {
-      return '${minutes}мин ${seconds}сек';
+      return '$minutesмин $secondsсек';
     }
-    return '${seconds}сек';
+    return '$secondsсек';
   }
 
   /// Инициализация

@@ -1,5 +1,6 @@
 /// Map Objects System
 /// Расширяемая система объектов на карте
+library;
 
 export 'map_object.dart';
 export 'trash_monster.dart';

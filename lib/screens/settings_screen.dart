@@ -1116,31 +1116,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Тема приложения'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildThemeOption(
-              themeProvider,
-              ThemeMode.system,
-              Icons.brightness_auto,
-              'Авто',
-              'Следовать настройкам системы',
-            ),
-            _buildThemeOption(
-              themeProvider,
-              ThemeMode.light,
-              Icons.light_mode,
-              'Светлая',
-              'Всегда светлая тема',
-            ),
-            _buildThemeOption(
-              themeProvider,
-              ThemeMode.dark,
-              Icons.dark_mode,
-              'Тёмная',
-              'Всегда тёмная тема',
-            ),
-          ],
+        content: RadioGroup<ThemeMode>(
+          groupValue: themeProvider.themeMode,
+          onChanged: (value) {
+            if (value != null) {
+              themeProvider.setThemeMode(value);
+              Navigator.pop(context);
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildThemeOption(
+                themeProvider,
+                ThemeMode.system,
+                Icons.brightness_auto,
+                'Авто',
+                'Следовать настройкам системы',
+              ),
+              _buildThemeOption(
+                themeProvider,
+                ThemeMode.light,
+                Icons.light_mode,
+                'Светлая',
+                'Всегда светлая тема',
+              ),
+              _buildThemeOption(
+                themeProvider,
+                ThemeMode.dark,
+                Icons.dark_mode,
+                'Тёмная',
+                'Всегда тёмная тема',
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -1160,16 +1169,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String subtitle,
   ) {
     final isSelected = themeProvider.themeMode == mode;
-    
+
     return RadioListTile<ThemeMode>(
       value: mode,
-      groupValue: themeProvider.themeMode,
-      onChanged: (value) {
-        if (value != null) {
-          themeProvider.setThemeMode(value);
-          Navigator.pop(context);
-        }
-      },
       title: Row(
         children: [
           Icon(icon, size: 20),
@@ -1178,7 +1180,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       subtitle: Text(subtitle),
-      secondary: isSelected 
+      secondary: isSelected
           ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
           : null,
     );
