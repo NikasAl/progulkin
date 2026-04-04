@@ -529,37 +529,31 @@ P2PProvider (~200 строк)
 | Метрика | До | После |
 |---------|-----|-------|
 | Analyzer warnings | 2 | 0 |
-| Analyzer info issues | 203 | 56 |
-| Deprecated API usage | ~95 | 2 (Radio widget) |
+| Analyzer info issues | 203 | 37 |
+| Deprecated API usage | ~95 | 0 |
 | print() calls | 41 | 0 |
 
-### Оставшиеся info-level issues (56)
+### Оставшиеся info-level issues (37)
 
 | Тип | Количество | Приоритет |
 |-----|------------|-----------|
 | prefer_const_constructors | 26 | Low |
-| unnecessary_brace_in_string_interps | 10 | Low |
 | prefer_final_locals | 8 | Low |
-| prefer_final_fields | 5 | Low |
-| deprecated_member_use (Radio) | 2 | Medium |
-| dangling_library_doc_comments | 2 | Low |
 | Other | 3 | Low |
 
 ### Рекомендации по дальнейшему рефакторингу
 
-#### Приоритет 1: Radio widget deprecation
-Заменить `RadioListTile` с deprecated свойствами `groupValue`/`onChanged` на новый API `RadioGroup` (Flutter 3.32+).
-
-#### Приоритет 2: God Objects (по оригинальному плану)
+#### Приоритет 1: God Objects (по оригинальному плану)
 Разделение `MapObjectProvider`, `HomeScreen`, `ObjectDetailsSheet` на более мелкие компоненты.
 
-#### Приоритет 3: Dependency Injection
+#### Приоритет 2: Dependency Injection
 Внедрение DI контейнера (GetIt) для улучшения тестируемости.
 
 ### Коммиты рефакторинга
 1. `e20090c` - Fix creature synchronization bugs
-2. `c9a3ce6` - Fix distance calculation bugs  
+2. `c9a3ce6` - Fix distance calculation bugs
 3. `cae9db7` - Fix analyzer warnings and async context issues
 4. `b0f9648` - Replace deprecated withOpacity with withValues
 5. `25b9cea` - Replace print with debugPrint in services
 6. `6744634` - Fix style issues and remove unused imports
+7. `4c5bbf0` - Fix more analyzer issues (RadioGroup, final fields, library directive)
