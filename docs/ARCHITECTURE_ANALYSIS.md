@@ -1,6 +1,7 @@
 # Анализ архитектуры Flutter проекта "Прогулкин"
 
 **Дата анализа:** 2026-04-04
+**Дата обновления:** 2026-04-04 (после рефакторинга)
 
 ## 1. Структура проекта
 
@@ -497,3 +498,68 @@ P2PProvider (~200 строк)
 - Меньше времени на понимание кода
 - Быстрее onboarding новых разработчиков
 - Меньше регрессионных багов
+
+---
+
+## 13. Выполненный рефакторинг (2026-04-04)
+
+### Исправленные проблемы
+
+#### Критические исправления (bugs)
+1. **Расчёт расстояния** - исправлены критические ошибки в функциях `_cos()` и `_sqrt()` в `map_object.dart` и `object_action_service.dart`. Кастомные реализации возвращали неверные значения (например, `_sqrt(x)` возвращал `x` вместо `√x`). Заменены на `dart:math`.
+
+2. **Синхронизация существ** - исправлена ошибка, при которой существа оставались на карте после завершения прогулки. Добавлены методы очистки в `MapObjectProvider`.
+
+#### Устранение warnings и deprecation
+1. **Unused code** - удалены неиспользуемый геттер `_accumulatedPauseDuration` и неиспользуемый импорт `dart:io`.
+
+2. **withOpacity → withValues** - заменено 94 использования устаревшего метода `Color.withOpacity()` на новый `Color.withValues(alpha: ...)`.
+
+3. **print → debugPrint** - заменено 41 использование `print()` на `debugPrint()` в сервисах (`location_service.dart`, `pedometer_service.dart`, `storage_service.dart`).
+
+4. **BuildContext async gaps** - добавлены проверки `mounted` перед использованием `context` после `await` в 5 местах.
+
+#### Style improvements
+- Удалены неиспользуемые импорты (`dart:typed_data`, `flutter/services.dart`)
+- Использован оператор `??=` вместо `if (x == null) { x = ... }`
+- Очищены minor style issues
+
+### Статистика до/после
+
+| Метрика | До | После |
+|---------|-----|-------|
+| Analyzer warnings | 2 | 0 |
+| Analyzer info issues | 203 | 56 |
+| Deprecated API usage | ~95 | 2 (Radio widget) |
+| print() calls | 41 | 0 |
+
+### Оставшиеся info-level issues (56)
+
+| Тип | Количество | Приоритет |
+|-----|------------|-----------|
+| prefer_const_constructors | 26 | Low |
+| unnecessary_brace_in_string_interps | 10 | Low |
+| prefer_final_locals | 8 | Low |
+| prefer_final_fields | 5 | Low |
+| deprecated_member_use (Radio) | 2 | Medium |
+| dangling_library_doc_comments | 2 | Low |
+| Other | 3 | Low |
+
+### Рекомендации по дальнейшему рефакторингу
+
+#### Приоритет 1: Radio widget deprecation
+Заменить `RadioListTile` с deprecated свойствами `groupValue`/`onChanged` на новый API `RadioGroup` (Flutter 3.32+).
+
+#### Приоритет 2: God Objects (по оригинальному плану)
+Разделение `MapObjectProvider`, `HomeScreen`, `ObjectDetailsSheet` на более мелкие компоненты.
+
+#### Приоритет 3: Dependency Injection
+Внедрение DI контейнера (GetIt) для улучшения тестируемости.
+
+### Коммиты рефакторинга
+1. `e20090c` - Fix creature synchronization bugs
+2. `c9a3ce6` - Fix distance calculation bugs  
+3. `cae9db7` - Fix analyzer warnings and async context issues
+4. `b0f9648` - Replace deprecated withOpacity with withValues
+5. `25b9cea` - Replace print with debugPrint in services
+6. `6744634` - Fix style issues and remove unused imports
