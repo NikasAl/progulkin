@@ -6,6 +6,10 @@ version: 1.0.0+1
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
+executables:
+  # Использование: dart run bin/flutter_build.dart run -d <device>
+  # Или: dart run progulkin: flutter_build run
+
 dependencies:
   flutter:
     sdk: flutter

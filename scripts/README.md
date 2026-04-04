@@ -1,6 +1,89 @@
-# Скрипты для записи видеообзора
+# Скрипты для разработки
 
-## Быстрый старт
+## Автоматическое обновление версии
+
+### Быстрый способ (рекомендуется)
+
+Используйте скрипт `f` вместо `flutter`:
+
+```bash
+# Вместо flutter run -d <device>
+./f run -d adb-A2FCCP5904403179
+
+# Вместо flutter build apk
+./f build apk
+
+# Вместо flutter build apk --release
+./f build apk --release
+```
+
+Хэш коммита будет автоматически обновлён перед каждой сборкой!
+
+### Добавление алиаса (опционально)
+
+Для удобства добавьте в `~/.bashrc` или `~/.zshrc`:
+
+```bash
+alias f='/path/to/progulkin/f'
+```
+
+Теперь из любой директории:
+```bash
+f run -d chrome
+f build apk --release
+```
+
+### Альтернативные способы
+
+**Dart-скрипт:**
+```bash
+dart run bin/flutter_build.dart run -d <device>
+dart run bin/flutter_build.dart build apk
+```
+
+**Shell-скрипт:**
+```bash
+bash scripts/flutter_wrapper.sh run -d <device>
+bash scripts/flutter_wrapper.sh build apk
+```
+
+## update_version.dart
+
+Скрипт для обновления информации о версии в `lib/config/version.dart`.
+
+**Запуск:**
+```bash
+dart run scripts/update_version.dart
+```
+
+**Что делает:**
+1. Читает версию из `pubspec.yaml`
+2. Получает текущий хэш коммита Git
+3. Генерирует/обновляет `lib/config/version.dart`
+
+**Использование перед сборкой:**
+```bash
+# Обновить версию и собрать APK
+dart run scripts/update_version.dart && flutter build apk
+
+# Обновить версию и собрать для iOS
+dart run scripts/update_version.dart && flutter build ios
+```
+
+**Результат:**
+```dart
+// lib/config/version.dart
+class AppVersion {
+  static const String version = '1.0.0';
+  static const int buildNumber = 1;
+  static const String commitHash = 'deacb72';
+  static String get fullVersion => 'v1.0.0 (deacb72)';
+}
+```
+
+---
+
+## Запись видеообзора
 
 ### 1. Подготовка телефона
 ```
@@ -161,50 +244,24 @@ sudo apt install android-tools-adb
 
 ```
 scripts/
-├── demo_setup.sh          # Главный скрипт запуска
-├── phone_mirror.py        # Python зеркалирование
-├── phone_mirror_scrcpy.sh # scrcpy обёртка
-├── record_screen.sh       # Запись экрана
-├── update_version.dart    # Обновление версии из Git
-└── README.md              # Этот файл
+├── f                         # Короткая команда flutter с автообновлением версии
+├── flutter_wrapper.sh        # Shell-обёртка для flutter
+├── demo_setup.sh             # Главный скрипт запуска видео
+├── phone_mirror.py           # Python зеркалирование
+├── phone_mirror_scrcpy.sh    # scrcpy обёртка
+├── record_screen.sh          # Запись экрана
+├── update_version.dart       # Обновление версии из Git
+└── README.md                 # Этот файл
+
+bin/
+└── flutter_build.dart        # Dart-обёртка для flutter
+
+lib/config/
+└── version.dart              # Автогенерируемый файл версии
 
 docs/
-└── VIDEO_SCRIPT.md        # Сценарий видеообзора
+└── VIDEO_SCRIPT.md           # Сценарий видеообзора
 
-videos/                    # Директория для записей (создаётся автоматически)
+videos/                       # Директория для записей (создаётся автоматически)
 └── progulkin_demo_*.mp4
-```
-
-## update_version.dart
-
-Скрипт для обновления информации о версии в `lib/config/version.dart`.
-
-**Запуск:**
-```bash
-dart run scripts/update_version.dart
-```
-
-**Что делает:**
-1. Читает версию из `pubspec.yaml`
-2. Получает текущий хэш коммита Git
-3. Генерирует/обновляет `lib/config/version.dart`
-
-**Использование перед сборкой:**
-```bash
-# Обновить версию и собрать APK
-dart run scripts/update_version.dart && flutter build apk
-
-# Обновить версию и собрать для iOS
-dart run scripts/update_version.dart && flutter build ios
-```
-
-**Результат:**
-```dart
-// lib/config/version.dart
-class AppVersion {
-  static const String version = '1.0.0';
-  static const int buildNumber = 1;
-  static const String commitHash = 'd8784e0';
-  static String get fullVersion => 'v1.0.0 (d8784e0)';
-}
 ```
