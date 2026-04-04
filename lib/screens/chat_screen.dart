@@ -53,14 +53,12 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     final provider = context.read<ChatProvider>();
-    
+
     // Сначала пробуем кэш
     var messages = provider.getCachedMessages(widget.chatId);
-    
-    if (messages == null) {
-      // Загружаем из базы
-      messages = await provider.loadChatMessages(widget.chatId, _userId!);
-    }
+
+    // Загружаем из базы если нет в кэше
+    messages ??= await provider.loadChatMessages(widget.chatId, _userId!);
 
     if (mounted) {
       setState(() {

@@ -227,14 +227,12 @@ class WalkProvider extends ChangeNotifier {
       
       _isTracking = true;
       // Переподписываемся на стрим, если нужно
-      if (_positionSubscription == null) {
-        _positionSubscription = _locationService.positionStream.listen((point) {
-          if (_isTracking && _currentWalk != null) {
-            _currentWalk!.points.add(point);
-            notifyListeners();
-          }
-        });
-      }
+      _positionSubscription ??= _locationService.positionStream.listen((point) {
+        if (_isTracking && _currentWalk != null) {
+          _currentWalk!.points.add(point);
+          notifyListeners();
+        }
+      });
       notifyListeners();
     }
   }

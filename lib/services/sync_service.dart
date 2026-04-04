@@ -5,7 +5,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:archive/archive.dart';
-import 'package:flutter/services.dart';
 import '../models/map_objects/map_objects.dart';
 import 'p2p/map_object_storage.dart';
 import 'merge_engine.dart';
