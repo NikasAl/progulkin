@@ -5,20 +5,44 @@ import '../models/map_objects/map_objects.dart';
 import '../models/contact_profile.dart';
 import '../services/p2p/p2p.dart';
 import '../services/map_object_export_service.dart';
-import '../services/creature_service.dart';
-import '../services/interest_notification_service.dart';
+import '../services/creature_service.dart'; // Для CatchResult
+import '../services/interest_notification_service.dart'; // Для InterestNotification
+import 'creature_provider.dart';
+import 'p2p_provider.dart';
+import 'moderation_provider.dart';
+import 'notification_provider.dart';
+import 'contact_provider.dart';
+import 'reminder_provider.dart';
+import 'foraging_provider.dart';
 
 /// Провайдер для управления объектами на карте
+/// 
+/// Служит фасадом для специализированных провайдеров:
+/// - CreatureProvider - управление существами
+/// - P2PProvider - P2P синхронизация
+/// - ModerationProvider - модерация объектов
+/// - NotificationProvider - уведомления
+/// - ContactProvider - профили контактов
+/// - InterestProvider - интересы к заметкам
+/// - ReminderProvider - напоминания
+/// - ForagingProvider - места сбора
 class MapObjectProvider extends ChangeNotifier {
   final MapObjectStorage _storage = MapObjectStorage();
-  final P2PService _p2pService = P2PService();
   final MapObjectExportService _exportService = MapObjectExportService();
   final Uuid _uuid = const Uuid();
-  final CreatureService _creatureService = CreatureService();
-  final InterestNotificationService _notificationService = InterestNotificationService();
 
   /// Доступ к хранилищу для прямого использования
   MapObjectStorage get storage => _storage;
+
+  // Специализированные провайдеры (опционально)
+  CreatureProvider? _creatureProvider;
+  P2PProvider? _p2pProvider;
+  ModerationProvider? _moderationProvider;
+  NotificationProvider? _notificationProvider;
+  ContactProvider? _contactProvider;
+  InterestProvider? _interestProvider;
+  ReminderProvider? _reminderProvider;
+  ForagingProvider? _foragingProvider;
 
   List<MapObject> _objects = [];
   List<MapObject> _nearbyObjects = [];
@@ -36,11 +60,6 @@ class MapObjectProvider extends ChangeNotifier {
   double? _userLat;
   double? _userLng;
 
-  // Подписки
-  StreamSubscription? _objectsSubscription;
-  StreamSubscription? _newObjectSubscription;
-  StreamSubscription? _syncSubscription;
-
   // Геттеры
   List<MapObject> get objects => _filterObjects(_objects);
   List<MapObject> get nearbyObjects => _filterObjects(_nearbyObjects);
@@ -52,12 +71,11 @@ class MapObjectProvider extends ChangeNotifier {
   Set<MapObjectType> get enabledTypes => Set.unmodifiable(_enabledTypes);
   bool get showCleaned => _showCleaned;
   int get minReputation => _minReputation;
-  bool get isP2PRunning => _p2pService.isRunning;
+  bool get isP2PRunning => _p2pProvider?.isRunning ?? false;
 
   /// Количество объектов по типам (только отображаемые на карте)
   Map<MapObjectType, int> get objectCounts {
     final counts = <MapObjectType, int>{};
-    // Используем отфильтрованный список, как и для отображения на карте
     final filteredObjects = objects;
     for (final type in MapObjectType.values) {
       counts[type] = filteredObjects.where((o) => o.type == type).length;
@@ -84,6 +102,49 @@ class MapObjectProvider extends ChangeNotifier {
     };
   }
 
+  /// Конструктор без параметров (для обратной совместимости)
+  MapObjectProvider();
+
+  /// Конструктор с специализированными провайдерами
+  MapObjectProvider.withProviders({
+    CreatureProvider? creatureProvider,
+    P2PProvider? p2pProvider,
+    ModerationProvider? moderationProvider,
+    NotificationProvider? notificationProvider,
+    ContactProvider? contactProvider,
+    InterestProvider? interestProvider,
+    ReminderProvider? reminderProvider,
+    ForagingProvider? foragingProvider,
+  }) : _creatureProvider = creatureProvider,
+       _p2pProvider = p2pProvider,
+       _moderationProvider = moderationProvider,
+       _notificationProvider = notificationProvider,
+       _contactProvider = contactProvider,
+       _interestProvider = interestProvider,
+       _reminderProvider = reminderProvider,
+       _foragingProvider = foragingProvider;
+
+  /// Установить специализированные провайдеры
+  void setProviders({
+    CreatureProvider? creatureProvider,
+    P2PProvider? p2pProvider,
+    ModerationProvider? moderationProvider,
+    NotificationProvider? notificationProvider,
+    ContactProvider? contactProvider,
+    InterestProvider? interestProvider,
+    ReminderProvider? reminderProvider,
+    ForagingProvider? foragingProvider,
+  }) {
+    if (creatureProvider != null) _creatureProvider = creatureProvider;
+    if (p2pProvider != null) _p2pProvider = p2pProvider;
+    if (moderationProvider != null) _moderationProvider = moderationProvider;
+    if (notificationProvider != null) _notificationProvider = notificationProvider;
+    if (contactProvider != null) _contactProvider = contactProvider;
+    if (interestProvider != null) _interestProvider = interestProvider;
+    if (reminderProvider != null) _reminderProvider = reminderProvider;
+    if (foragingProvider != null) _foragingProvider = foragingProvider;
+  }
+
   /// Инициализация
   Future<void> init() async {
     _isLoading = true;
@@ -97,21 +158,10 @@ class MapObjectProvider extends ChangeNotifier {
       // Очищаем истёкших диких существ при запуске
       await _cleanExpiredWildCreatures();
 
-      // Инициализируем сервис уведомлений
-      await _notificationService.init();
-
-      // Подписываемся на новые объекты от P2P
-      _newObjectSubscription = _p2pService.newObjectStream.listen((MapObject object) {
-        _onNewObjectReceived(object);
-      });
-
-      // Подписываемся на результаты синхронизации
-      _syncSubscription = _p2pService.syncStream.listen((result) {
-        if (result.hasChanges) {
-          debugPrint('🔄 Синхронизация: получено=${result.objectsReceived}, отправлено=${result.objectsSent}');
-          _reloadObjects();
-        }
-      });
+      // Инициализируем NotificationProvider
+      if (_notificationProvider != null) {
+        await _notificationProvider!.init();
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -125,13 +175,17 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Очистить истёкших диких существ из базы данных
   Future<int> _cleanExpiredWildCreatures() async {
+    if (_creatureProvider != null) {
+      return await _creatureProvider!.cleanExpiredWildCreatures(_objects);
+    }
+    
+    // Fallback реализация
     int removed = 0;
     final toRemove = <String>[];
     
     for (final obj in _objects) {
       if (obj.type == MapObjectType.creature) {
         final creature = obj as Creature;
-        // Удаляем только диких истёкших существ
         if (creature.isWild && creature.isExpired) {
           toRemove.add(creature.id);
           removed++;
@@ -152,15 +206,25 @@ class MapObjectProvider extends ChangeNotifier {
   }
 
   /// Очистить всех диких существ (при завершении прогулки)
-  /// Оставляет только пойманных существ пользователя
   Future<int> cleanAllWildCreatures({String? keepForUserId}) async {
+    if (_creatureProvider != null) {
+      final removed = await _creatureProvider!.cleanAllWildCreatures(_objects);
+      if (removed > 0) {
+        _objects.removeWhere((o) => 
+          o.type == MapObjectType.creature && (o as Creature).isWild);
+        _updateNearbyObjects();
+        notifyListeners();
+      }
+      return removed;
+    }
+    
+    // Fallback реализация
     int removed = 0;
     final toRemove = <String>[];
     
     for (final obj in _objects) {
       if (obj.type == MapObjectType.creature) {
         final creature = obj as Creature;
-        // Удаляем диких существ
         if (creature.isWild) {
           toRemove.add(creature.id);
           removed++;
@@ -181,6 +245,8 @@ class MapObjectProvider extends ChangeNotifier {
     return removed;
   }
 
+  // ==================== P2P ====================
+
   /// Запуск P2P сервиса
   Future<void> startP2P({
     required String signalingServer,
@@ -192,31 +258,27 @@ class MapObjectProvider extends ChangeNotifier {
       return;
     }
 
-    try {
-      final zone = MapObject.encodeGeohash(_userLat!, _userLng!, 6);
-
-      final config = P2PConfig(
+    if (_p2pProvider != null) {
+      await _p2pProvider!.start(
         signalingServer: signalingServer,
         signalingPort: signalingPort,
-        zone: zone,
         deviceId: deviceId,
+        userLat: _userLat!,
+        userLng: _userLng!,
       );
-
-      await _p2pService.start(config);
-      debugPrint('✅ P2P запущен в зоне $zone');
       notifyListeners();
-    } catch (e) {
-      debugPrint('❌ Ошибка запуска P2P: $e');
-      _error = 'Ошибка P2P: $e';
-      notifyListeners();
+      return;
     }
+    
+    debugPrint('⚠️ P2PProvider не установлен');
   }
 
   /// Остановка P2P сервиса
   Future<void> stopP2P() async {
-    await _p2pService.stop();
-    debugPrint('🛑 P2P остановлен');
-    notifyListeners();
+    if (_p2pProvider != null) {
+      await _p2pProvider!.stop();
+      notifyListeners();
+    }
   }
 
   /// Обновление позиции пользователя
@@ -226,6 +288,8 @@ class MapObjectProvider extends ChangeNotifier {
     _updateNearbyObjects();
     notifyListeners();
   }
+
+  // ==================== Создание объектов ====================
 
   /// Создание мусорного монстра
   Future<TrashMonster> createTrashMonster({
@@ -298,6 +362,22 @@ class MapObjectProvider extends ChangeNotifier {
     required CreatureHabitat habitat,
     int lifetimeMinutes = 60,
   }) async {
+    if (_creatureProvider != null) {
+      final creature = await _creatureProvider!.spawnCreature(
+        id: _uuid.v4(),
+        latitude: latitude,
+        longitude: longitude,
+        creatureType: creatureType,
+        rarity: rarity,
+        habitat: habitat,
+        lifetimeMinutes: lifetimeMinutes,
+      );
+      _objects.add(creature);
+      notifyListeners();
+      return creature;
+    }
+    
+    // Fallback реализация
     final creature = Creature.spawnWild(
       id: _uuid.v4(),
       latitude: latitude,
@@ -313,25 +393,28 @@ class MapObjectProvider extends ChangeNotifier {
   }
 
   /// Спавн существ вокруг игрока
-  /// Возвращает список заспавненных существ
   Future<List<Creature>> spawnCreaturesAroundPlayer({
     required double playerLat,
     required double playerLng,
     int maxCreatures = 2,
     double radiusKm = 1.5,
   }) async {
-    final spawned = _creatureService.spawnAroundPlayer(
-      playerLat: playerLat,
-      playerLng: playerLng,
-      maxCreatures: maxCreatures,
-      radiusKm: radiusKm,
-    );
-
-    for (final creature in spawned) {
-      await _saveAndBroadcast(creature);
+    if (_creatureProvider != null) {
+      final spawned = await _creatureProvider!.spawnCreaturesAroundPlayer(
+        generateId: () => _uuid.v4(),
+        playerLat: playerLat,
+        playerLng: playerLng,
+        maxCreatures: maxCreatures,
+        radiusKm: radiusKm,
+      );
+      _objects.addAll(spawned);
+      notifyListeners();
+      return spawned;
     }
-
-    return spawned;
+    
+    // Fallback - нужен CreatureService
+    debugPrint('⚠️ CreatureProvider не установлен, спавн невозможен');
+    return [];
   }
 
   /// Попытка поимки существа с расчётом шанса
@@ -343,6 +426,27 @@ class MapObjectProvider extends ChangeNotifier {
     double? userLat,
     double? userLng,
   }) async {
+    if (_creatureProvider != null) {
+      final result = await _creatureProvider!.attemptCatchCreature(
+        creatureId: creatureId,
+        userId: userId,
+        userName: userName,
+        playerLevel: playerLevel,
+        userLat: userLat,
+        userLng: userLng,
+      );
+      if (result.isSuccess) {
+        final index = _objects.indexWhere((o) => o.id == creatureId);
+        if (index >= 0) {
+          final obj = await _storage.getObject(creatureId);
+          if (obj != null) _objects[index] = obj;
+        }
+        notifyListeners();
+      }
+      return result;
+    }
+    
+    // Fallback реализация
     final obj = await _storage.getObject(creatureId);
     if (obj == null || obj is! Creature) {
       return CatchResult.failed(
@@ -358,81 +462,61 @@ class MapObjectProvider extends ChangeNotifier {
       );
     }
 
-    // Существо уже поймано
     if (!obj.isWild) {
-      return CatchResult.failed(
-        creature: obj,
-        chance: 0,
-        escaped: false,
-      );
+      return CatchResult.failed(creature: obj, chance: 0, escaped: false);
     }
 
-    // Проверка расстояния (25 метров максимум)
     if (userLat != null && userLng != null) {
-      final distance = calculateDistance(
-        userLat, userLng,
-        obj.latitude, obj.longitude,
-      );
+      final distance = calculateDistance(userLat, userLng, obj.latitude, obj.longitude);
       if (distance > 25) {
-        return CatchResult.failed(
-          creature: obj,
-          chance: 0,
-          escaped: false,
-        );
+        return CatchResult.failed(creature: obj, chance: 0, escaped: false);
       }
     }
 
-    final result = _creatureService.tryCatchCreature(obj, playerLevel);
+    // Простая логика поимки для fallback
+    final caught = obj.catchCreature(userId, userName);
+    await _storage.updateObject(caught);
+    await _broadcastUpdate(caught);
 
-    if (result.isSuccess) {
-      final caught = obj.catchCreature(userId, userName);
-      await _storage.updateObject(caught);
-      await _broadcastUpdate(caught);
-
-      final index = _objects.indexWhere((o) => o.id == creatureId);
-      if (index >= 0) {
-        _objects[index] = caught;
-      }
-      notifyListeners();
+    final index = _objects.indexWhere((o) => o.id == creatureId);
+    if (index >= 0) {
+      _objects[index] = caught;
     }
+    notifyListeners();
 
-    return result;
+    return CatchResult.success(creature: caught, chance: 100);
   }
 
   /// Получить коллекцию пойманных существ пользователя
   List<Creature> getUserCreatureCollection(String userId) {
-    return _objects
-        .whereType<Creature>()
-        .where((c) => c.caughtBy == userId)
-        .toList();
+    if (_creatureProvider != null) {
+      return _creatureProvider!.getUserCreatureCollection(userId);
+    }
+    return _objects.whereType<Creature>().where((c) => c.caughtBy == userId).toList();
   }
 
   /// Получить диких существ рядом с игроком
   List<Creature> getWildCreaturesNearby() {
-    return _nearbyObjects
-        .whereType<Creature>()
-        .where((c) => c.isWild && c.isAlive)
-        .toList();
+    if (_creatureProvider != null) {
+      return _creatureProvider!.getWildCreaturesNearby(_nearbyObjects);
+    }
+    return _nearbyObjects.whereType<Creature>().where((c) => c.isWild && c.isAlive).toList();
   }
 
   /// Получить статистику коллекции существ
   Map<String, dynamic> getCreatureCollectionStats(String userId) {
+    if (_creatureProvider != null) {
+      return _creatureProvider!.getCreatureCollectionStats(userId);
+    }
+    
     final collection = getUserCreatureCollection(userId);
-
     final byRarity = <CreatureRarity, int>{};
     for (final rarity in CreatureRarity.values) {
       byRarity[rarity] = collection.where((c) => c.rarity == rarity).length;
     }
-
-    final byType = <CreatureType, int>{};
-    for (final creature in collection) {
-      byType[creature.creatureType] = (byType[creature.creatureType] ?? 0) + 1;
-    }
-
     return {
       'total': collection.length,
       'byRarity': byRarity,
-      'byType': byType,
       'totalPoints': collection.fold(0, (sum, c) => sum + c.catchPoints),
     };
   }
@@ -495,7 +579,7 @@ class MapObjectProvider extends ChangeNotifier {
     return reminder;
   }
 
-  /// Создание места для сбора (грибы, ягоды, орехи, травы)
+  /// Создание места для сбора
   Future<ForagingSpot> createForagingSpot({
     required double latitude,
     required double longitude,
@@ -528,8 +612,16 @@ class MapObjectProvider extends ChangeNotifier {
     return spot;
   }
 
+  // ==================== Места сбора (делегирование ForagingProvider) ====================
+
   /// Отметить сбор в месте
   Future<void> markForagingHarvest(String spotId) async {
+    if (_foragingProvider != null) {
+      await _foragingProvider!.markHarvest(spotId);
+      _updateObjectFromStorage(spotId);
+      return;
+    }
+    
     final obj = await _storage.getObject(spotId);
     if (obj == null || obj is! ForagingSpot) return;
 
@@ -546,6 +638,12 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Подтвердить место сбора
   Future<void> verifyForagingSpot(String spotId) async {
+    if (_foragingProvider != null) {
+      await _foragingProvider!.verifySpot(spotId);
+      _updateObjectFromStorage(spotId);
+      return;
+    }
+    
     final obj = await _storage.getObject(spotId);
     if (obj == null || obj is! ForagingSpot) return;
 
@@ -562,30 +660,40 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Получить места сбора рядом с пользователем
   List<ForagingSpot> getForagingSpotsNearby() {
-    return _nearbyObjects
-        .whereType<ForagingSpot>()
-        .where((s) => !s.isDeleted)
-        .toList();
+    if (_foragingProvider != null) {
+      return _foragingProvider!.getSpotsNearby();
+    }
+    return _nearbyObjects.whereType<ForagingSpot>().where((s) => !s.isDeleted).toList();
   }
 
   /// Получить места сбора по категории
   List<ForagingSpot> getForagingSpotsByCategory(ForagingCategory category) {
-    return _objects
-        .whereType<ForagingSpot>()
-        .where((s) => s.category == category && !s.isDeleted)
-        .toList();
+    if (_foragingProvider != null) {
+      return _foragingProvider!.getSpotsByCategory(category);
+    }
+    return _objects.whereType<ForagingSpot>()
+        .where((s) => s.category == category && !s.isDeleted).toList();
   }
 
   /// Получить места сбора в сезон
   List<ForagingSpot> getForagingSpotsInSeason() {
-    return _objects
-        .whereType<ForagingSpot>()
-        .where((s) => s.isInSeason && !s.isDeleted)
-        .toList();
+    if (_foragingProvider != null) {
+      return _foragingProvider!.getSpotsInSeason();
+    }
+    return _objects.whereType<ForagingSpot>()
+        .where((s) => s.isInSeason && !s.isDeleted).toList();
   }
+
+  // ==================== Интересы (делегирование InterestProvider) ====================
 
   /// Добавить "Интересно" к заметке
   Future<void> addInterestToNote(String noteId, String userId) async {
+    if (_interestProvider != null) {
+      await _interestProvider!.addInterestToNote(noteId, userId);
+      _updateObjectFromStorage(noteId);
+      return;
+    }
+    
     await _storage.addInterest(noteId: noteId, userId: userId);
     
     final obj = await _storage.getObject(noteId);
@@ -595,26 +703,21 @@ class MapObjectProvider extends ChangeNotifier {
     await _storage.updateObject(updated);
     await _broadcastUpdate(updated);
     
-    // Отправляем уведомление автору
-    await _notificationService.notifyAuthorAboutInterest(
-      noteId: noteId,
-      noteTitle: updated.title,
-      authorId: updated.ownerId,
-      interestedUserId: userId,
-      interestedUserName: 'Кто-то', // TODO: Получить имя пользователя
-    );
-    
-    // Обновляем локальный список
     final index = _objects.indexWhere((o) => o.id == noteId);
     if (index >= 0) {
       _objects[index] = updated;
     }
-    
     notifyListeners();
   }
 
   /// Убрать "Интересно" с заметки
   Future<void> removeInterestFromNote(String noteId, String userId) async {
+    if (_interestProvider != null) {
+      await _interestProvider!.removeInterestFromNote(noteId, userId);
+      _updateObjectFromStorage(noteId);
+      return;
+    }
+    
     await _storage.removeInterest(noteId, userId);
     
     final obj = await _storage.getObject(noteId);
@@ -624,40 +727,46 @@ class MapObjectProvider extends ChangeNotifier {
     await _storage.updateObject(updated);
     await _broadcastUpdate(updated);
     
-    // Обновляем локальный список
     final index = _objects.indexWhere((o) => o.id == noteId);
     if (index >= 0) {
       _objects[index] = updated;
     }
-    
     notifyListeners();
   }
 
   /// Получить список пользователей, отметивших "Интересно"
   Future<List<NoteInterest>> getInterestsForNote(String noteId) async {
+    if (_interestProvider != null) {
+      return await _interestProvider!.getInterestsForNote(noteId);
+    }
     final results = await _storage.getInterestsForNote(noteId);
     return results.map((json) => NoteInterest.fromJson(json)).toList();
   }
 
   /// Проверил ли пользователь "Интересно" на заметке
   Future<bool> hasInterest(String noteId, String userId) async {
+    if (_interestProvider != null) {
+      return await _interestProvider!.hasInterest(noteId, userId);
+    }
     final interests = await getInterestsForNote(noteId);
     return interests.any((i) => i.userId == userId);
   }
 
   /// Запросить контакт у автора заметки
   Future<void> requestContact(String noteId, String userId) async {
-    await _storage.addInterest(
-      noteId: noteId,
-      userId: userId,
-      contactRequestSent: true,
-    );
-    
-    // TODO: Отправить P2P уведомление автору
+    if (_interestProvider != null) {
+      await _interestProvider!.requestContact(noteId, userId);
+      return;
+    }
+    await _storage.addInterest(noteId: noteId, userId: userId, contactRequestSent: true);
   }
 
   /// Одобрить запрос на контакт
   Future<void> approveContactRequest(String noteId, String userId) async {
+    if (_interestProvider != null) {
+      await _interestProvider!.approveContactRequest(noteId, userId);
+      return;
+    }
     await _storage.addInterest(
       noteId: noteId,
       userId: userId,
@@ -666,8 +775,18 @@ class MapObjectProvider extends ChangeNotifier {
     );
   }
 
+  // ==================== Модерация ====================
+
   /// Подтвердить объект
   Future<void> confirmObject(String objectId) async {
+    if (_moderationProvider != null) {
+      await _moderationProvider!.confirmObject(objectId);
+      _updateObjectFromStorage(objectId);
+      _updateNearbyObjects();
+      notifyListeners();
+      return;
+    }
+    
     final obj = await _storage.getObject(objectId);
     if (obj == null) return;
 
@@ -687,13 +806,20 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Опровергнуть объект
   Future<void> denyObject(String objectId) async {
+    if (_moderationProvider != null) {
+      await _moderationProvider!.denyObject(objectId);
+      _updateObjectFromStorage(objectId);
+      _updateNearbyObjects();
+      notifyListeners();
+      return;
+    }
+    
     final obj = await _storage.getObject(objectId);
     if (obj == null) return;
 
     obj.denies++;
     obj.incrementVersion();
 
-    // Автоскрытие при большом количестве жалоб
     if (obj.shouldBeHidden) {
       obj.status = MapObjectStatus.hidden;
     }
@@ -711,6 +837,14 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Отметить монстра как убранного
   Future<void> cleanTrashMonster(String objectId, String userId) async {
+    if (_moderationProvider != null) {
+      await _moderationProvider!.cleanTrashMonster(objectId, userId);
+      _updateObjectFromStorage(objectId);
+      _updateNearbyObjects();
+      notifyListeners();
+      return;
+    }
+    
     final obj = await _storage.getObject(objectId);
     if (obj == null || obj is! TrashMonster) return;
 
@@ -727,7 +861,6 @@ class MapObjectProvider extends ChangeNotifier {
   }
 
   /// Поймать существо
-  /// [userLat], [userLng] - координаты пользователя для проверки расстояния
   Future<bool> catchCreature(
     String objectId,
     String userId,
@@ -735,15 +868,24 @@ class MapObjectProvider extends ChangeNotifier {
     double? userLat,
     double? userLng,
   }) async {
+    if (_creatureProvider != null) {
+      final success = await _creatureProvider!.catchCreature(
+        objectId, userId, userName,
+        userLat: userLat, userLng: userLng,
+      );
+      if (success) {
+        _updateObjectFromStorage(objectId);
+        _updateNearbyObjects();
+        notifyListeners();
+      }
+      return success;
+    }
+    
     final obj = await _storage.getObject(objectId);
     if (obj == null || obj is! Creature) return false;
 
-    // Проверка расстояния (25 метров максимум)
     if (userLat != null && userLng != null) {
-      final distance = calculateDistance(
-        userLat, userLng,
-        obj.latitude, obj.longitude,
-      );
+      final distance = calculateDistance(userLat, userLng, obj.latitude, obj.longitude);
       if (distance > 25) {
         debugPrint('⚠️ Попытка поймать существо с расстояния ${distance.toInt()}м');
         return false;
@@ -763,10 +905,16 @@ class MapObjectProvider extends ChangeNotifier {
     return true;
   }
 
-  // ==================== Управление напоминаниями ====================
+  // ==================== Напоминания (делегирование ReminderProvider) ====================
 
   /// Активировать напоминание
   Future<void> activateReminder(String reminderId) async {
+    if (_reminderProvider != null) {
+      await _reminderProvider!.activateReminder(reminderId);
+      _updateObjectFromStorage(reminderId);
+      return;
+    }
+    
     final obj = await _storage.getObject(reminderId);
     if (obj == null || obj is! ReminderCharacter) return;
 
@@ -783,6 +931,12 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Деактивировать напоминание
   Future<void> deactivateReminder(String reminderId) async {
+    if (_reminderProvider != null) {
+      await _reminderProvider!.deactivateReminder(reminderId);
+      _updateObjectFromStorage(reminderId);
+      return;
+    }
+    
     final obj = await _storage.getObject(reminderId);
     if (obj == null || obj is! ReminderCharacter) return;
 
@@ -799,6 +953,12 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Отложить напоминание
   Future<void> snoozeReminder(String reminderId, Duration duration) async {
+    if (_reminderProvider != null) {
+      await _reminderProvider!.snoozeReminder(reminderId, duration);
+      _updateObjectFromStorage(reminderId);
+      return;
+    }
+    
     final obj = await _storage.getObject(reminderId);
     if (obj == null || obj is! ReminderCharacter) return;
 
@@ -815,18 +975,19 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Получить напоминания пользователя
   List<ReminderCharacter> getUserReminders(String userId) {
-    return _objects
-        .whereType<ReminderCharacter>()
-        .where((r) => r.ownerId == userId)
-        .toList();
+    if (_reminderProvider != null) {
+      return _reminderProvider!.getUserReminders(userId);
+    }
+    return _objects.whereType<ReminderCharacter>().where((r) => r.ownerId == userId).toList();
   }
 
   /// Получить активные напоминания пользователя
   List<ReminderCharacter> getActiveReminders(String userId) {
-    return _objects
-        .whereType<ReminderCharacter>()
-        .where((r) => r.ownerId == userId && r.isActive)
-        .toList();
+    if (_reminderProvider != null) {
+      return _reminderProvider!.getActiveReminders(userId);
+    }
+    return _objects.whereType<ReminderCharacter>()
+        .where((r) => r.ownerId == userId && r.isActive).toList();
   }
 
   /// Прочитать секретное сообщение
@@ -870,6 +1031,8 @@ class MapObjectProvider extends ChangeNotifier {
     return await _storage.getObjectsInRadius(lat, lng, radiusMeters);
   }
 
+  // ==================== Фильтры ====================
+
   /// Включить/выключить тип объектов
   void toggleObjectType(MapObjectType type) {
     if (_enabledTypes.contains(type)) {
@@ -901,7 +1064,7 @@ class MapObjectProvider extends ChangeNotifier {
   /// Включить/выключить P2P
   void setP2PEnabled(bool enabled) {
     _p2pEnabled = enabled;
-    if (!enabled && _p2pService.isRunning) {
+    if (!enabled && (_p2pProvider?.isRunning ?? false)) {
       stopP2P();
     }
     notifyListeners();
@@ -909,7 +1072,9 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Принудительная синхронизация
   Future<void> forceSync() async {
-    await _p2pService.forceSync();
+    if (_p2pProvider != null) {
+      await _p2pProvider!.forceSync();
+    }
   }
 
   /// Очистить все объекты
@@ -942,7 +1107,6 @@ class MapObjectProvider extends ChangeNotifier {
     final result = await _exportService.importFromFile();
 
     if (result.success) {
-      // Перезагружаем объекты после успешного импорта
       await _reloadObjects();
     }
 
@@ -954,110 +1118,17 @@ class MapObjectProvider extends ChangeNotifier {
     return await _exportService.getExportStats();
   }
 
-  // Приватные методы
-
-  Future<void> _saveAndBroadcast(MapObject object) async {
-    await _storage.saveObject(object);
-    _objects.add(object);
-
-    if (_p2pEnabled && _p2pService.isRunning) {
-      await _p2pService.createAndBroadcastObject(object);
-    }
-
-    notifyListeners();
-  }
-
-  Future<void> _broadcastUpdate(MapObject object) async {
-    if (_p2pEnabled && _p2pService.isRunning) {
-      await _p2pService.createAndBroadcastObject(object);
-    }
-  }
-
-  Future<void> _reloadObjects() async {
-    _objects = await _storage.getAllObjects();
-    _updateNearbyObjects();
-    notifyListeners();
-  }
-
-  void _onNewObjectReceived(MapObject object) {
-    // Добавляем в список если ещё нет
-    final existingIndex = _objects.indexWhere((o) => o.id == object.id);
-    if (existingIndex >= 0) {
-      _objects[existingIndex] = object;
-    } else {
-      _objects.add(object);
-    }
-
-    _updateNearbyObjects();
-    _checkAndNotifyNearby(object);
-    notifyListeners();
-  }
-
-  void _updateNearbyObjects() {
-    if (_userLat == null || _userLng == null) {
-      _nearbyObjects = [];
-      return;
-    }
-
-    _nearbyObjects = _objects.where((obj) {
-      final distance = calculateDistance(
-        _userLat!, _userLng!,
-        obj.latitude, obj.longitude,
-      );
-      return distance <= 500; // 500 метров
-    }).toList();
-  }
-
-  void _checkAndNotifyNearby(MapObject object) {
-    if (_userLat == null || _userLng == null) return;
-
-    final distance = calculateDistance(
-      _userLat!, _userLng!,
-      object.latitude, object.longitude,
-    );
-
-    if (distance <= 100) {
-      debugPrint('📍 Рядом объект: ${object.type.emoji} ${object.shortDescription}');
-      // TODO: Показать уведомление
-    }
-  }
-
-  List<MapObject> _filterObjects(List<MapObject> objects) {
-    return objects.where((obj) {
-      // Фильтр по типу
-      if (!_enabledTypes.contains(obj.type)) return false;
-
-      // Фильтр по репутации создателя
-      if (obj.ownerReputation < _minReputation) return false;
-
-      // Фильтр скрытых объектов
-      if (obj.status == MapObjectStatus.hidden) return false;
-
-      // Фильтр убранных монстров
-      if (!_showCleaned && obj.type == MapObjectType.trashMonster) {
-        if ((obj as TrashMonster).isCleaned) return false;
-      }
-
-      // Фильтр существ: показываем только диких (не пойманных)
-      // Пойманные существа доступны только в коллекции
-      if (obj.type == MapObjectType.creature) {
-        final creature = obj as Creature;
-        // Не показываем истёкших или пойманных существ на карте
-        if (creature.isExpired || !creature.isWild) return false;
-      }
-
-      return true;
-    }).toList();
-  }
-
   // ==================== Профили контактов ====================
 
   /// Получить профиль контакта
   Future<ContactProfile?> getContactProfile(String userId) async {
+    if (_contactProvider != null) {
+      return await _contactProvider!.getContactProfile(userId);
+    }
+    
     final json = await _storage.getContactProfile(userId);
     if (json == null) return null;
     
-    // Конвертируем snake_case в camelCase
     final converted = <String, dynamic>{};
     json.forEach((key, value) {
       switch (key) {
@@ -1093,16 +1164,23 @@ class MapObjectProvider extends ChangeNotifier {
     required String viewerId,
     required String noteId,
   }) async {
+    if (_contactProvider != null) {
+      return await _contactProvider!.canShowContact(
+        ownerId: ownerId,
+        viewerId: viewerId,
+        noteId: noteId,
+        hasInterest: hasInterest,
+        getInterestsForNote: getInterestsForNote,
+      );
+    }
+    
     final profile = await getContactProfile(ownerId);
     if (profile == null) return false;
     
-    // Владелец всегда видит свой контакт
     if (ownerId == viewerId) return true;
     
-    // Проверяем настройки видимости
     switch (profile.visibility) {
       case ContactVisibility.afterApproval:
-        // Проверяем, одобрен ли контакт
         final interests = await getInterestsForNote(noteId);
         final interest = interests.firstWhere(
           (i) => i.userId == viewerId,
@@ -1111,7 +1189,6 @@ class MapObjectProvider extends ChangeNotifier {
         return interest.contactApproved;
         
       case ContactVisibility.afterInterest:
-        // Проверяем, есть ли "Интересно"
         return await hasInterest(noteId, viewerId);
         
       case ContactVisibility.nobody:
@@ -1152,27 +1229,34 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Получить непрочитанные уведомления
   Future<List<InterestNotification>> getUnreadNotifications() async {
-    return await _notificationService.getUnreadNotifications();
+    if (_notificationProvider != null) {
+      return await _notificationProvider!.getUnreadNotifications();
+    }
+    return [];
   }
 
   /// Получить количество непрочитанных уведомлений
   Future<int> getUnreadNotificationCount() async {
-    return await _notificationService.getUnreadCount();
+    if (_notificationProvider != null) {
+      return await _notificationProvider!.getUnreadCount();
+    }
+    return 0;
   }
 
   /// Отметить уведомление как прочитанное
   Future<void> markNotificationRead(String notificationId) async {
-    await _notificationService.markAsRead(notificationId);
-    notifyListeners();
+    if (_notificationProvider != null) {
+      await _notificationProvider!.markAsRead(notificationId);
+      notifyListeners();
+    }
   }
 
   /// Stream уведомлений
-  Stream<InterestNotification> get notificationStream => _notificationService.notificationStream;
+  Stream<InterestNotification>? get notificationStream => _notificationProvider?.notificationStream;
 
   // ==================== Интеграция с специализированными провайдерами ====================
 
   /// Обновить объект из специализированного провайдера
-  /// Используется для синхронизации состояния между провайдерами
   void updateObjectFromProvider(String id, MapObject updated) {
     final index = _objects.indexWhere((o) => o.id == id);
     if (index >= 0) {
@@ -1184,7 +1268,16 @@ class MapObjectProvider extends ChangeNotifier {
 
   /// Обработать объект, полученный через P2P от P2PProvider
   void onObjectReceivedFromP2P(MapObject object) {
-    _onNewObjectReceived(object);
+    final existingIndex = _objects.indexWhere((o) => o.id == object.id);
+    if (existingIndex >= 0) {
+      _objects[existingIndex] = object;
+    } else {
+      _objects.add(object);
+    }
+
+    _updateNearbyObjects();
+    _checkAndNotifyNearby(object);
+    notifyListeners();
   }
 
   /// Принудительно обновить список nearby объектов
@@ -1196,14 +1289,92 @@ class MapObjectProvider extends ChangeNotifier {
   /// Получить текущую позицию пользователя
   (double? lat, double? lng) get userPosition => (_userLat, _userLng);
 
+  // ==================== Приватные методы ====================
+
+  Future<void> _saveAndBroadcast(MapObject object) async {
+    await _storage.saveObject(object);
+    _objects.add(object);
+
+    if (_p2pProvider != null) {
+      await _p2pProvider!.broadcastObject(object);
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> _broadcastUpdate(MapObject object) async {
+    if (_p2pProvider != null) {
+      await _p2pProvider!.broadcastObject(object);
+    }
+  }
+
+  Future<void> _reloadObjects() async {
+    _objects = await _storage.getAllObjects();
+    _updateNearbyObjects();
+    notifyListeners();
+  }
+
+  void _updateObjectFromStorage(String objectId) async {
+    final obj = await _storage.getObject(objectId);
+    if (obj == null) return;
+    
+    final index = _objects.indexWhere((o) => o.id == objectId);
+    if (index >= 0) {
+      _objects[index] = obj;
+      notifyListeners();
+    }
+  }
+
+  void _updateNearbyObjects() {
+    if (_userLat == null || _userLng == null) {
+      _nearbyObjects = [];
+      return;
+    }
+
+    _nearbyObjects = _objects.where((obj) {
+      final distance = calculateDistance(
+        _userLat!, _userLng!,
+        obj.latitude, obj.longitude,
+      );
+      return distance <= 500; // 500 метров
+    }).toList();
+  }
+
+  void _checkAndNotifyNearby(MapObject object) {
+    if (_userLat == null || _userLng == null) return;
+
+    final distance = calculateDistance(
+      _userLat!, _userLng!,
+      object.latitude, object.longitude,
+    );
+
+    if (distance <= 100) {
+      debugPrint('📍 Рядом объект: ${object.type.emoji} ${object.shortDescription}');
+    }
+  }
+
+  List<MapObject> _filterObjects(List<MapObject> objects) {
+    return objects.where((obj) {
+      if (!_enabledTypes.contains(obj.type)) return false;
+      if (obj.ownerReputation < _minReputation) return false;
+      if (obj.status == MapObjectStatus.hidden) return false;
+
+      if (!_showCleaned && obj.type == MapObjectType.trashMonster) {
+        if ((obj as TrashMonster).isCleaned) return false;
+      }
+
+      if (obj.type == MapObjectType.creature) {
+        final creature = obj as Creature;
+        if (creature.isExpired || !creature.isWild) return false;
+      }
+
+      return true;
+    }).toList();
+  }
+
   @override
   void dispose() {
-    _objectsSubscription?.cancel();
-    _newObjectSubscription?.cancel();
-    _syncSubscription?.cancel();
     _storage.dispose();
-    _p2pService.dispose();
-    _notificationService.dispose();
     super.dispose();
   }
 }

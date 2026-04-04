@@ -1,35 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/map_objects/map_objects.dart';
+import '../models/contact_profile.dart'; // Для NoteInterest
 import '../services/p2p/p2p.dart';
-
-/// Заметка о заинтересованности
-class NoteInterest {
-  final String noteId;
-  final String userId;
-  final DateTime timestamp;
-  final bool contactRequestSent;
-  final bool contactApproved;
-
-  NoteInterest({
-    required this.noteId,
-    required this.userId,
-    required this.timestamp,
-    this.contactRequestSent = false,
-    this.contactApproved = false,
-  });
-
-  factory NoteInterest.fromJson(Map<String, dynamic> json) {
-    return NoteInterest(
-      noteId: json['note_id'] as String? ?? '',
-      userId: json['user_id'] as String? ?? '',
-      timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'] as String)
-          : DateTime.now(),
-      contactRequestSent: json['contact_request_sent'] == 1 || json['contact_request_sent'] == true,
-      contactApproved: json['contact_approved'] == 1 || json['contact_approved'] == true,
-    );
-  }
-}
 
 /// Провайдер для управления интересами к заметкам
 /// Отвечает за отметки "Интересно" и запросы контактов

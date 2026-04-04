@@ -122,8 +122,17 @@ class _ProgulkinAppState extends State<ProgulkinApp> {
     _reminderProvider = ReminderProvider(storage: _sharedStorage);
     _foragingProvider = ForagingProvider(storage: _sharedStorage);
 
-    // Создаём MapObjectProvider (координатор)
-    _mapObjectProvider = MapObjectProvider();
+    // Создаём MapObjectProvider (координатор/фасад)
+    _mapObjectProvider = MapObjectProvider.withProviders(
+      creatureProvider: _creatureProvider,
+      p2pProvider: _p2pProvider,
+      moderationProvider: _moderationProvider,
+      notificationProvider: _notificationProvider,
+      contactProvider: _contactProvider,
+      interestProvider: _interestProvider,
+      reminderProvider: _reminderProvider,
+      foragingProvider: _foragingProvider,
+    );
 
     // Настраиваем связи между провайдерами
     _wireProviders();
