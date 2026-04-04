@@ -165,6 +165,7 @@ scripts/
 ├── phone_mirror.py        # Python зеркалирование
 ├── phone_mirror_scrcpy.sh # scrcpy обёртка
 ├── record_screen.sh       # Запись экрана
+├── update_version.dart    # Обновление версии из Git
 └── README.md              # Этот файл
 
 docs/
@@ -172,4 +173,38 @@ docs/
 
 videos/                    # Директория для записей (создаётся автоматически)
 └── progulkin_demo_*.mp4
+```
+
+## update_version.dart
+
+Скрипт для обновления информации о версии в `lib/config/version.dart`.
+
+**Запуск:**
+```bash
+dart run scripts/update_version.dart
+```
+
+**Что делает:**
+1. Читает версию из `pubspec.yaml`
+2. Получает текущий хэш коммита Git
+3. Генерирует/обновляет `lib/config/version.dart`
+
+**Использование перед сборкой:**
+```bash
+# Обновить версию и собрать APK
+dart run scripts/update_version.dart && flutter build apk
+
+# Обновить версию и собрать для iOS
+dart run scripts/update_version.dart && flutter build ios
+```
+
+**Результат:**
+```dart
+// lib/config/version.dart
+class AppVersion {
+  static const String version = '1.0.0';
+  static const int buildNumber = 1;
+  static const String commitHash = 'd8784e0';
+  static String get fullVersion => 'v1.0.0 (d8784e0)';
+}
 ```

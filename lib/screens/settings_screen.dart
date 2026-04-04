@@ -7,6 +7,7 @@ import '../models/walk.dart';
 import '../providers/walk_provider.dart';
 import '../providers/map_object_provider.dart';
 import '../providers/theme_provider.dart';
+import '../config/version.dart';
 import 'storage_screen.dart';
 import 'route_planning_screen.dart';
 import 'profile_screen.dart';
@@ -479,10 +480,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           
           // Информация о приложении
           _buildSectionHeader('О приложении'),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('Прогулкин'),
-            subtitle: Text('Версия 1.0.0\nТрекинг прогулок с OpenStreetMap'),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('Прогулкин'),
+            subtitle: Text(
+              '${AppVersion.versionInfo}\n'
+              'Трекинг прогулок с OpenStreetMap',
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.code),
+            title: const Text('Коммит сборки'),
+            subtitle: Text(
+              'Хэш: ${AppVersion.commitHash}\n'
+              'Полная версия: ${AppVersion.fullVersion}',
+              style: const TextStyle(fontFamily: 'monospace'),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.code),

@@ -10,7 +10,8 @@ lib/
 ├── main.dart                      # Точка входа, инициализация провайдеров
 ├── config/
 │   ├── app_config.dart           # Конфигурация приложения
-│   └── constants.dart            # Константы
+│   ├── constants.dart            # Константы
+│   └── version.dart              # Информация о версии и хэш коммита
 ├── models/
 │   ├── walk.dart                 # Модель прогулки
 │   ├── walk_point.dart           # Точка GPS маршрута
@@ -660,3 +661,53 @@ MapObjectProvider (Facade)
 9. `212855d` - MapObjectProvider as facade with delegation
 10. `ea81e46` - Fix InterestProvider import and CatchResult.points
 11. `8151874` - Remove fallback implementations (668 lines final)
+12. `d8784e0` - Add commit hash display in settings
+
+---
+
+## 14. Система версионирования (добавлено 2026-04-04)
+
+### Структура
+
+```
+lib/config/version.dart       # Класс AppVersion с константами версии
+scripts/update_version.dart   # Скрипт генерации version.dart
+```
+
+### AppVersion класс
+
+```dart
+class AppVersion {
+  static const String version = '1.0.0';      // Из pubspec.yaml
+  static const int buildNumber = 1;           // Из pubspec.yaml
+  static const String commitHash = 'd8784e0'; // Из git rev-parse --short HEAD
+  
+  static String get fullVersion => 'v$version ($commitHash)';
+  static String get versionInfo => 'Версия $version\nСборка $buildNumber • $commitHash';
+}
+```
+
+### Использование
+
+В настройках приложения отображается:
+- Версия: 1.0.0
+- Номер сборки: 1
+- Хэш коммита: d8784e0
+
+### Обновление перед сборкой
+
+```bash
+# Автоматическое обновление
+dart run scripts/update_version.dart && flutter build apk
+
+# Результат в settings_screen.dart:
+ListTile(
+  title: Text('Коммит сборки'),
+  subtitle: Text('Хэш: ${AppVersion.commitHash}\nПолная версия: ${AppVersion.fullVersion}'),
+)
+```
+
+### Преимущества
+- Позволяет определить точную версию кода по хэшу коммита
+- Упрощает отладку на продакшене
+- Автоматизируется через скрипт
