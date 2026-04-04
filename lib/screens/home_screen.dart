@@ -6,6 +6,10 @@ import 'package:latlong2/latlong.dart';
 import '../providers/walk_provider.dart';
 import '../providers/pedometer_provider.dart';
 import '../providers/map_object_provider.dart';
+import '../providers/creature_provider.dart';
+import '../providers/moderation_provider.dart';
+import '../providers/interest_provider.dart';
+import '../providers/reminder_provider.dart';
 import '../models/walk_point.dart';
 import '../models/map_objects/map_objects.dart';
 import '../services/location_service.dart';
@@ -741,8 +745,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _spawnCreatures() async {
     if (_currentLocation == null) return;
     
-    final mapObjectProvider = context.read<MapObjectProvider>();
-    final spawned = await mapObjectProvider.spawnCreaturesAroundPlayer(
+    final creatureProvider = context.read<CreatureProvider>();
+    
+    final spawned = await creatureProvider.spawnCreaturesAroundPlayer(
+      generateId: () => DateTime.now().millisecondsSinceEpoch.toString(),
       playerLat: _currentLocation!.latitude,
       playerLng: _currentLocation!.longitude,
       maxCreatures: 2,
@@ -765,8 +771,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _stopCreatureSpawning();
     
     // Очищаем диких существ после прогулки
+    final creatureProvider = context.read<CreatureProvider>();
     final mapObjectProvider = context.read<MapObjectProvider>();
-    await mapObjectProvider.cleanAllWildCreatures();
+    await creatureProvider.cleanAllWildCreatures(mapObjectProvider.allObjects);
     
     final steps = pedometerProvider.getCurrentSteps();
     final success = await walkProvider.stopWalk(steps: steps);
@@ -882,6 +889,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// Показать детали объекта в BottomSheet
   void _showObjectDetails(MapObject object) {
     final mapObjectProvider = context.read<MapObjectProvider>();
+    final moderationProvider = context.read<ModerationProvider>();
+    final interestProvider = context.read<InterestProvider>();
+    final reminderProvider = context.read<ReminderProvider>();
+    final creatureProvider = context.read<CreatureProvider>();
     final walkProvider = context.read<WalkProvider>();
     final isWalking = walkProvider.isTracking;
     final userId = _userInfo?.id ?? '';
@@ -909,7 +920,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     VoidCallback? onAction;
     if (actionCheck.canPerform) {
       onAction = () async {
-        final result = await _performObjectAction(object, mapObjectProvider, userId);
+        final result = await _performObjectAction(
+          object,
+          mapObjectProvider,
+          creatureProvider,
+          userId,
+        );
         if (mounted && result != null) {
           Navigator.pop(context);
           _handleActionResult(result, object, walkProvider);
@@ -936,7 +952,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             distance: distance,
             isWalking: isWalking,
             onConfirm: () async {
-              await mapObjectProvider.confirmObject(object.id);
+              await moderationProvider.confirmObject(object.id);
               // Записываем статистику прогулки
               if (walkProvider.hasCurrentWalk) {
                 walkProvider.recordObjectConfirmed();
@@ -952,7 +968,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               }
             },
             onDeny: () async {
-              await mapObjectProvider.denyObject(object.id);
+              await moderationProvider.denyObject(object.id);
               // Записываем статистику прогулки
               if (walkProvider.hasCurrentWalk) {
                 walkProvider.recordObjectDenied();
@@ -973,9 +989,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ? (noteId, userId) async {
                     final note = object as InterestNote;
                     if (note.hasInterestFrom(userId)) {
-                      await mapObjectProvider.removeInterestFromNote(noteId, userId);
+                      await interestProvider.removeInterestFromNote(noteId, userId);
                     } else {
-                      await mapObjectProvider.addInterestToNote(noteId, userId);
+                      await interestProvider.addInterestToNote(noteId, userId);
                     }
                     if (context.mounted) {
                       setState(() {});
@@ -990,9 +1006,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ? (reminderId) async {
                     final reminder = object as ReminderCharacter;
                     if (reminder.isActive) {
-                      await mapObjectProvider.deactivateReminder(reminderId);
+                      await reminderProvider.deactivateReminder(reminderId);
                     } else {
-                      await mapObjectProvider.activateReminder(reminderId);
+                      await reminderProvider.activateReminder(reminderId);
                     }
                     if (context.mounted) {
                       setState(() {});
@@ -1007,7 +1023,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 : null,
             onReminderSnooze: object.type == MapObjectType.reminderCharacter
                 ? (reminderId, duration) async {
-                    await mapObjectProvider.snoozeReminder(reminderId, duration);
+                    await reminderProvider.snoozeReminder(reminderId, duration);
                     if (context.mounted) {
                       setState(() {});
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1028,19 +1044,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// Выполнить действие с объектом
   Future<Object?> _performObjectAction(
     MapObject object,
-    MapObjectProvider provider,
+    MapObjectProvider mapObjectProvider,
+    CreatureProvider creatureProvider,
     String userId,
   ) async {
     try {
       switch (object.type) {
         case MapObjectType.trashMonster:
           final monster = object as TrashMonster;
-          await provider.cleanTrashMonster(monster.id, userId);
+          await mapObjectProvider.cleanTrashMonster(monster.id, userId);
           return monster;
           
         case MapObjectType.secretMessage:
           final secret = object as SecretMessage;
-          final content = await provider.readSecretMessage(secret.id, userId);
+          final content = await mapObjectProvider.readSecretMessage(secret.id, userId);
           if (content != null) {
             return _SecretReadResult(title: secret.title, content: content);
           }
@@ -1048,7 +1065,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           
         case MapObjectType.creature:
           final creature = object as Creature;
-          final success = await provider.catchCreature(
+          final success = await creatureProvider.catchCreature(
             creature.id,
             userId,
             _userInfo?.name ?? 'Прогульщик',
