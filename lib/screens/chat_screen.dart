@@ -288,7 +288,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: TextStyle(
                     fontSize: 10,
                     color: isMe
-                        ? Theme.of(context).colorScheme.onPrimary.withOpacity(0.7)
+                        ? Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)
                         : Colors.grey[600],
                   ),
                 ),
@@ -302,7 +302,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             : Icons.access_time,
                     size: 14,
                     color: isMe
-                        ? Theme.of(context).colorScheme.onPrimary.withOpacity(0.7)
+                        ? Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)
                         : Colors.grey[600],
                   ),
                 ],
@@ -321,7 +321,7 @@ class _ChatScreenState extends State<ChatScreen> {
         color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),

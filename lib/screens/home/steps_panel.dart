@@ -21,7 +21,7 @@ class StepsPanel extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -56,7 +56,7 @@ class StepsPanel extends StatelessWidget {
                       Text(
                         'шагов • ${pedometerProvider.formattedDistance}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.7),
+                          color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
                         ),
                       ),
                     ],

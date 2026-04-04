@@ -308,9 +308,9 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
+        color: Colors.green.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -492,7 +492,7 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
           margin: const EdgeInsets.symmetric(vertical: 8),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
+            color: Colors.blue.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -541,9 +541,9 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -744,7 +744,7 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: status == 'hidden' ? Colors.red.withOpacity(0.5) : Colors.grey[300]!,
+                        color: status == 'hidden' ? Colors.red.withValues(alpha: 0.5) : Colors.grey[300]!,
                       ),
                     ),
                     child: ClipRRect(
@@ -778,7 +778,7 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.9),
+                      color: statusColor.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
@@ -845,9 +845,9 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
-          color: isActive ? color.withOpacity(0.2) : Colors.transparent,
+          color: isActive ? color.withValues(alpha: 0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: color.withOpacity(isActive ? 0.5 : 0.3)),
+          border: Border.all(color: color.withValues(alpha: isActive ? 0.5 : 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1046,9 +1046,9 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
+              color: Colors.orange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [

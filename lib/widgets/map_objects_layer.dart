@@ -74,7 +74,7 @@ class _MarkerWidget extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.green.withOpacity(0.5),
+                color: Colors.green.withValues(alpha: 0.5),
                 width: 2,
               ),
             ),
@@ -87,7 +87,7 @@ class _MarkerWidget extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -187,24 +187,24 @@ class _MarkerWidget extends StatelessWidget {
 
   Color _getBackgroundColor() {
     if (object.status == MapObjectStatus.hidden) {
-      return Colors.grey.withOpacity(0.7);
+      return Colors.grey.withValues(alpha: 0.7);
     }
 
     switch (object.type) {
       case MapObjectType.trashMonster:
         final monster = object as TrashMonster;
         if (monster.isCleaned) {
-          return Colors.green.withOpacity(0.8);
+          return Colors.green.withValues(alpha: 0.8);
         }
-        return Colors.orange.withOpacity(0.8);
+        return Colors.orange.withValues(alpha: 0.8);
 
       case MapObjectType.secretMessage:
-        return Colors.purple.withOpacity(0.8);
+        return Colors.purple.withValues(alpha: 0.8);
 
       case MapObjectType.creature:
         final creature = object as Creature;
         if (!creature.isWild) {
-          return Colors.blue.withOpacity(0.8);
+          return Colors.blue.withValues(alpha: 0.8);
         }
         return _getRarityColor(creature.rarity);
 
@@ -213,35 +213,35 @@ class _MarkerWidget extends StatelessWidget {
         return _getCategoryColor(note.category);
 
       case MapObjectType.reminderCharacter:
-        return Colors.cyan.withOpacity(0.8);
+        return Colors.cyan.withValues(alpha: 0.8);
 
       case MapObjectType.foragingSpot:
         final spot = object as ForagingSpot;
         // Цвет в зависимости от сезона
         if (spot.isInSeason) {
-          return Colors.green.withOpacity(0.8);
+          return Colors.green.withValues(alpha: 0.8);
         }
-        return Colors.brown.withOpacity(0.8);
+        return Colors.brown.withValues(alpha: 0.8);
 
       default:
-        return Colors.blue.withOpacity(0.8);
+        return Colors.blue.withValues(alpha: 0.8);
     }
   }
 
   Color _getRarityColor(CreatureRarity rarity) {
     switch (rarity) {
       case CreatureRarity.common:
-        return Colors.grey.withOpacity(0.8);
+        return Colors.grey.withValues(alpha: 0.8);
       case CreatureRarity.uncommon:
-        return Colors.green.withOpacity(0.8);
+        return Colors.green.withValues(alpha: 0.8);
       case CreatureRarity.rare:
-        return Colors.blue.withOpacity(0.8);
+        return Colors.blue.withValues(alpha: 0.8);
       case CreatureRarity.epic:
-        return Colors.purple.withOpacity(0.8);
+        return Colors.purple.withValues(alpha: 0.8);
       case CreatureRarity.legendary:
-        return Colors.amber.withOpacity(0.8);
+        return Colors.amber.withValues(alpha: 0.8);
       case CreatureRarity.mythical:
-        return Colors.red.withOpacity(0.8);
+        return Colors.red.withValues(alpha: 0.8);
     }
   }
 
@@ -249,23 +249,23 @@ class _MarkerWidget extends StatelessWidget {
   Color _getCategoryColor(InterestCategory category) {
     switch (category) {
       case InterestCategory.nature:
-        return Colors.green.withOpacity(0.8);
+        return Colors.green.withValues(alpha: 0.8);
       case InterestCategory.culture:
-        return Colors.indigo.withOpacity(0.8);
+        return Colors.indigo.withValues(alpha: 0.8);
       case InterestCategory.sport:
-        return Colors.orange.withOpacity(0.8);
+        return Colors.orange.withValues(alpha: 0.8);
       case InterestCategory.food:
-        return Colors.brown.withOpacity(0.8);
+        return Colors.brown.withValues(alpha: 0.8);
       case InterestCategory.photo:
-        return Colors.pink.withOpacity(0.8);
+        return Colors.pink.withValues(alpha: 0.8);
       case InterestCategory.art:
-        return Colors.purple.withOpacity(0.8);
+        return Colors.purple.withValues(alpha: 0.8);
       case InterestCategory.games:
-        return Colors.red.withOpacity(0.8);
+        return Colors.red.withValues(alpha: 0.8);
       case InterestCategory.tip:
-        return Colors.amber.withOpacity(0.8);
+        return Colors.amber.withValues(alpha: 0.8);
       case InterestCategory.other:
-        return Colors.blue.withOpacity(0.8);
+        return Colors.blue.withValues(alpha: 0.8);
     }
   }
 
@@ -373,7 +373,7 @@ class _StatusBadge extends StatelessWidget {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 2,
           ),
         ],

@@ -218,7 +218,7 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -260,7 +260,7 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
                                 _buildObjectsText(trashCount, secretCount, creatureCount),
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8),
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -401,11 +401,11 @@ class _NearbyObjectAlertState extends State<NearbyObjectAlert>
           child: Container(
             margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.95),
+              color: color.withValues(alpha: 0.95),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -426,7 +426,7 @@ class _NearbyObjectAlertState extends State<NearbyObjectAlert>
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
                       child: Center(
@@ -456,7 +456,7 @@ class _NearbyObjectAlertState extends State<NearbyObjectAlert>
                           Text(
                             '${widget.distance.toInt()} м от вас',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 13,
                             ),
                           ),

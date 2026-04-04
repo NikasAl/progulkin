@@ -106,7 +106,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.5),
+                    Colors.black.withValues(alpha: 0.5),
                     Colors.transparent,
                   ],
                 ),
@@ -139,7 +139,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                 onPressed: () => _finish(),
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white,
-                  backgroundColor: Colors.black.withOpacity(0.3),
+                  backgroundColor: Colors.black.withValues(alpha: 0.3),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
@@ -189,7 +189,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.55),
+                    color: Colors.black.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
@@ -219,7 +219,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                         page.subtitle,
                         style: TextStyle(
                           fontSize: 18,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                           shadows: const [
                             Shadow(
                               color: Colors.black54,
@@ -239,7 +239,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           height: 1.5,
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           shadows: const [
                             Shadow(
                               color: Colors.black54,
@@ -274,12 +274,12 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
           width: isActive ? 24 : 8,
           height: 8,
           decoration: BoxDecoration(
-            color: isActive ? Colors.white : Colors.white.withOpacity(0.4),
+            color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(4),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 4,
                     ),
                   ]
@@ -328,7 +328,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
               },
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
-                backgroundColor: Colors.white.withOpacity(0.15),
+                backgroundColor: Colors.white.withValues(alpha: 0.15),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),

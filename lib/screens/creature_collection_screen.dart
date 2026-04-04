@@ -196,7 +196,7 @@ class _CreatureCollectionScreenState extends State<CreatureCollectionScreen> {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getRarityColor(rarity).withOpacity(0.2),
+                  color: _getRarityColor(rarity).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -277,7 +277,7 @@ class _CreatureCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: rarityColor.withOpacity(0.5),
+          color: rarityColor.withValues(alpha: 0.5),
           width: 2,
         ),
       ),
@@ -291,7 +291,7 @@ class _CreatureCard extends StatelessWidget {
               width: 60,
               height: 60,
               decoration: BoxDecoration(
-                color: rarityColor.withOpacity(0.1),
+                color: rarityColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -319,7 +319,7 @@ class _CreatureCard extends StatelessWidget {
               margin: const EdgeInsets.only(top: 4),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: rarityColor.withOpacity(0.2),
+                color: rarityColor.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -468,9 +468,9 @@ class _RarityBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         '${rarity.badge} ${rarity.name}',

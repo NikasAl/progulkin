@@ -183,7 +183,7 @@ class _StorageScreenState extends State<StorageScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -202,7 +202,7 @@ class _StorageScreenState extends State<StorageScreen> {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: color.withOpacity(0.8),
+              color: color.withValues(alpha: 0.8),
             ),
             textAlign: TextAlign.center,
           ),
@@ -254,7 +254,7 @@ class _StorageScreenState extends State<StorageScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: _getTypeColor(type).withOpacity(0.2),
+              color: _getTypeColor(type).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
@@ -283,7 +283,7 @@ class _StorageScreenState extends State<StorageScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: count > 0 ? Colors.blue.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+              color: count > 0 ? Colors.blue.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -515,7 +515,7 @@ class _StorageScreenState extends State<StorageScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.cleaning_services, color: Colors.orange),
@@ -529,7 +529,7 @@ class _StorageScreenState extends State<StorageScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.delete_forever, color: Colors.red),
@@ -730,7 +730,7 @@ class _StorageScreenState extends State<StorageScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(

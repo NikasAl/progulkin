@@ -123,7 +123,7 @@ class _LocationMarkerState extends State<LocationMarker>
                   width: widget.size,
                   height: widget.size,
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.15),
+                    color: Colors.blue.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -134,7 +134,7 @@ class _LocationMarkerState extends State<LocationMarker>
               width: widget.size * 0.6,
               height: widget.size * 0.6,
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.2),
+                color: Colors.blue.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
             ),
@@ -166,7 +166,7 @@ class _LocationMarkerState extends State<LocationMarker>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
