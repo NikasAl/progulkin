@@ -2,43 +2,55 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'providers/map_object_provider.dart';
+import 'providers/creature_provider.dart';
+import 'providers/p2p_provider.dart';
+import 'providers/moderation_provider.dart';
+import 'providers/notification_provider.dart';
+import 'providers/contact_provider.dart';
+import 'providers/interest_provider.dart';
+import 'providers/reminder_provider.dart';
+import 'providers/foraging_provider.dart';
 import 'providers/walk_provider.dart';
 import 'providers/pedometer_provider.dart';
-import 'providers/map_object_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/incoming_file_service.dart';
 import 'services/sync_service.dart';
+import 'services/p2p/p2p.dart';
 import 'screens/home_screen.dart';
 import 'models/map_objects/map_objects.dart'; // Инициализация фабрики объектов
 
 /// Глобальный ключ навигатора для показа диалогов из сервиса
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+/// Общее хранилище объектов (Singleton)
+final MapObjectStorage _sharedStorage = MapObjectStorage();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Инициализация фабрики объектов карты (обязательно до использования)
   initMapObjectFactory();
-  
+
   // Инициализация локали для форматирования дат
   await initializeDateFormatting('ru_RU', null);
-  
+
   // Инициализация сервиса входящих файлов
   IncomingFileService().init();
-  
+
   // Настраиваем callback для показа результата импорта
   IncomingFileService().onFileReceived = (result) {
     _showImportResult(result);
   };
-  
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  
+
   runApp(const ProgulkinApp());
 }
 
@@ -46,7 +58,7 @@ void main() async {
 void _showImportResult(ZipImportResult result) {
   final context = navigatorKey.currentContext;
   if (context == null) return;
-  
+
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
@@ -60,7 +72,8 @@ void _showImportResult(ZipImportResult result) {
           Text(result.success ? 'Импорт завершён' : 'Ошибка импорта'),
         ],
       ),
-      content: Text(result.success ? result.summary : (result.error ?? 'Неизвестная ошибка')),
+      content: Text(
+          result.success ? result.summary : (result.error ?? 'Неизвестная ошибка')),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -71,8 +84,160 @@ void _showImportResult(ZipImportResult result) {
   );
 }
 
-class ProgulkinApp extends StatelessWidget {
+class ProgulkinApp extends StatefulWidget {
   const ProgulkinApp({super.key});
+
+  @override
+  State<ProgulkinApp> createState() => _ProgulkinAppState();
+}
+
+class _ProgulkinAppState extends State<ProgulkinApp> {
+  late final MapObjectProvider _mapObjectProvider;
+  late final CreatureProvider _creatureProvider;
+  late final P2PProvider _p2pProvider;
+  late final ModerationProvider _moderationProvider;
+  late final NotificationProvider _notificationProvider;
+  late final ContactProvider _contactProvider;
+  late final InterestProvider _interestProvider;
+  late final ReminderProvider _reminderProvider;
+  late final ForagingProvider _foragingProvider;
+
+  bool _initialized = false;
+  bool _providersCreated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _createProviders();
+  }
+
+  void _createProviders() {
+    // Создаём специализированные провайдеры
+    _creatureProvider = CreatureProvider(storage: _sharedStorage);
+    _p2pProvider = P2PProvider();
+    _moderationProvider = ModerationProvider(storage: _sharedStorage);
+    _notificationProvider = NotificationProvider();
+    _contactProvider = ContactProvider(storage: _sharedStorage);
+    _interestProvider = InterestProvider(storage: _sharedStorage);
+    _reminderProvider = ReminderProvider(storage: _sharedStorage);
+    _foragingProvider = ForagingProvider(storage: _sharedStorage);
+
+    // Создаём MapObjectProvider (координатор)
+    _mapObjectProvider = MapObjectProvider();
+
+    // Настраиваем связи между провайдерами
+    _wireProviders();
+
+    _providersCreated = true;
+  }
+
+  void _wireProviders() {
+    // CreatureProvider callbacks
+    _creatureProvider.broadcastUpdate = (object) async {
+      await _p2pProvider.broadcastObject(object);
+    };
+    _creatureProvider.getAllObjects = () => _mapObjectProvider.allObjects;
+    _creatureProvider.updateObjectInList = (id, updated) {
+      _mapObjectProvider.updateObjectFromProvider(id, updated);
+    };
+
+    // P2PProvider callbacks
+    _p2pProvider.onObjectReceived = (object) {
+      _mapObjectProvider.onObjectReceivedFromP2P(object);
+    };
+    _p2pProvider.onSyncComplete = (result) {
+      if (result.hasChanges) {
+        _mapObjectProvider.reload();
+      }
+    };
+
+    // ModerationProvider callbacks
+    _moderationProvider.broadcastUpdate = (object) async {
+      await _p2pProvider.broadcastObject(object);
+    };
+    _moderationProvider.updateObjectInList = (id, updated) {
+      _mapObjectProvider.updateObjectFromProvider(id, updated);
+    };
+    _moderationProvider.updateNearbyObjects = () {
+      _mapObjectProvider.refreshNearbyObjects();
+    };
+
+    // InterestProvider callbacks
+    _interestProvider.broadcastUpdate = (object) async {
+      await _p2pProvider.broadcastObject(object);
+    };
+    _interestProvider.updateObjectInList = (id, updated) {
+      _mapObjectProvider.updateObjectFromProvider(id, updated);
+    };
+    _interestProvider.notifyAuthorAboutInterest = (
+        {required noteId,
+        required noteTitle,
+        required authorId,
+        required interestedUserId,
+        required interestedUserName}) async {
+      await _notificationProvider.notifyAuthorAboutInterest(
+        noteId: noteId,
+        noteTitle: noteTitle,
+        authorId: authorId,
+        interestedUserId: interestedUserId,
+        interestedUserName: interestedUserName,
+      );
+    };
+
+    // ReminderProvider callbacks
+    _reminderProvider.broadcastUpdate = (object) async {
+      await _p2pProvider.broadcastObject(object);
+    };
+    _reminderProvider.updateObjectInList = (id, updated) {
+      _mapObjectProvider.updateObjectFromProvider(id, updated);
+    };
+    _reminderProvider.getAllObjects = () => _mapObjectProvider.allObjects;
+
+    // ForagingProvider callbacks
+    _foragingProvider.broadcastUpdate = (object) async {
+      await _p2pProvider.broadcastObject(object);
+    };
+    _foragingProvider.updateObjectInList = (id, updated) {
+      _mapObjectProvider.updateObjectFromProvider(id, updated);
+    };
+    _foragingProvider.getAllObjects = () => _mapObjectProvider.allObjects;
+    _foragingProvider.getNearbyObjects = () => _mapObjectProvider.nearbyObjects;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized && _providersCreated) {
+      _initialized = true;
+      _initProviders();
+    }
+  }
+
+  Future<void> _initProviders() async {
+    // Инициализируем MapObjectProvider
+    await _mapObjectProvider.init();
+
+    if (!mounted) return;
+
+    // Инициализируем NotificationProvider
+    await _notificationProvider.init();
+
+    if (!mounted) return;
+
+    // Инициализируем P2PProvider
+    await _p2pProvider.init(
+      onNewObject: (object) {
+        _mapObjectProvider.onObjectReceivedFromP2P(object);
+      },
+      onSync: (result) {
+        if (result.hasChanges) {
+          _mapObjectProvider.reload();
+        }
+      },
+    );
+
+    debugPrint('✅ Провайдеры инициализированы');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +246,15 @@ class ProgulkinApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => WalkProvider()),
         ChangeNotifierProvider(create: (_) => PedometerProvider()),
-        ChangeNotifierProvider(create: (_) => MapObjectProvider()),
+        ChangeNotifierProvider.value(value: _mapObjectProvider),
+        ChangeNotifierProvider.value(value: _creatureProvider),
+        ChangeNotifierProvider.value(value: _p2pProvider),
+        ChangeNotifierProvider.value(value: _moderationProvider),
+        ChangeNotifierProvider.value(value: _notificationProvider),
+        ChangeNotifierProvider.value(value: _contactProvider),
+        ChangeNotifierProvider.value(value: _interestProvider),
+        ChangeNotifierProvider.value(value: _reminderProvider),
+        ChangeNotifierProvider.value(value: _foragingProvider),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: Consumer<ThemeProvider>(

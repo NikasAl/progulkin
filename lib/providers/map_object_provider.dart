@@ -1169,6 +1169,33 @@ class MapObjectProvider extends ChangeNotifier {
   /// Stream уведомлений
   Stream<InterestNotification> get notificationStream => _notificationService.notificationStream;
 
+  // ==================== Интеграция с специализированными провайдерами ====================
+
+  /// Обновить объект из специализированного провайдера
+  /// Используется для синхронизации состояния между провайдерами
+  void updateObjectFromProvider(String id, MapObject updated) {
+    final index = _objects.indexWhere((o) => o.id == id);
+    if (index >= 0) {
+      _objects[index] = updated;
+      _updateNearbyObjects();
+      notifyListeners();
+    }
+  }
+
+  /// Обработать объект, полученный через P2P от P2PProvider
+  void onObjectReceivedFromP2P(MapObject object) {
+    _onNewObjectReceived(object);
+  }
+
+  /// Принудительно обновить список nearby объектов
+  void refreshNearbyObjects() {
+    _updateNearbyObjects();
+    notifyListeners();
+  }
+
+  /// Получить текущую позицию пользователя
+  (double? lat, double? lng) get userPosition => (_userLat, _userLng);
+
   @override
   void dispose() {
     _objectsSubscription?.cancel();
