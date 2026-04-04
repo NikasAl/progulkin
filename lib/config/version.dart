@@ -13,7 +13,7 @@ class AppVersion {
 
   /// Хэш коммита Git (короткий)
   /// Обновляется автоматически при сборке
-  static const String commitHash = 'deacb72';
+  static const String commitHash = '8699a26';
 
   /// Полная строка версии для отображения
   static String get fullVersion => 'v$version ($commitHash)';
