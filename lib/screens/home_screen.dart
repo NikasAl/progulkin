@@ -159,6 +159,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     // Подписываемся на обновления позиции во время прогулки
     _locationService.positionStream.listen((point) {
+      if (!mounted) return;
+
       final walkProvider = context.read<WalkProvider>();
 
       setState(() {
@@ -1307,6 +1309,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   );
                   
                   if (confirm == true) {
+                    if (!mounted) return;
                     await context.read<MapObjectProvider>().deleteObject(
                       object.id,
                       _userInfo?.id ?? '',
@@ -1361,7 +1364,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     
     // Записываем статистику если объект создан во время прогулки
-    if (result != null) {
+    if (result != null && mounted) {
       final walkProvider = context.read<WalkProvider>();
       if (walkProvider.hasCurrentWalk) {
         walkProvider.recordObjectAdded(result.points);

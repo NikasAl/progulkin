@@ -23,18 +23,10 @@ class WalkProvider extends ChangeNotifier {
   // Время паузы для корректного отображения duration
   DateTime? _pauseStartTime;
   Duration _totalPauseDuration = Duration.zero; // Сумма всех периодов паузы
-  
+
   // Настройки источника расстояния
   DistanceSource _distanceSource = DistanceSource.pedometer;
   double _stepLength = 0.75;
-  
-  // Геттер для совместимости
-  Duration get _accumulatedPauseDuration {
-    if (_pauseStartTime != null && !_isTracking) {
-      return _totalPauseDuration + DateTime.now().difference(_pauseStartTime!);
-    }
-    return _totalPauseDuration;
-  }
 
   // Геттеры
   Walk? get currentWalk => _currentWalk;
