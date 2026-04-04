@@ -1,324 +1,499 @@
-# Анализ архитектуры Прогулкин
+# Анализ архитектуры Flutter проекта "Прогулкин"
 
-**Дата обновления:** Март 2026
-**Версия проекта:** 1.0.0
-**Общий объём кода:** ~11,500 строк Dart
+**Дата анализа:** 2026-04-04
 
----
-
-## 1. Текущая структура проекта
-
-### 1.1. Распределение кода по слоям
-
-| Слой | Файлов | Строк | % |
-|------|--------|-------|---|
-| **Screens** | 10 | ~4,200 | 37% |
-| **Services** | 12 | ~2,600 | 23% |
-| **Widgets** | 6 | ~2,000 | 17% |
-| **Models** | 8 | ~1,500 | 13% |
-| **Providers** | 3 | ~1,000 | 9% |
-| **Config** | 2 | ~200 | 1% |
-
-### 1.2. Самые большие файлы
-
-| Файл | Строк | Оценка | Изменение |
-|------|-------|--------|-----------|
-| `home_screen.dart` | 1,072 | 🟡 Внимание | — |
-| `settings_screen.dart` | 797 | 🟡 Внимание | — |
-| `add_object_screen.dart` | 650 | 🟢 Приемлемо | ⬇️ -350 (рефакторинг) |
-| `route_planning_screen.dart` | 657 | 🟢 Приемлемо | — |
-| `object_details_sheet.dart` | 777 | 🟢 Приемлемо | — |
-| `photo_capture_widget.dart` | 250 | 🟢 Новый | ✨ Создан |
-
----
-
-## 2. Выполненный рефакторинг (Март 2026)
-
-### 2.1. ✅ Создан файл констант
-
-**Файл:** `lib/config/constants.dart` (~200 строк)
-
-Вынесены все магические числа:
-- Радиусы (100м, 50м, 500м)
-- Параметры фото (качество, размеры)
-- Таймауты
-- Настройки по умолчанию
-
-**Используется в:**
-- `photo_compression_service.dart`
-- `object_action_service.dart`
-- `add_object_screen.dart`
-- `nearby_objects_notifier.dart`
-- `photo_capture_widget.dart`
-
-### 2.2. ✅ Создан PhotoCaptureWidget
-
-**Файл:** `lib/widgets/photo_capture_widget.dart` (~250 строк)
-
-Устранено дублирование UI фото (~200 строк):
-- GPS-верификация в одном месте
-- Переиспользуется в формах TrashMonster и InterestNote
-- Централизованная логика сжатия
-
-### 2.3. ✅ Рефакторинг add_object_screen.dart
-
-**До:** 1,009 строк
-**После:** 650 строк
-**Уменьшение:** -35% (350 строк)
-
-Изменения:
-- Удалён дублированный UI фото
-- Удалён метод `_takePhoto()` (перенесён в виджет)
-- Упрощены переменные состояния
-- Добавлено использование констант
-
----
-
-## 3. Текущие проблемные места
-
-### 3.1. 🟡 HomeScreen (1,072 строки)
-
-**Статус:** Требует внимания
-
-**Оставшиеся обязанности:**
-```
-HomeScreen (1,072 строки)
-├── Инициализация провайдеров (~50 строк)
-├── Управление состоянием карты (~100 строк)
-├── Построение UI карты с маркерами (~125 строк)
-├── Панели UI (топ, шаги, низ) (~200 строк)
-├── Логика прогулок (~60 строк)
-├── Обработка объектов (~150 строк)
-└── Навигация (~50 строк)
-```
-
-**Рекомендуемые улучшения:**
-1. Вынести маркеры карты в `MapMarkers` виджет (~50 строк)
-2. Вынести обработку объектов в отдельный миксин
-
-**Приоритет:** Низкий (не блокирует разработку)
-
-### 3.2. 🟡 SettingsScreen (797 строк)
-
-**Статус:** Кандидат на декомпозицию
-
-**Решение:** Создать директорию `lib/screens/settings/` с модульными виджетами.
-
-**Приоритет:** Низкий (не блокирует разработку)
-
-### 3.3. 🟡 Отсутствие тестов
-
-**Проблема:** Нет директории `test/`.
-
-**Приоритет:** Средний
-
----
-
-## 4. Что хорошо ✅
-
-### 4.1. Модульная архитектура
-
-Чёткое разделение слоёв:
-```
-UI Layer (Screens/Widgets)
-    ↓ uses Provider.of<T>()
-State Management (Providers)
-    ↓ uses
-Business Logic Layer (Services)
-    ↓ uses
-Data Layer (Storage/SQLite)
-```
-
-### 4.2. Переиспользуемые компоненты
-
-| Компонент | Назначение | Переиспользование |
-|-----------|------------|-------------------|
-| `ObjectDetailsSheet` | Детали объектов | HomeScreen, History |
-| `WalkStatsPanel` | Статистика прогулки | HomeScreen, WalkDetail |
-| `StepsPanel` | Шагомер | HomeScreen |
-| `BottomControls` | Управление записью | HomeScreen |
-| `MapObjectsLayer` | Маркеры карты | HomeScreen |
-| `PhotoCaptureWidget` | Съёмка фото | TrashMonster, InterestNote |
-
-### 4.3. Централизованные константы
-
-Все магические числа вынесены в `AppConstants`:
-- Радиусы действий
-- Параметры фото
-- Таймауты
-- Настройки по умолчанию
-
-### 4.4. Чистые модели
-
-- Наследование от `MapObject`
-- Полиморфная сериализация через фабрику
-- Иммутабельность с `copyWith`-паттерном
-
-### 4.5. P2P архитектура
-
-Модульная структура:
-```
-services/p2p/
-├── p2p_service.dart        # Координация
-├── p2p_connection.dart     # WebRTC
-├── secure_signaling_client.dart  # Сигналинг
-├── sync_protocol.dart      # Протокол синхронизации
-└── map_object_storage.dart # Хранилище
-```
-
----
-
-## 5. Фото-поддержка объектов
-
-### 5.1. Текущий статус
-
-| Тип объекта | Модель | Создание | Просмотр | GPS верификация |
-|-------------|--------|----------|----------|-----------------|
-| TrashMonster | ✅ `photoIds` | ✅ | ✅ | ✅ |
-| InterestNote | ✅ `photoIds` | ✅ | ✅ | ✅ |
-| SecretMessage | — | — | — | — |
-| Creature | — | — | — | — |
-| ReminderCharacter | — | — | — | — |
-
-### 5.2. Технические детали
-
-**Сервис сжатия:** `PhotoCompressionService` (WebP через flutter_image_compress)
-
-**Виджет съёмки:** `PhotoCaptureWidget` (GPS-верификация, сжатие, UI)
-
-**Параметры (из AppConstants):**
-- Качество: 80%
-- Макс. размер превью: 800x600
-- Макс. размер оригинала: 250KB
-- Радиус верификации: 100м
-
----
-
-## 6. Структура директорий
+## 1. Структура проекта
 
 ```
 lib/
+├── main.dart                      # Точка входа, инициализация провайдеров
 ├── config/
-│   ├── app_config.dart
-│   └── constants.dart              ✅ Создан
+│   ├── app_config.dart           # Конфигурация приложения
+│   └── constants.dart            # Константы
 ├── models/
-│   ├── contact_profile.dart
-│   ├── distance_source.dart
-│   ├── p2p_message.dart
-│   ├── walk.dart
-│   ├── walk_point.dart
-│   └── map_objects/
-│       ├── map_object.dart
-│       ├── map_objects.dart
-│       ├── trash_monster.dart      ✅ с photoIds
-│       ├── secret_message.dart
-│       ├── creature.dart
-│       ├── interest_note.dart      ✅ с photoIds
-│       └── reminder_character.dart
+│   ├── walk.dart                 # Модель прогулки
+│   ├── walk_point.dart           # Точка GPS маршрута
+│   ├── distance_source.dart      # Источник расстояния
+│   ├── contact_profile.dart      # Профиль контакта
+│   ├── p2p_message.dart          # P2P сообщение
+│   └── map_objects/              # Объекты карты
+│       ├── map_object.dart       # Базовый класс
+│       ├── map_objects.dart      # Фабрика объектов
+│       ├── trash_monster.dart    # Мусорный монстр
+│       ├── secret_message.dart   # Секретное сообщение
+│       ├── creature.dart         # Существо
+│       ├── interest_note.dart    # Заметка
+│       ├── reminder_character.dart # Напоминалка
+│       └── foraging_spot.dart    # Место сбора
 ├── providers/
-│   ├── walk_provider.dart
-│   ├── pedometer_provider.dart
-│   └── map_object_provider.dart
+│   ├── walk_provider.dart        # Управление прогулками
+│   ├── pedometer_provider.dart   # Подсчёт шагов
+│   ├── map_object_provider.dart  # Объекты карты (БОЛЬШОЙ!)
+│   ├── chat_provider.dart        # P2P чаты
+│   └── theme_provider.dart       # Тема приложения
 ├── services/
-│   ├── location_service.dart
-│   ├── pedometer_service.dart
-│   ├── tile_cache_service.dart
-│   ├── object_action_service.dart
-│   ├── user_id_service.dart
-│   ├── storage_service.dart
-│   ├── photo_compression_service.dart  ✅ WebP
-│   ├── map_object_export_service.dart
+│   ├── location_service.dart     # GPS трекинг с фильтрацией
+│   ├── pedometer_service.dart    # Шагомер (акселерометр)
+│   ├── storage_service.dart      # Хранение прогулок (SharedPreferences)
+│   ├── sync_service.dart         # Синхронизация через ZIP
+│   ├── creature_service.dart     # Спавн существ
+│   ├── user_id_service.dart      # ID пользователя
 │   └── p2p/
-│       ├── p2p.dart
-│       ├── p2p_service.dart
-│       ├── p2p_connection.dart
-│       ├── secure_signaling_client.dart
-│       ├── sync_protocol.dart
-│       └── map_object_storage.dart
+│       ├── p2p_service.dart      # P2P сервис
+│       ├── map_object_storage.dart # SQLite хранилище
+│       ├── signaling_client.dart  # Сигнальный сервер
+│       └── ...
 ├── screens/
-│   ├── home_screen.dart
-│   ├── home/
-│   │   ├── walk_stats_panel.dart
-│   │   ├── steps_panel.dart
-│   │   ├── bottom_controls.dart
-│   │   └── home_components.dart
-│   ├── settings_screen.dart
-│   ├── history_screen.dart
-│   ├── walk_detail_screen.dart
-│   ├── add_object_screen.dart      ✅ Рефакторинг
-│   ├── route_planning_screen.dart
-│   └── storage_screen.dart
-├── widgets/
-│   ├── map_objects_layer.dart
-│   ├── object_details_sheet.dart
-│   ├── object_filters_widget.dart
-│   ├── nearby_objects_notifier.dart
-│   ├── stats_widget.dart
-│   └── photo_capture_widget.dart   ✅ Создан
-└── main.dart
+│   ├── home_screen.dart          # Главный экран (~1100 строк!)
+│   ├── settings_screen.dart      # Настройки (~1050 строк!)
+│   └── ...
+└── widgets/
+    ├── map_objects_layer.dart    # Слой объектов на карте
+    ├── object_details_sheet.dart # Детали объекта (~1100 строк!)
+    └── ...
 ```
 
 ---
 
-## 7. Метрики качества
+## 2. Провайдеры и состояние
 
-### После рефакторинга
+### WalkProvider (~380 строк)
+**Ответственность:** Управление прогулками, GPS трекинг, статистика
 
-| Метрика | Значение | Оценка |
-|---------|----------|--------|
-| Макс. размер файла | 1,072 | 🟡 Средне |
-| Средний размер файла | ~150 | 🟢 Хорошо |
-| Дублирование кода | ~3% | 🟢 Хорошо |
-| Тестируемость бизнес-логики | Высокая | 🟢 Хорошо |
-| Покрытие тестами | 0% | 🔴 Плохо |
-| Магические числа | 0 | 🟢 Отлично |
+**Проблемы:**
+- ❌ **Нарушение SRP** - управляет и прогулками, и настройками расстояния
+- ❌ Создает экземпляры сервисов напрямую: `LocationService()`, `StorageService()`, `PedometerService()`
 
-### Улучшения от рефакторинга
+```dart
+// walk_provider.dart:12-14
+final LocationService _locationService = LocationService();
+final StorageService _storageService = StorageService();
+final PedometerService _pedometerService = PedometerService();
+```
 
-| Показатель | До | После | Изменение |
-|------------|-----|-------|-----------|
-| `add_object_screen.dart` | 1,009 | 650 | **-35%** |
-| Дублирование кода | 8% | 3% | **-5%** |
-| Магические числа | ~20 | 0 | **-100%** |
-| Переиспользуемых виджетов | 5 | 6 | **+1** |
+### MapObjectProvider (~1180 строк!) 
+**Ответственность:** ВСЁ - объекты карты, P2P, существа, уведомления, модерация
 
----
+**КРИТИЧЕСКИЕ ПРОБЛЕМЫ:**
+- ❌ **God Object** - 1180 строк кода!
+- ❌ Управляет 5+ сервисами напрямую
+- ❌ Содержит бизнес-логику спавна существ, модерации, уведомлений
 
-## 8. История изменений
+```dart
+// map_object_provider.dart:12-18
+final MapObjectStorage _storage = MapObjectStorage();
+final P2PService _p2pService = P2PService();
+final MapObjectExportService _exportService = MapObjectExportService();
+final Uuid _uuid = const Uuid();
+final CreatureService _creatureService = CreatureService();
+final InterestNotificationService _notificationService = InterestNotificationService();
+```
 
-| Дата | Изменение | Файлы |
-|------|-----------|-------|
-| Март 2026 | Рефакторинг Phase 1: ObjectDetailsSheet | `widgets/object_details_sheet.dart` |
-| Март 2026 | Рефакторинг Phase 2: ObjectActionService | `services/object_action_service.dart` |
-| Март 2026 | WebP сжатие через flutter_image_compress | `services/photo_compression_service.dart` |
-| Март 2026 | Фото-поддержка TrashMonster | `screens/add_object_screen.dart`, `widgets/object_details_sheet.dart` |
-| Март 2026 | Реорганизация UI: Хранилище в Настройки | `screens/home_screen.dart`, `screens/settings_screen.dart` |
-| Март 2026 | Рефакторинг Phase 3: Константы + PhotoCaptureWidget | `config/constants.dart`, `widgets/photo_capture_widget.dart` |
+### PedometerProvider (~120 строк)
+✅ **Хороший пример** - фокусированная ответственность
 
----
-
-## 9. Выводы
-
-### Критический рефакторинг не требуется ✅
-
-Архитектура проекта находится в хорошем состоянии:
-- Чёткое разделение слоёв
-- Переиспользуемые компоненты
-- Вынесенная бизнес-логика
-- Модульная структура P2P
-- Централизованные константы
-- Устранено дублирование UI фото
-
-### Рекомендуемые улучшения (по приоритету)
-
-1. **🟢 Тесты** — базовое покрытие (4-6 часов)
-2. **🟢 SettingsScreen** — декомпозиция (3-4 часа)
-3. **🟢 HomeScreen** — декомпозиция (3-4 часа)
-
-### Общая оценка архитектуры: 8/10
-
-Сильные стороны перевешивают слабые. Проект готов к дальнейшему развитию без критического рефакторинга.
+### ThemeProvider (~80 строк)
+✅ **Хороший пример** - минимальный, фокусированный
 
 ---
 
-*Документ обновлён: Март 2026 — после рефакторинга Phase 3*
+## 3. Сервисы
+
+### LocationService (~580 строк)
+**Ответственность:** GPS трекинг с продвинутой фильтрацией
+
+**Плюсы:**
+- ✅ Singleton паттерн корректен
+- ✅ Продвинутая фильтрация GPS данных
+- ✅ Обнаружение неподвижности
+
+**Проблемы:**
+- ⚠️ Настройки фильтрации изменяемые извне (side effects)
+
+### PedometerService (~410 строк)
+**Ответственность:** Подсчёт шагов через системный датчик или акселерометр
+
+**Плюсы:**
+- ✅ Fallback на акселерометр при недоступности системного шагомера
+- ✅ Настраиваемая чувствительность
+
+### MapObjectStorage (~780 строк)
+**Ответственность:** SQLite хранилище объектов
+
+**Проблемы:**
+- ❌ **God Service** - управляет объектами, фото, сообщениями, уведомлениями, профилями
+- ❌ Нет разделения на репозитории
+
+### P2PService (~340 строк)
+**Ответственность:** P2P синхронизация
+
+**Плюсы:**
+- ✅ Чистая архитектура с отдельными компонентами (SignalingClient, SyncProtocol)
+- ✅ Хорошая обработка состояний
+
+---
+
+## 4. Модели данных
+
+### MapObject (базовый класс)
+✅ **Хороший дизайн:**
+- Полиморфизм через фабрику
+- Поддержка soft delete
+- Версионирование для синхронизации
+- Geohash для зонной синхронизации
+
+### Walk
+✅ **Хороший дизайн:**
+- Поддержка разных источников расстояния
+- Статистика объектов карты
+
+### Иерархия MapObjects
+✅ **Хороший дизайн:**
+```
+MapObject (abstract)
+├── TrashMonster    - с auto-classification
+├── SecretMessage   - с геолокационным_unlock
+├── Creature        - с RPG характеристиками
+├── InterestNote    - с фото и интересами
+├── ReminderCharacter - с триггерами
+└── ForagingSpot    - с сезонностью
+```
+
+---
+
+## 5. Экраны
+
+### HomeScreen (~1100 строк!)
+**КРИТИЧЕСКИЕ ПРОБЛЕМЫ:**
+- ❌ **God Widget** - 1100 строк!
+- ❌ Содержит бизнес-логику (спавн существ, обработка объектов)
+- ❌ Прямой доступ к сервисам из виджета
+
+```dart
+// home_screen.dart:38-42
+final LocationService _locationService = LocationService();
+final UserIdService _userIdService = UserIdService();
+final TileCacheService _tileCacheService = TileCacheService();
+final ObjectActionService _actionService = ObjectActionService();
+```
+
+### SettingsScreen (~1050 строк!)
+**Проблемы:**
+- ❌ Слишком большой экран
+- ⚠️ Прямой доступ к сервисам для изменения настроек
+
+---
+
+## 6. Виджеты
+
+### ObjectDetailsSheet (~1100 строк!)
+**Проблемы:**
+- ❌ **God Widget**
+- ❌ Содержит логику загрузки фото и модерации
+
+### MapObjectsLayer (~650 строк)
+**Плюсы:**
+- ✅ Переиспользуемый компонент
+- ⚠️ Содержит логику рендеринга для каждого типа объекта
+
+---
+
+## 7. Проблемы архитектуры
+
+### 🔴 КРИТИЧЕСКИЕ
+
+#### 1. God Objects
+| Компонент | Строки | Проблема |
+|-----------|--------|----------|
+| MapObjectProvider | ~1180 | Управляет всем |
+| HomeScreen | ~1100 | UI + бизнес-логика |
+| ObjectDetailsSheet | ~1100 | UI + логика модерации |
+| SettingsScreen | ~1050 | UI + логика настроек |
+
+#### 2. Нарушение Dependency Inversion
+```dart
+// Все провайдеры создают сервисы напрямую:
+final LocationService _locationService = LocationService();
+final StorageService _storageService = StorageService();
+// Должно быть через DI/конструктор
+```
+
+#### 3. Нарушение Single Responsibility Principle
+- `MapObjectProvider` делает слишком много:
+  - Управление объектами
+  - P2P синхронизация
+  - Спавн существ
+  - Модерация фото
+  - Уведомления
+  - Профили контактов
+
+#### 4. Сильная связанность (Tight Coupling)
+```dart
+// home_screen.dart напрямую зависит от сервисов
+final LocationService _locationService = LocationService();
+final UserIdService _userIdService = UserIdService();
+// Вместо использования провайдеров или DI
+```
+
+### 🟡 СРЕДНИЕ
+
+#### 5. Дублирование кода
+- Функция `calculateDistance` определена в `map_object.dart` и дублируется в `walk.dart` (как `_haversineDistance`)
+
+#### 6. Отсутствие абстракций для сервисов
+- Нет интерфейсов для сервисов → невозможно тестировать с моками
+
+#### 7. Проблемы с управлением состоянием
+- `_currentLocation` дублируется в HomeScreen и MapObjectProvider
+- `_routePoints` в HomeScreen дублирует данные из WalkProvider
+
+### 🟢 МИНОРНЫЕ
+
+#### 8. Magic Numbers
+```dart
+// map_object_provider.dart
+return distance <= 500; // 500 метров - magic number
+
+// catchCreature
+return distance <= 25; // 25 метров - magic number
+```
+
+#### 9. Глобальный NavigatorKey
+```dart
+// main.dart
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+```
+
+---
+
+## 8. Рекомендации по рефакторингу
+
+### Приоритет 1: Разделение MapObjectProvider
+
+```dart
+// Было:
+class MapObjectProvider extends ChangeNotifier {
+  final MapObjectStorage _storage = MapObjectStorage();
+  final P2PService _p2pService = P2PService();
+  final CreatureService _creatureService = CreatureService();
+  // ... ещё 5 сервисов
+}
+
+// Стало:
+class MapObjectProvider extends ChangeNotifier {
+  final MapObjectRepository _repository;
+  final P2PManager _p2pManager;
+  // Только координация
+}
+
+// Вынести в отдельные провайдеры:
+class CreatureProvider { ... }
+class NotificationProvider { ... }
+class ModerationProvider { ... }
+```
+
+### Приоритет 2: Внедрение Dependency Injection
+
+```dart
+// main.dart
+void main() async {
+  final getIt = GetIt.instance;
+  
+  // Регистрация сервисов
+  getIt.registerSingleton<LocationService>(LocationService());
+  getIt.registerSingleton<StorageService>(StorageService());
+  getIt.registerSingleton<MapObjectStorage>(MapObjectStorage());
+  
+  // Провайдеры получают зависимости через конструктор
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => WalkProvider(
+            locationService: getIt<LocationService>(),
+            storageService: getIt<StorageService>(),
+          ),
+        ),
+        // ...
+      ],
+    ),
+  );
+}
+
+class WalkProvider extends ChangeNotifier {
+  final LocationService _locationService;
+  final StorageService _storageService;
+  
+  WalkProvider({
+    required LocationService locationService,
+    required StorageService storageService,
+  }) : _locationService = locationService,
+       _storageService = storageService;
+}
+```
+
+### Приоритет 3: Разделение экранов
+
+```dart
+// home_screen.dart - разделить на:
+
+// home/
+//   home_screen.dart          (~200 строк - только структура)
+//   home_controller.dart      (~200 строк - логика)
+//   components/
+//     map_widget.dart
+//     top_panel.dart
+//     bottom_controls.dart
+//     creature_spawner.dart
+```
+
+### Приоритет 4: Вынести общую логику
+
+```dart
+// utils/geo_utils.dart
+double calculateDistance(double lat1, double lon1, double lat2, double lon2);
+
+// utils/format_utils.dart
+String formatDuration(Duration d);
+String formatDistance(double meters);
+```
+
+### Приоритет 5: Создать репозитории
+
+```dart
+// repositories/
+//   map_object_repository.dart
+//   walk_repository.dart
+//   message_repository.dart
+//   notification_repository.dart
+
+abstract class MapObjectRepository {
+  Future<List<MapObject>> getAll();
+  Future<void> save(MapObject object);
+  Future<void> delete(String id);
+  Stream<List<MapObject>> watch();
+}
+
+class SqliteMapObjectRepository implements MapObjectRepository {
+  final Database _db;
+  // ...
+}
+```
+
+### Приоритет 6: Добавить абстракции сервисов
+
+```dart
+abstract class LocationServiceBase {
+  Stream<WalkPoint> get positionStream;
+  Future<bool> checkPermission();
+  Future<WalkPoint?> getCurrentPosition();
+  Future<void> startTracking();
+  void stopTracking();
+}
+
+// Теперь можно создавать моки для тестов:
+class MockLocationService implements LocationServiceBase { ... }
+```
+
+---
+
+## 9. Итоговая оценка
+
+| Критерий | Оценка | Комментарий |
+|----------|--------|-------------|
+| **SOLID - SRP** | 🔴 2/10 | Много God Objects |
+| **SOLID - OCP** | 🟡 5/10 | Расширяемость через наследование, но не через композицию |
+| **SOLID - LSP** | 🟢 8/10 | Модели хорошо спроектированы |
+| **SOLID - ISP** | 🟡 5/10 | Некоторые провайдеры имеют слишком много методов |
+| **SOLID - DIP** | 🔴 2/10 | Прямое создание зависимостей |
+| **Тестируемость** | 🔴 3/10 | Нет DI, нет интерфейсов |
+| **Поддерживаемость** | 🟡 5/10 | Код читаемый, но сложный для изменений |
+| **Масштабируемость** | 🟡 5/10 | Функционально, но нужен рефакторинг |
+
+---
+
+## 10. План рефакторинга (рекомендуемый порядок)
+
+### Фаза 1: Основы (2-3 недели)
+1. **Неделя 1:** Внедрить DI (GetIt) + создать интерфейсы сервисов
+2. **Неделя 2:** Разделить `MapObjectProvider` на 3-4 провайдера
+3. **Неделя 3:** Разделить `HomeScreen` на компоненты
+
+### Фаза 2: Улучшения (2-3 недели)
+4. **Неделя 4:** Вынести репозитории, создать абстракции
+5. **Неделя 5:** Добавить unit-тесты для критической логики
+6. **Неделя 6:** Рефакторинг утилит и констант
+
+### Фаза 3: Оптимизация (1-2 недели)
+7. Устранить дублирование состояния
+8. Добавить интеграционные тесты
+9. Документировать архитектуру
+
+---
+
+## 11. Детальный план разделения MapObjectProvider
+
+### Текущее состояние (~1180 строк)
+```
+MapObjectProvider
+├── Управление объектами (CRUD)
+├── P2P синхронизация
+├── Спавн существ
+├── Модерация фото
+├── Уведомления
+├── Профили контактов
+├── Интересы к заметкам
+└── Экспорт/импорт
+```
+
+### Предлагаемое разделение
+```
+MapObjectProvider (~300 строк)
+├── Координация
+├── Фильтрация объектов
+└── Делегирование специализированным провайдерам
+
+CreatureProvider (~200 строк)
+├── Спавн существ
+├── Поимка существ
+└── Коллекция пользователя
+
+NotificationProvider (~150 строк)
+├── Уведомления о интересах
+├── Напоминания
+└── Статус прочтения
+
+ModerationProvider (~150 строк)
+├── Голосование за фото
+├── Подтверждение/опровержение объектов
+└── Статистика модерации
+
+P2PProvider (~200 строк)
+├── Синхронизация
+├── Статус соединения
+└── Обмен объектами
+```
+
+---
+
+## 12. Выгоды от рефакторинга
+
+### Тестируемость
+- Можно писать unit-тесты для каждого провайдера изолированно
+- Моки для сервисов через интерфейсы
+- Интеграционные тесты без реальных зависимостей
+
+### Поддерживаемость
+- Каждый файл < 300 строк
+- Чёткая ответственность каждого компонента
+- Легче находить и исправлять баги
+
+### Масштабируемость
+- Легко добавлять новые типы объектов
+- Новые функции не ломают существующий код
+- Командная разработка без конфликтов
+
+### Производительность разработки
+- Меньше времени на понимание кода
+- Быстрее onboarding новых разработчиков
+- Меньше регрессионных багов
