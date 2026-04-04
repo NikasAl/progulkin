@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -125,7 +126,7 @@ class PedometerService {
     // Чем выше чувствительность, тем короче может быть интервал
     _minStepInterval = 0.4 / _sensitivity;
     if (AppConfig.enableLogging) {
-      print('Pedometer: чувствительность=$_sensitivity, мин.интервал=${_minStepInterval.toStringAsFixed(2)} сек');
+      debugPrint('Pedometer: чувствительность=$_sensitivity, мин.интервал=${_minStepInterval.toStringAsFixed(2)} сек');
     }
   }
   
@@ -133,7 +134,7 @@ class PedometerService {
   void setAverageStepLength(double meters) {
     _averageStepLength = meters.clamp(0.5, 1.0);
     if (AppConfig.enableLogging) {
-      print('Pedometer: средняя длина шага=$_averageStepLength м');
+      debugPrint('Pedometer: средняя длина шага=$_averageStepLength м');
     }
   }
 
@@ -175,14 +176,14 @@ class PedometerService {
         },
         onError: (error) {
           if (AppConfig.enableLogging) {
-            print('Pedometer: ошибка системного шагомера: $error, переключаемся на акселерометр');
+            debugPrint('Pedometer: ошибка системного шагомера: $error, переключаемся на акселерометр');
           }
           _startAccelerometerCounting();
         },
       );
     } catch (e) {
       if (AppConfig.enableLogging) {
-        print('Pedometer: ошибка запуска шагомера: $e, переключаемся на акселерометр');
+        debugPrint('Pedometer: ошибка запуска шагомера: $e, переключаемся на акселерометр');
       }
       await _startAccelerometerCounting();
     }
@@ -202,7 +203,7 @@ class PedometerService {
     _timeBuffer.clear();
 
     if (AppConfig.enableLogging) {
-      print('Pedometer: запуск подсчёта через акселерометр (алгоритм на основе пиков)');
+      debugPrint('Pedometer: запуск подсчёта через акселерометр (алгоритм на основе пиков)');
     }
 
     _accelerometerSubscription = accelerometerEvents.listen((AccelerometerEvent event) {
@@ -271,7 +272,7 @@ class PedometerService {
         _stepTimePred = stepTimeCandidate;
         _isStepSeries = false;
         if (AppConfig.enableLogging) {
-          print('Pedometer: новая серия шагов началась');
+          debugPrint('Pedometer: новая серия шагов началась');
         }
       }
       
@@ -290,7 +291,7 @@ class PedometerService {
           _distanceController.add(distance);
           
           if (AppConfig.enableLogging) {
-            print('Pedometer: ШАГ #$_detectedSteps, dt=${dt.toStringAsFixed(2)} сек, амплитуда=${amplitude.toStringAsFixed(2)}');
+            debugPrint('Pedometer: ШАГ #$_detectedSteps, dt=${dt.toStringAsFixed(2)} сек, амплитуда=${amplitude.toStringAsFixed(2)}');
           }
         }
         _isStepSeries = true;
@@ -346,14 +347,14 @@ class PedometerService {
         },
         onError: (error) {
           if (AppConfig.enableLogging) {
-            print('Pedometer: ошибка системного шагомера при возобновлении: $error');
+            debugPrint('Pedometer: ошибка системного шагомера при возобновлении: $error');
           }
           _resumeAccelerometerCounting();
         },
       );
     } catch (e) {
       if (AppConfig.enableLogging) {
-        print('Pedometer: ошибка возобновления шагомера: $e');
+        debugPrint('Pedometer: ошибка возобновления шагомера: $e');
       }
       _resumeAccelerometerCounting();
     }
@@ -372,7 +373,7 @@ class PedometerService {
     _isJustStarted = true;
 
     if (AppConfig.enableLogging) {
-      print('Pedometer: возобновление подсчёта через акселерометр (шагов=$_detectedSteps)');
+      debugPrint('Pedometer: возобновление подсчёта через акселерометр (шагов=$_detectedSteps)');
     }
 
     _accelerometerSubscription = accelerometerEvents.listen((AccelerometerEvent event) {

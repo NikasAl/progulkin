@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../config/app_config.dart';
@@ -65,24 +66,24 @@ class LocationService {
     if (adaptiveSmoothing != null) enableAdaptiveSmoothing = adaptiveSmoothing;
     if (turnThreshold != null) sharpTurnThresholdDegrees = turnThreshold;
     if (smoothingWeight != null) this.smoothingWeight = smoothingWeight;
-    print('Настройки: скорость=$maxWalkingSpeedKmh км/ч, точность=$maxAccuracyMeters м, радиус неподвижности=$stationaryRadiusMeters м');
-    print('Сглаживание: вкл=$enableSmoothing, адаптивное=$enableAdaptiveSmoothing, порог поворота=$sharpTurnThresholdDegrees°, вес=${this.smoothingWeight}');
+    debugPrint('Настройки: скорость=$maxWalkingSpeedKmh км/ч, точность=$maxAccuracyMeters м, радиус неподвижности=$stationaryRadiusMeters м');
+    debugPrint('Сглаживание: вкл=$enableSmoothing, адаптивное=$enableAdaptiveSmoothing, порог поворота=$sharpTurnThresholdDegrees°, вес=${this.smoothingWeight}');
   }
 
   /// Проверка разрешений на геолокацию
   Future<bool> checkPermission() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      print('GPS сервис отключён');
+      debugPrint('GPS сервис отключён');
       return false;
     }
 
     LocationPermission permission = await Geolocator.checkPermission();
-    print('Текущее разрешение: $permission');
+    debugPrint('Текущее разрешение: $permission');
     
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      print('Запрошено разрешение, результат: $permission');
+      debugPrint('Запрошено разрешение, результат: $permission');
       if (permission == LocationPermission.denied) {
         return false;
       }
@@ -119,15 +120,15 @@ class LocationService {
           timeLimit: const Duration(seconds: 20),
         );
       } catch (e) {
-        print('Не удалось получить позицию: $e');
+        debugPrint('Не удалось получить позицию: $e');
         return null;
       }
 
       final walkPoint = _positionToWalkPoint(position);
-      print('Позиция: ${walkPoint.latitude.toStringAsFixed(6)}, ${walkPoint.longitude.toStringAsFixed(6)}, точность: ${walkPoint.accuracy.toStringAsFixed(1)}м');
+      debugPrint('Позиция: ${walkPoint.latitude.toStringAsFixed(6)}, ${walkPoint.longitude.toStringAsFixed(6)}, точность: ${walkPoint.accuracy.toStringAsFixed(1)}м');
       return walkPoint;
     } catch (e) {
-      print('Ошибка: $e');
+      debugPrint('Ошибка: $e');
       return null;
     }
   }
@@ -148,8 +149,8 @@ class LocationService {
     _pointsAccepted = 0;
     _isStationary = false;
 
-    print('Начинаем отслеживание GPS...');
-    print('Настройки: макс.скорость=$maxWalkingSpeedKmh км/ч, макс.точность=$maxAccuracyMeters м');
+    debugPrint('Начинаем отслеживание GPS...');
+    debugPrint('Настройки: макс.скорость=$maxWalkingSpeedKmh км/ч, макс.точность=$maxAccuracyMeters м');
 
     // Настройки локации
     late LocationSettings locationSettings;
@@ -181,7 +182,7 @@ class LocationService {
         _processPosition(position);
       },
       onError: (error) {
-        print('Ошибка GPS: $error');
+        debugPrint('Ошибка GPS: $error');
       },
     );
   }
@@ -192,10 +193,10 @@ class LocationService {
     final walkPoint = _positionToWalkPoint(position);
     
     if (AppConfig.enableLogging) {
-      print('\n--- Точка #$_pointsReceived ---');
-      print('Координаты: ${walkPoint.latitude.toStringAsFixed(6)}, ${walkPoint.longitude.toStringAsFixed(6)}');
-      print('Точность: ${walkPoint.accuracy.toStringAsFixed(1)}м');
-      print('Скорость GPS: ${(walkPoint.speed * 3.6).toStringAsFixed(1)} км/ч');
+      debugPrint('\n--- Точка #$_pointsReceived ---');
+      debugPrint('Координаты: ${walkPoint.latitude.toStringAsFixed(6)}, ${walkPoint.longitude.toStringAsFixed(6)}');
+      debugPrint('Точность: ${walkPoint.accuracy.toStringAsFixed(1)}м');
+      debugPrint('Скорость GPS: ${(walkPoint.speed * 3.6).toStringAsFixed(1)} км/ч');
     }
 
     // Определение неподвижности
@@ -203,7 +204,7 @@ class LocationService {
       _checkStationary(walkPoint);
       if (_isStationary) {
         if (AppConfig.enableLogging) {
-          print('⊙ Неподвижность: точка в радиусе ${stationaryRadiusMeters.toStringAsFixed(0)}м');
+          debugPrint('⊙ Неподвижность: точка в радиусе ${stationaryRadiusMeters.toStringAsFixed(0)}м');
         }
         // Не добавляем точку, но обновляем последнюю валидную
         return;
@@ -234,11 +235,11 @@ class LocationService {
       _positionController.add(finalPoint);
       
       if (AppConfig.enableLogging) {
-        print('✓ ПРИНЯТА (принято: $_pointsAccepted из $_pointsReceived), heading: ${finalPoint.heading.toStringAsFixed(0)}°');
+        debugPrint('✓ ПРИНЯТА (принято: $_pointsAccepted из $_pointsReceived), heading: ${finalPoint.heading.toStringAsFixed(0)}°');
       }
     } else {
       if (AppConfig.enableLogging) {
-        print('✗ ОТКЛОНЕНА: ${filterResult.reason}');
+        debugPrint('✗ ОТКЛОНЕНА: ${filterResult.reason}');
       }
     }
   }
@@ -336,11 +337,11 @@ class LocationService {
           final smoothLat = smoothed.latitude;
           final smoothLon = smoothed.longitude;
           final shift = _calculateDistance(origLat, origLon, smoothLat, smoothLon);
-          print('〰️ Сглаживание: смещение ${shift.toStringAsFixed(2)}м');
+          debugPrint('〰️ Сглаживание: смещение ${shift.toStringAsFixed(2)}м');
         }
       } else {
         if (AppConfig.enableLogging) {
-          print('🔺 Поворот сохранён без сглаживания');
+          debugPrint('🔺 Поворот сохранён без сглаживания');
         }
       }
     }
@@ -375,7 +376,7 @@ class LocationService {
     // Если изменение направления больше порога - это поворот, не сглаживаем
     if (angleChange > sharpTurnThresholdDegrees) {
       if (AppConfig.enableLogging) {
-        print('↪️ Обнаружен поворот: ${angleChange.toStringAsFixed(1)}°');
+        debugPrint('↪️ Обнаружен поворот: ${angleChange.toStringAsFixed(1)}°');
       }
       return false;
     }
@@ -466,7 +467,7 @@ class LocationService {
       _stationaryBuffer = [newPoint];
       _isStationary = false;
       if (AppConfig.enableLogging) {
-        print('📍 Новая точка отсчёта для проверки неподвижности');
+        debugPrint('📍 Новая точка отсчёта для проверки неподвижности');
       }
       return;
     }
@@ -480,14 +481,14 @@ class LocationService {
     );
     
     if (AppConfig.enableLogging) {
-      print('📏 Расстояние от начала: ${distanceFromStart.toStringAsFixed(1)}м, буфер: ${_stationaryBuffer.length}');
+      debugPrint('📏 Расстояние от начала: ${distanceFromStart.toStringAsFixed(1)}м, буфер: ${_stationaryBuffer.length}');
     }
     
     // Если превысили радиус - движение! Сбрасываем и начинаем сначала
     if (distanceFromStart > stationaryRadiusMeters) {
       if (_isStationary) {
         if (AppConfig.enableLogging) {
-          print('⚡ Вышли из неподвижности (прошли ${distanceFromStart.toStringAsFixed(1)}м)');
+          debugPrint('⚡ Вышли из неподвижности (прошли ${distanceFromStart.toStringAsFixed(1)}м)');
         }
       }
       _stationaryStartPoint = newPoint;
@@ -507,7 +508,7 @@ class LocationService {
       
       if (!_isStationary) {
         if (AppConfig.enableLogging) {
-          print('⚠ Неподвижность подтверждена ($duration сек, ${_stationaryBuffer.length} точек)');
+          debugPrint('⚠ Неподвижность подтверждена ($duration сек, ${_stationaryBuffer.length} точек)');
         }
         _isStationary = true;
       }
@@ -531,7 +532,7 @@ class LocationService {
     _pointsReceived = 0;
     _pointsAccepted = 0;
     _isStationary = false;
-    print('GPS остановлен. Статистика: принято $_pointsAccepted из $_pointsReceived');
+    debugPrint('GPS остановлен. Статистика: принято $_pointsAccepted из $_pointsReceived');
   }
 
   /// Проверка, активно ли отслеживание

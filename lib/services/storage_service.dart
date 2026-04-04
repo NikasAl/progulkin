@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/walk.dart';
 
@@ -37,7 +38,7 @@ class StorageService {
       
       return await _prefs!.setString(_walksKey, jsonString);
     } catch (e) {
-      print('Ошибка сохранения прогулки: $e');
+      debugPrint('Ошибка сохранения прогулки: $e');
       return false;
     }
   }
@@ -55,7 +56,7 @@ class StorageService {
           .map((json) => Walk.fromMap(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('Ошибка загрузки прогулок: $e');
+      debugPrint('Ошибка загрузки прогулок: $e');
       return [];
     }
   }
@@ -81,7 +82,7 @@ class StorageService {
       
       return await _prefs!.setString(_walksKey, jsonString);
     } catch (e) {
-      print('Ошибка удаления прогулки: $e');
+      debugPrint('Ошибка удаления прогулки: $e');
       return false;
     }
   }
@@ -97,7 +98,7 @@ class StorageService {
       final jsonString = jsonEncode(settings);
       return await _prefs!.setString(_settingsKey, jsonString);
     } catch (e) {
-      print('Ошибка сохранения настроек: $e');
+      debugPrint('Ошибка сохранения настроек: $e');
       return false;
     }
   }
@@ -111,7 +112,7 @@ class StorageService {
       }
       return jsonDecode(jsonString) as Map<String, dynamic>;
     } catch (e) {
-      print('Ошибка загрузки настроек: $e');
+      debugPrint('Ошибка загрузки настроек: $e');
       return _defaultSettings();
     }
   }
