@@ -1,7 +1,9 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/map_objects/creature.dart';
 import 'package:uuid/uuid.dart';
+import 'habitat_service.dart';
 
 /// Сервис для спавна и управления существами
 class CreatureService {
@@ -11,6 +13,10 @@ class CreatureService {
 
   final _random = Random();
   final _uuid = const Uuid();
+  final HabitatService _habitatService = HabitatService();
+
+  /// Кэшированный результат определения среды
+  HabitatDetectionResult? _lastHabitatResult;
 
   /// Конфигурация спавна для каждого типа существа
   static const Map<CreatureType, CreatureSpawnConfig> _spawnConfigs = {
@@ -123,34 +129,95 @@ class CreatureService {
     ),
   };
 
-  /// Определить среду обитания по координатам
-  /// Использует простую эвристику на основе географических признаков
-  CreatureHabitat detectHabitat(double latitude, double longitude) {
-    // Простая эвристика: случайный выбор с весами
-    // В реальном приложении можно использовать OSM данные или ML
-    final roll = _random.nextDouble();
+  /// Определить среду обитания по координатам (асинхронно через OSM)
+  Future<HabitatDetectionResult> detectHabitatAsync(
+    double latitude,
+    double longitude,
+  ) async {
+    final result = await _habitatService.detectHabitat(latitude, longitude);
+    _lastHabitatResult = result;
 
-    if (roll < 0.25) {
-      return CreatureHabitat.forest;
-    } else if (roll < 0.45) {
-      return CreatureHabitat.water;
-    } else if (roll < 0.55) {
-      return CreatureHabitat.city;
-    } else if (roll < 0.65) {
-      return CreatureHabitat.field;
-    } else if (roll < 0.75) {
-      return CreatureHabitat.home;
-    } else if (roll < 0.85) {
-      return CreatureHabitat.swamp;
-    } else if (roll < 0.95) {
-      return CreatureHabitat.mountain;
+    if (result.fromCache) {
+      debugPrint('🌍 Среда (из кэша): ${result.primaryHabitat.name}');
     } else {
-      return CreatureHabitat.anywhere;
+      debugPrint('🌍 Среда определена: ${result.primaryHabitat.name} '
+          '(score: ${result.habitatScores[result.primaryHabitat]?.toStringAsFixed(2)})');
     }
+
+    return result;
   }
 
-  /// Попытка заспавнить существо в заданной области
-  /// Возвращает существо или null если спавн не произошёл
+  /// Определить среду обитания синхронно (использует кэш или fallback)
+  CreatureHabitat detectHabitat(double latitude, double longitude) {
+    // Если есть кэшированный результат - используем его
+    if (_lastHabitatResult != null) {
+      return _lastHabitatResult!.primaryHabitat;
+    }
+
+    // Fallback - городская среда (наиболее вероятна)
+    return CreatureHabitat.city;
+  }
+
+  /// Попытка заспавнить существо в заданной области (асинхронная версия)
+  Future<Creature?> trySpawnCreatureAsync({
+    required double centerLat,
+    required double centerLng,
+    double radiusKm = 1.0,
+    CreatureHabitat? forceHabitat,
+  }) async {
+    // Определяем среду через OSM
+    final habitatResult = forceHabitat != null
+        ? HabitatDetectionResult(
+            primaryHabitat: forceHabitat,
+            habitatScores: {forceHabitat: 1.0},
+            detectedAt: DateTime.now(),
+          )
+        : await detectHabitatAsync(centerLat, centerLng);
+
+    // Находим существ, которые могут появиться в любой из подходящих сред
+    final possibleCreatures = _getPossibleCreatures(habitatResult);
+
+    if (possibleCreatures.isEmpty) {
+      debugPrint('⚠️ Нет существ для среды: ${habitatResult.primaryHabitat.name}');
+      return null;
+    }
+
+    // Сортируем по редкости (редкие в конце)
+    possibleCreatures.sort((a, b) => a.value.rarity.level.compareTo(b.value.rarity.level));
+
+    // Проверяем каждого кандидата от редкого к обычному
+    for (int i = possibleCreatures.length - 1; i >= 0; i--) {
+      final entry = possibleCreatures[i];
+      final creatureType = entry.key;
+      final config = entry.value;
+
+      // Модификатор шанса на основе score среды
+      final habitatScore = _getHabitatScore(config.habitats, habitatResult);
+      final adjustedChance = config.spawnChance * habitatScore;
+
+      // Бросок кубика на спавн
+      if (_random.nextDouble() < adjustedChance) {
+        // Выбираем наиболее подходящую среду для этого существа
+        final bestHabitat = _selectBestHabitat(config.habitats, habitatResult);
+
+        debugPrint('🦊 Спавн: ${creatureType.emoji} ${creatureType.name} '
+            'в среде ${bestHabitat.name} (chance: ${(adjustedChance * 100).toStringAsFixed(1)}%)');
+
+        return _createCreature(
+          creatureType: creatureType,
+          config: config,
+          centerLat: centerLat,
+          centerLng: centerLng,
+          radiusKm: radiusKm,
+          habitat: bestHabitat,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  /// Попытка заспавнить существо (синхронная версия для обратной совместимости)
   Creature? trySpawnCreature({
     required double centerLat,
     required double centerLng,
@@ -177,7 +244,6 @@ class CreatureService {
 
       // Бросок кубика на спавн
       if (_random.nextDouble() < config.spawnChance) {
-        // Спавн произошёл! Создаём существо
         return _createCreature(
           creatureType: creatureType,
           config: config,
@@ -190,6 +256,60 @@ class CreatureService {
     }
 
     return null;
+  }
+
+  /// Получить список возможных существ для всех подходящих сред
+  List<MapEntry<CreatureType, CreatureSpawnConfig>> _getPossibleCreatures(
+    HabitatDetectionResult habitatResult,
+  ) {
+    final result = <MapEntry<CreatureType, CreatureSpawnConfig>>[];
+    final addedTypes = <CreatureType>{};
+
+    for (final habitat in habitatResult.sortedHabitats) {
+      if (!habitatResult.isHabitatSuitable(habitat)) continue;
+
+      for (final entry in _spawnConfigs.entries) {
+        if (entry.value.habitats.contains(habitat) && !addedTypes.contains(entry.key)) {
+          result.add(entry);
+          addedTypes.add(entry.key);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /// Получить score для существа на основе его сред обитания
+  double _getHabitatScore(
+    List<CreatureHabitat> creatureHabitats,
+    HabitatDetectionResult habitatResult,
+  ) {
+    double maxScore = 0;
+    for (final habitat in creatureHabitats) {
+      final score = habitatResult.habitatScores[habitat] ?? 0;
+      if (score > maxScore) maxScore = score;
+    }
+    // Минимальный шанс 0.3 даже если среда не идеально подходит
+    return max(0.3, maxScore);
+  }
+
+  /// Выбрать лучшую среду для существа
+  CreatureHabitat _selectBestHabitat(
+    List<CreatureHabitat> creatureHabitats,
+    HabitatDetectionResult habitatResult,
+  ) {
+    CreatureHabitat best = creatureHabitats.first;
+    double bestScore = 0;
+
+    for (final habitat in creatureHabitats) {
+      final score = habitatResult.habitatScores[habitat] ?? 0;
+      if (score > bestScore) {
+        bestScore = score;
+        best = habitat;
+      }
+    }
+
+    return best;
   }
 
   /// Создать существо с заданными параметрами
@@ -234,8 +354,30 @@ class CreatureService {
     );
   }
 
-  /// Спавнить существ вокруг позиции игрока
-  /// Вызывается периодически во время прогулки
+  /// Спавнить существ вокруг позиции игрока (асинхронная версия)
+  Future<List<Creature>> spawnAroundPlayerAsync({
+    required double playerLat,
+    required double playerLng,
+    int maxCreatures = 3,
+    double radiusKm = 2.0,
+  }) async {
+    final spawned = <Creature>[];
+
+    for (int i = 0; i < maxCreatures; i++) {
+      final creature = await trySpawnCreatureAsync(
+        centerLat: playerLat,
+        centerLng: playerLng,
+        radiusKm: radiusKm,
+      );
+      if (creature != null) {
+        spawned.add(creature);
+      }
+    }
+
+    return spawned;
+  }
+
+  /// Спавнить существ вокруг игрока (синхронная версия)
   List<Creature> spawnAroundPlayer({
     required double playerLat,
     required double playerLng,
@@ -270,6 +412,9 @@ class CreatureService {
   CreatureSpawnConfig? getSpawnConfig(CreatureType type) {
     return _spawnConfigs[type];
   }
+
+  /// Получить последнее определение среды
+  HabitatDetectionResult? get lastHabitatResult => _lastHabitatResult;
 
   /// Рассчитать шанс поимки существа
   double calculateCatchChance(Creature creature, int playerLevel) {

@@ -59,7 +59,8 @@ class CreatureProvider extends ChangeNotifier {
     int maxCreatures = 2,
     double radiusKm = 1.5,
   }) async {
-    final spawned = _creatureService.spawnAroundPlayer(
+    // Используем асинхронную версию с определением среды через OSM
+    final spawned = await _creatureService.spawnAroundPlayerAsync(
       playerLat: playerLat,
       playerLng: playerLng,
       maxCreatures: maxCreatures,
