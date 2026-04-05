@@ -13,11 +13,11 @@ class AppConstants {
   static const double photoVerificationRadius = 100.0;
 
   /// Радиус уборки мусорного монстра (метры)
-  static const double cleaningRadius = 100.0;
+  static const double cleaningRadius = 20.0;
 
   /// Радиус ловли существ (метры)
   /// Ограничен точностью GPS ~20-30м
-  static const double catchingRadius = 25.0;
+  static const double catchingRadius = 20.0;
 
   /// Радиус уведомлений о близлежащих объектах (метры)
   static const double nearbyAlertRadius = 100.0;

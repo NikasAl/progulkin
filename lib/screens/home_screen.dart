@@ -358,6 +358,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               objects: mapObjectProvider.objects,
               onObjectTap: (obj) => _showObjectDetails(obj),
               onObjectLongPress: (obj) => _showObjectOptions(obj),
+              userLocation: _currentLocation,
             );
           },
         ),

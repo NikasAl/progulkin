@@ -2,18 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/map_objects/map_objects.dart';
+import '../config/constants.dart';
 
 /// Виджет слоя объектов на карте
 class MapObjectsLayer extends StatelessWidget {
   final List<MapObject> objects;
   final Function(MapObject)? onObjectTap;
   final Function(MapObject)? onObjectLongPress;
+  final LatLng? userLocation;
+  final double interactionRadius;
 
   const MapObjectsLayer({
     super.key,
     required this.objects,
     this.onObjectTap,
     this.onObjectLongPress,
+    this.userLocation,
+    this.interactionRadius = AppConstants.cleaningRadius,
   });
 
   @override
@@ -26,6 +31,8 @@ class MapObjectsLayer extends StatelessWidget {
   }
 
   Marker _buildMarker(BuildContext context, MapObject obj) {
+    final isInInteractionRange = _isObjectInRange(obj);
+
     return Marker(
       point: LatLng(obj.latitude, obj.longitude),
       width: _getMarkerSize(obj),
@@ -33,9 +40,35 @@ class MapObjectsLayer extends StatelessWidget {
       child: GestureDetector(
         onTap: onObjectTap != null ? () => onObjectTap!(obj) : null,
         onLongPress: onObjectLongPress != null ? () => onObjectLongPress!(obj) : null,
-        child: _MarkerWidget(object: obj),
+        child: _MarkerWidget(
+          object: obj,
+          highlight: isInInteractionRange,
+        ),
       ),
     );
+  }
+
+  /// Проверить, находится ли объект в радиусе действия
+  bool _isObjectInRange(MapObject obj) {
+    if (userLocation == null) return false;
+
+    final distance = calculateDistance(
+      userLocation!.latitude,
+      userLocation!.longitude,
+      obj.latitude,
+      obj.longitude,
+    );
+
+    // Для разных типов объектов - разный радиус
+    double radius = interactionRadius;
+    if (obj.type == MapObjectType.creature) {
+      radius = AppConstants.catchingRadius;
+    } else if (obj.type == MapObjectType.secretMessage) {
+      final secret = obj as SecretMessage;
+      radius = secret.unlockRadius;
+    }
+
+    return distance <= radius;
   }
 
   double _getMarkerSize(MapObject obj) {
@@ -56,18 +89,68 @@ class MapObjectsLayer extends StatelessWidget {
 }
 
 /// Виджет маркера объекта
-class _MarkerWidget extends StatelessWidget {
+class _MarkerWidget extends StatefulWidget {
   final MapObject object;
+  final bool highlight;
 
-  const _MarkerWidget({required this.object});
+  const _MarkerWidget({
+    required this.object,
+    this.highlight = false,
+  });
+
+  @override
+  State<_MarkerWidget> createState() => _MarkerWidgetState();
+}
+
+class _MarkerWidgetState extends State<_MarkerWidget>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _pulseController;
+  Animation<double>? _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAnimation();
+  }
+
+  @override
+  void didUpdateWidget(_MarkerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.highlight != oldWidget.highlight) {
+      _initAnimation();
+    }
+  }
+
+  void _initAnimation() {
+    if (widget.highlight && _pulseController == null) {
+      _pulseController = AnimationController(
+        duration: const Duration(milliseconds: 800),
+        vsync: this,
+      )..repeat(reverse: true);
+
+      _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+        CurvedAnimation(parent: _pulseController!, curve: Curves.easeInOut),
+      );
+    } else if (!widget.highlight && _pulseController != null) {
+      _pulseController?.dispose();
+      _pulseController = null;
+      _pulseAnimation = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    final content = Stack(
       alignment: Alignment.center,
       children: [
         // Внешнее кольцо (индикатор репутации)
-        if (object.isTrusted)
+        if (widget.object.isTrusted)
           Container(
             width: 50,
             height: 50,
@@ -79,7 +162,28 @@ class _MarkerWidget extends StatelessWidget {
               ),
             ),
           ),
-        
+
+        // Кольцо выделения для объектов в радиусе действия
+        if (widget.highlight)
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.yellow.withValues(alpha: 0.8),
+                width: 3,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.yellow.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+          ),
+
         // Основной маркер
         Container(
           decoration: BoxDecoration(
@@ -87,8 +191,10 @@ class _MarkerWidget extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 4,
+                color: widget.highlight
+                    ? Colors.yellow.withValues(alpha: 0.5)
+                    : Colors.black.withValues(alpha: 0.3),
+                blurRadius: widget.highlight ? 8 : 4,
                 offset: const Offset(0, 2),
               ),
             ],
@@ -97,23 +203,38 @@ class _MarkerWidget extends StatelessWidget {
             child: _buildMarkerContent(),
           ),
         ),
-        
+
         // Индикатор статуса
         if (_hasStatusIndicator())
           Positioned(
             bottom: 0,
             right: 0,
-            child: _StatusBadge(object: object),
+            child: _StatusBadge(object: widget.object),
           ),
       ],
     );
+
+    // Применяем анимацию пульсации если объект в радиусе
+    if (_pulseAnimation != null) {
+      return AnimatedBuilder(
+        animation: _pulseAnimation!,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _pulseAnimation!.value,
+            child: content,
+          );
+        },
+      );
+    }
+
+    return content;
   }
 
   /// Построение содержимого маркера (эмодзи или картинка)
   Widget _buildMarkerContent() {
     // Для мусорных монстров используем картинки
-    if (object.type == MapObjectType.trashMonster) {
-      final monster = object as TrashMonster;
+    if (widget.object.type == MapObjectType.trashMonster) {
+      final monster = widget.object as TrashMonster;
       return ClipOval(
         child: Image.asset(
           monster.trashType.assetPath,
@@ -132,8 +253,8 @@ class _MarkerWidget extends StatelessWidget {
     }
 
     // Для мест сбора используем картинки
-    if (object.type == MapObjectType.foragingSpot) {
-      final spot = object as ForagingSpot;
+    if (widget.object.type == MapObjectType.foragingSpot) {
+      final spot = widget.object as ForagingSpot;
       return ClipOval(
         child: Image.asset(
           spot.itemTypeAssetPath,
@@ -152,8 +273,8 @@ class _MarkerWidget extends StatelessWidget {
     }
 
     // Для существ тоже можно добавить картинки позже
-    if (object.type == MapObjectType.creature) {
-      final creature = object as Creature;
+    if (widget.object.type == MapObjectType.creature) {
+      final creature = widget.object as Creature;
       return Text(
         creature.creatureType.emoji,
         style: TextStyle(fontSize: _getEmojiSize()),
@@ -161,8 +282,8 @@ class _MarkerWidget extends StatelessWidget {
     }
 
     // Для заметок об интересных местах используем эмодзи категории
-    if (object.type == MapObjectType.interestNote) {
-      final note = object as InterestNote;
+    if (widget.object.type == MapObjectType.interestNote) {
+      final note = widget.object as InterestNote;
       return Text(
         note.category.emoji,
         style: TextStyle(fontSize: _getEmojiSize()),
@@ -170,8 +291,8 @@ class _MarkerWidget extends StatelessWidget {
     }
 
     // Для напоминалок используем эмодзи персонажа
-    if (object.type == MapObjectType.reminderCharacter) {
-      final reminder = object as ReminderCharacter;
+    if (widget.object.type == MapObjectType.reminderCharacter) {
+      final reminder = widget.object as ReminderCharacter;
       return Text(
         reminder.characterType.emoji,
         style: TextStyle(fontSize: _getEmojiSize()),
@@ -180,19 +301,19 @@ class _MarkerWidget extends StatelessWidget {
 
     // Для остальных типов - эмодзи
     return Text(
-      object.type.emoji,
+      widget.object.type.emoji,
       style: TextStyle(fontSize: _getEmojiSize()),
     );
   }
 
   Color _getBackgroundColor() {
-    if (object.status == MapObjectStatus.hidden) {
+    if (widget.object.status == MapObjectStatus.hidden) {
       return Colors.grey.withValues(alpha: 0.7);
     }
 
-    switch (object.type) {
+    switch (widget.object.type) {
       case MapObjectType.trashMonster:
-        final monster = object as TrashMonster;
+        final monster = widget.object as TrashMonster;
         if (monster.isCleaned) {
           return Colors.green.withValues(alpha: 0.8);
         }
@@ -202,21 +323,21 @@ class _MarkerWidget extends StatelessWidget {
         return Colors.purple.withValues(alpha: 0.8);
 
       case MapObjectType.creature:
-        final creature = object as Creature;
+        final creature = widget.object as Creature;
         if (!creature.isWild) {
           return Colors.blue.withValues(alpha: 0.8);
         }
         return _getRarityColor(creature.rarity);
 
       case MapObjectType.interestNote:
-        final note = object as InterestNote;
+        final note = widget.object as InterestNote;
         return _getCategoryColor(note.category);
 
       case MapObjectType.reminderCharacter:
         return Colors.cyan.withValues(alpha: 0.8);
 
       case MapObjectType.foragingSpot:
-        final spot = object as ForagingSpot;
+        final spot = widget.object as ForagingSpot;
         // Цвет в зависимости от сезона
         if (spot.isInSeason) {
           return Colors.green.withValues(alpha: 0.8);
@@ -270,31 +391,31 @@ class _MarkerWidget extends StatelessWidget {
   }
 
   double _getEmojiSize() {
-    if (object.type == MapObjectType.creature) {
-      final creature = object as Creature;
+    if (widget.object.type == MapObjectType.creature) {
+      final creature = widget.object as Creature;
       return 20.0 + creature.rarity.level * 2;
     }
     return 22.0;
   }
 
   bool _hasStatusIndicator() {
-    if (object.type == MapObjectType.trashMonster) {
-      return (object as TrashMonster).isCleaned;
+    if (widget.object.type == MapObjectType.trashMonster) {
+      return (widget.object as TrashMonster).isCleaned;
     }
-    if (object.type == MapObjectType.creature) {
-      return !(object as Creature).isWild;
+    if (widget.object.type == MapObjectType.creature) {
+      return !(widget.object as Creature).isWild;
     }
     // Для заметок показываем индикатор если есть фото
-    if (object.type == MapObjectType.interestNote) {
-      return (object as InterestNote).photoIds.isNotEmpty;
+    if (widget.object.type == MapObjectType.interestNote) {
+      return (widget.object as InterestNote).photoIds.isNotEmpty;
     }
     // Для напоминаний показываем статус
-    if (object.type == MapObjectType.reminderCharacter) {
+    if (widget.object.type == MapObjectType.reminderCharacter) {
       return true;
     }
     // Для мест сбора показываем если есть фото или верифицировано
-    if (object.type == MapObjectType.foragingSpot) {
-      final spot = object as ForagingSpot;
+    if (widget.object.type == MapObjectType.foragingSpot) {
+      final spot = widget.object as ForagingSpot;
       return spot.photoIds.isNotEmpty || spot.isVerified;
     }
     return false;

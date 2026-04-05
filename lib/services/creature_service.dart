@@ -17,7 +17,7 @@ class CreatureService {
     // Обычные (white) - спавнятся часто, живут долго
     CreatureType.domovoy: CreatureSpawnConfig(
       rarity: CreatureRarity.common,
-      habitats: [CreatureHabitat.home, CreatureHabitat.city],
+      habitats: [CreatureHabitat.home, CreatureHabitat.city, CreatureHabitat.anywhere],
       spawnChance: 0.3,
       lifetimeMinutes: 120,
       minLevel: 1,
