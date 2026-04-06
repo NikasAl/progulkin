@@ -522,7 +522,8 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
               );
             }).toList(),
           ),
-    ];
+      ],
+    );
   }
 
   Color _getRarityColor(CreatureRarity rarity) {
