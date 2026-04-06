@@ -44,6 +44,7 @@ dependencies:
   permission_handler: ^11.1.0
   crypto: ^3.0.3
   http: ^1.1.0
+  image: ^4.1.0  # Для анализа цветов пикселей на тайлах карты
   
   # Сжатие фото в WebP (нативное)
   flutter_image_compress: ^2.3.0

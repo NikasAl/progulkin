@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/map_objects/creature.dart';
 import 'package:uuid/uuid.dart';
-import 'habitat_service.dart';
+import 'tile_color_habitat_service.dart';
 
 /// Сервис для спавна и управления существами
 class CreatureService {
@@ -13,10 +13,10 @@ class CreatureService {
 
   final _random = Random();
   final _uuid = const Uuid();
-  final HabitatService _habitatService = HabitatService();
+  final TileColorHabitatService _tileColorService = TileColorHabitatService();
 
   /// Кэшированный результат определения среды
-  HabitatDetectionResult? _lastHabitatResult;
+  TileColorHabitatResult? _lastHabitatResult;
 
   /// Конфигурация спавна для каждого типа существа
   static const Map<CreatureType, CreatureSpawnConfig> _spawnConfigs = {
@@ -129,19 +129,21 @@ class CreatureService {
     ),
   };
 
-  /// Определить среду обитания по координатам (асинхронно через OSM)
-  Future<HabitatDetectionResult> detectHabitatAsync(
+  /// Определить среду обитания по координатам (через анализ цвета тайла)
+  Future<TileColorHabitatResult?> detectHabitatAsync(
     double latitude,
     double longitude,
   ) async {
-    final result = await _habitatService.detectHabitat(latitude, longitude);
-    _lastHabitatResult = result;
+    final result = await _tileColorService.detectHabitat(latitude, longitude);
+    if (result != null) {
+      _lastHabitatResult = result;
 
-    if (result.fromCache) {
-      debugPrint('🌍 Среда (из кэша): ${result.primaryHabitat.name}');
-    } else {
-      debugPrint('🌍 Среда определена: ${result.primaryHabitat.name} '
-          '(score: ${result.habitatScores[result.primaryHabitat]?.toStringAsFixed(2)})');
+      if (result.fromCache) {
+        debugPrint('🌍 Среда (из кэша): ${result.primaryHabitat.name}');
+      } else {
+        debugPrint('🌍 Среда определена: ${result.primaryHabitat.name} '
+            '(score: ${result.habitatScores[result.primaryHabitat]?.toStringAsFixed(2)})');
+      }
     }
 
     return result;
@@ -165,14 +167,28 @@ class CreatureService {
     double radiusKm = 1.0,
     CreatureHabitat? forceHabitat,
   }) async {
-    // Определяем среду через OSM
+    // Определяем среду через анализ цвета тайла
     final habitatResult = forceHabitat != null
-        ? HabitatDetectionResult(
+        ? TileColorHabitatResult(
             primaryHabitat: forceHabitat,
             habitatScores: {forceHabitat: 1.0},
+            colorAnalysis: ColorAnalysis(
+              red: 128,
+              green: 128,
+              blue: 128,
+              hue: 0,
+              saturation: 0,
+              lightness: 0.5,
+              colorName: 'unknown',
+            ),
             detectedAt: DateTime.now(),
           )
         : await detectHabitatAsync(centerLat, centerLng);
+
+    if (habitatResult == null) {
+      debugPrint('⚠️ Не удалось определить среду обитания');
+      return null;
+    }
 
     // Находим существ, которые могут появиться в любой из подходящих сред
     final possibleCreatures = _getPossibleCreatures(habitatResult);
@@ -260,18 +276,24 @@ class CreatureService {
 
   /// Получить список возможных существ для всех подходящих сред
   List<MapEntry<CreatureType, CreatureSpawnConfig>> _getPossibleCreatures(
-    HabitatDetectionResult habitatResult,
+    TileColorHabitatResult habitatResult,
   ) {
     final result = <MapEntry<CreatureType, CreatureSpawnConfig>>[];
     final addedTypes = <CreatureType>{};
 
-    for (final habitat in habitatResult.sortedHabitats) {
-      if (!habitatResult.isHabitatSuitable(habitat)) continue;
+    // Сортируем habitats по score
+    final sortedHabitats = habitatResult.habitatScores.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
-      for (final entry in _spawnConfigs.entries) {
-        if (entry.value.habitats.contains(habitat) && !addedTypes.contains(entry.key)) {
-          result.add(entry);
-          addedTypes.add(entry.key);
+    for (final entry in sortedHabitats) {
+      final habitat = entry.key;
+      final score = entry.value;
+      if (score <= 0) continue;
+
+      for (final configEntry in _spawnConfigs.entries) {
+        if (configEntry.value.habitats.contains(habitat) && !addedTypes.contains(configEntry.key)) {
+          result.add(configEntry);
+          addedTypes.add(configEntry.key);
         }
       }
     }
@@ -282,7 +304,7 @@ class CreatureService {
   /// Получить score для существа на основе его сред обитания
   double _getHabitatScore(
     List<CreatureHabitat> creatureHabitats,
-    HabitatDetectionResult habitatResult,
+    TileColorHabitatResult habitatResult,
   ) {
     double maxScore = 0;
     for (final habitat in creatureHabitats) {
@@ -296,7 +318,7 @@ class CreatureService {
   /// Выбрать лучшую среду для существа
   CreatureHabitat _selectBestHabitat(
     List<CreatureHabitat> creatureHabitats,
-    HabitatDetectionResult habitatResult,
+    TileColorHabitatResult habitatResult,
   ) {
     CreatureHabitat best = creatureHabitats.first;
     double bestScore = 0;
@@ -414,7 +436,7 @@ class CreatureService {
   }
 
   /// Получить последнее определение среды
-  HabitatDetectionResult? get lastHabitatResult => _lastHabitatResult;
+  TileColorHabitatResult? get lastHabitatResult => _lastHabitatResult;
 
   /// Рассчитать шанс поимки существа
   double calculateCatchChance(Creature creature, int playerLevel) {

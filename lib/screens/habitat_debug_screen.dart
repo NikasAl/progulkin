@@ -2,13 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../services/tile_color_habitat_service.dart';
 import '../services/habitat_service.dart';
 import '../services/creature_service.dart';
 import '../services/location_service.dart';
 import '../models/map_objects/creature.dart';
 
 /// Отладочный экран для визуализации сред обитания (habitats)
-/// Позволяет увидеть какие области OSM определяются как habitats
+/// Использует анализ цвета тайлов карты (работает офлайн)
 class HabitatDebugScreen extends StatefulWidget {
   const HabitatDebugScreen({super.key});
 
@@ -19,14 +20,14 @@ class HabitatDebugScreen extends StatefulWidget {
 class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
   final MapController _mapController = MapController();
   final LocationService _locationService = LocationService();
-  final HabitatService _habitatService = HabitatService();
+  final TileColorHabitatService _tileColorService = TileColorHabitatService();
   final CreatureService _creatureService = CreatureService();
 
   LatLng? _currentLocation;
   LatLng _mapCenter = const LatLng(55.7558, 37.6173); // Москва по умолчанию
-  double _currentZoom = 14.0;
+  double _currentZoom = 15.0;
 
-  HabitatDetectionResult? _currentHabitat;
+  TileColorHabitatResult? _currentHabitat;
   List<_HabitatMarker> _habitatMarkers = [];
   bool _isLoading = false;
   String? _error;
@@ -66,16 +67,23 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
     });
 
     try {
-      final result = await _habitatService.detectHabitat(
+      final result = await _tileColorService.detectHabitat(
         _mapCenter.latitude,
         _mapCenter.longitude,
       );
 
       if (mounted) {
-        setState(() {
-          _currentHabitat = result;
-          _isLoading = false;
-        });
+        if (result != null) {
+          setState(() {
+            _currentHabitat = result;
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _error = 'Не удалось определить среду обитания';
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -97,8 +105,8 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
     try {
       // Сканируем сетку точек вокруг центра карты
       final center = _mapCenter;
-      const step = 0.005; // ~500м между точками
-      const radius = 0.015; // ~1.5км от центра
+      const step = 0.003; // ~300м между точками
+      const radius = 0.012; // ~1.2км от центра
 
       final futures = <Future<_HabitatMarker>>[];
 
@@ -128,21 +136,26 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
 
   Future<_HabitatMarker> _detectHabitatAtPoint(double lat, double lng) async {
     try {
-      final result = await _habitatService.detectHabitat(lat, lng);
-      return _HabitatMarker(
-        position: LatLng(lat, lng),
-        habitat: result.primaryHabitat,
-        scores: result.habitatScores,
-        fromCache: result.fromCache,
-      );
+      final result = await _tileColorService.detectHabitat(lat, lng);
+      if (result != null) {
+        return _HabitatMarker(
+          position: LatLng(lat, lng),
+          habitat: result.primaryHabitat,
+          scores: result.habitatScores,
+          fromCache: result.fromCache,
+          colorAnalysis: result.colorAnalysis,
+        );
+      }
     } catch (e) {
-      return _HabitatMarker(
-        position: LatLng(lat, lng),
-        habitat: null,
-        scores: {},
-        fromCache: false,
-      );
+      // Ignore errors for individual points
     }
+    return _HabitatMarker(
+      position: LatLng(lat, lng),
+      habitat: null,
+      scores: {},
+      fromCache: false,
+      colorAnalysis: null,
+    );
   }
 
   Future<void> _spawnTestCreature() async {
@@ -189,7 +202,7 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
   }
 
   void _clearCache() {
-    _habitatService.clearCache();
+    _tileColorService.clearCache();
     setState(() {
       _currentHabitat = null;
       _habitatMarkers.clear();
@@ -206,7 +219,7 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Отладка Habitats'),
+        title: const Text('Отладка Habitats (по цвету тайлов)'),
         actions: [
           IconButton(
             icon: const Icon(Icons.my_location),
@@ -244,7 +257,7 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
                     final color = _habitatColors[marker.habitat] ?? Colors.grey;
                     return CircleMarker(
                       point: marker.position,
-                      radius: 200, // 200 метров
+                      radius: 100, // 100 метров
                       color: color.withValues(alpha: 0.4),
                       borderColor: color,
                       borderStrokeWidth: 2,
@@ -323,6 +336,31 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
                     Text(
                       '📍 Центр карты: ${_mapCenter.latitude.toStringAsFixed(5)}, ${_mapCenter.longitude.toStringAsFixed(5)}',
                       style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 4),
+                    // Информация о методе
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.palette, color: Colors.green.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Анализ цвета тайла карты (работает офлайн)',
+                              style: TextStyle(
+                                color: Colors.green.shade700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 8),
 
@@ -440,6 +478,7 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
   Widget _buildHabitatResult() {
     final habitat = _currentHabitat!.primaryHabitat;
     final color = _habitatColors[habitat] ?? Colors.grey;
+    final colorAnalysis = _currentHabitat!.colorAnalysis;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -473,6 +512,65 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
                   ),
                 ),
             ],
+          ),
+          const SizedBox(height: 8),
+
+          // Информация о цвете
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // Цветовой квадрат
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Color.fromARGB(
+                          255,
+                          colorAnalysis.red,
+                          colorAnalysis.green,
+                          colorAnalysis.blue,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'RGB: ${colorAnalysis.red}, ${colorAnalysis.green}, ${colorAnalysis.blue}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            'HSL: ${colorAnalysis.hue.toStringAsFixed(0)}°, '
+                                '${(colorAnalysis.saturation * 100).toStringAsFixed(0)}%, '
+                                '${(colorAnalysis.lightness * 100).toStringAsFixed(0)}%',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          Text(
+                            'Тип цвета: ${colorAnalysis.colorName}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
 
@@ -570,11 +668,13 @@ class _HabitatMarker {
   final CreatureHabitat? habitat;
   final Map<CreatureHabitat, double> scores;
   final bool fromCache;
+  final ColorAnalysis? colorAnalysis;
 
   _HabitatMarker({
     required this.position,
     required this.habitat,
     required this.scores,
     required this.fromCache,
+    this.colorAnalysis,
   });
 }
