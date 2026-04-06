@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import '../models/map_objects/creature.dart';
+import 'habitat_cache_service.dart';
 
 /// Результат определения среды обитания по цвету тайла
 class TileColorHabitatResult {
@@ -43,7 +44,7 @@ class ColorAnalysis {
 }
 
 /// Сервис для определения среды обитания по цвету пикселей на тайлах карты
-/// Работает офлайн, используя кэшированные тайлы
+/// Использует кэш habitats (для офлайн) или загружает тайлы по HTTP
 class TileColorHabitatService {
   static final TileColorHabitatService _instance = TileColorHabitatService._internal();
   factory TileColorHabitatService() => _instance;
@@ -54,6 +55,9 @@ class TileColorHabitatService {
 
   /// Кэш результатов по geohash
   final Map<String, TileColorHabitatResult> _cache = {};
+
+  /// Сервис кэша habitats
+  final HabitatCacheService _habitatCache = HabitatCacheService();
 
   /// Время жизни кэша (10 минут)
   static const Duration cacheLifetime = Duration(minutes: 10);
@@ -69,7 +73,7 @@ class TileColorHabitatService {
     double latitude,
     double longitude,
   ) async {
-    // Проверяем кэш
+    // Проверяем кэш результатов
     final geohash = _computeGeohash(latitude, longitude, 7);
     final cached = _cache[geohash];
     if (cached != null) {
@@ -85,8 +89,33 @@ class TileColorHabitatService {
       }
     }
 
+    // Сначала пробуем получить из кэша habitats (офлайн)
+    final cachedHabitat = _habitatCache.getHabitatWithInterpolation(latitude, longitude);
+    if (cachedHabitat != null) {
+      debugPrint('🎯 Habitat из кэша: ${cachedHabitat.emoji} ${cachedHabitat.name}');
+      
+      final result = TileColorHabitatResult(
+        primaryHabitat: cachedHabitat,
+        habitatScores: {cachedHabitat: 1.0},
+        colorAnalysis: ColorAnalysis(
+          red: 0,
+          green: 0,
+          blue: 0,
+          hue: 0,
+          saturation: 0,
+          lightness: 0,
+          colorName: 'cached',
+        ),
+        fromCache: true,
+        detectedAt: DateTime.now(),
+      );
+      
+      _cache[geohash] = result;
+      return result;
+    }
+
+    // Если нет в кэше - пробуем загрузить тайл по HTTP
     try {
-      // Загружаем тайл и анализируем цвет
       final tileBytes = await _loadTile(latitude, longitude, _analysisZoom);
       if (tileBytes == null) {
         debugPrint('⚠️ Не удалось загрузить тайл для ($latitude, $longitude)');

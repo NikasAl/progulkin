@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 import 'package:latlong2/latlong.dart';
+import 'habitat_cache_service.dart';
+import '../models/map_objects/creature.dart';
 
 /// Сервис для кэширования тайлов карт для оффлайн использования
 /// Использует Singleton паттерн для избежания повторной инициализации
@@ -13,6 +15,8 @@ class TileCacheService {
   
   static const String _storeName = 'progulkin_map_cache';
   static const String _tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  
+  final HabitatCacheService _habitatCacheService = HabitatCacheService();
   
   bool _isInitialized = false;
   bool _initializationAttempted = false;
@@ -46,10 +50,15 @@ class TileCacheService {
       final store = FMTCStore(_storeName);
       await store.manage.create();
       
+      // Инициализируем кэш habitats
+      await _habitatCacheService.init();
+      
       _isInitialized = true;
       debugPrint('TileCacheService: Инициализирован успешно');
     } on RootAlreadyInitialised {
       // Уже инициализирован - это нормально
+      // Но всё равно инициализируем кэш habitats
+      await _habitatCacheService.init();
       _isInitialized = true;
       debugPrint('TileCacheService: Уже был инициализирован ранее');
     } catch (e) {
@@ -209,6 +218,21 @@ class TileCacheService {
       _isDownloading = false;
       _currentDownloadArea = null;
       
+      // Анализируем habitats для загруженной области (офлайн-спавн существ)
+      debugPrint('TileCacheService: Анализ habitats для области...');
+      try {
+        await _habitatCacheService.downloadAndAnalyzeArea(
+          minLat: minLat,
+          maxLat: maxLat,
+          minLon: minLon,
+          maxLon: maxLon,
+          zoom: 15, // Оптимальный zoom для анализа habitats
+        );
+      } catch (e) {
+        debugPrint('TileCacheService: Ошибка анализа habitats: $e');
+        // Не считаем критичной ошибкой
+      }
+      
       return DownloadResult(
         success: true,
         tilesDownloaded: totalDownloaded,
@@ -284,6 +308,20 @@ class TileCacheService {
       
       _isDownloading = false;
       
+      // Анализируем habitats для загруженной области
+      debugPrint('TileCacheService: Анализ habitats для области...');
+      try {
+        await _habitatCacheService.downloadAndAnalyzeArea(
+          minLat: bounds.south,
+          maxLat: bounds.north,
+          minLon: bounds.west,
+          maxLon: bounds.east,
+          zoom: 15,
+        );
+      } catch (e) {
+        debugPrint('TileCacheService: Ошибка анализа habitats: $e');
+      }
+      
       return DownloadResult(
         success: true,
         tilesDownloaded: totalDownloaded,
@@ -297,6 +335,16 @@ class TileCacheService {
         error: e.toString(),
       );
     }
+  }
+  
+  /// Получить habitat для координаты из кэша (для офлайн-спавна существ)
+  CreatureHabitat? getHabitatForLocation(double lat, double lng) {
+    return _habitatCacheService.getHabitatWithInterpolation(lat, lng);
+  }
+  
+  /// Получить статистику кэша habitats
+  Map<String, dynamic> getHabitatStats() {
+    return _habitatCacheService.getStats();
   }
   
   /// Очистить кэш
