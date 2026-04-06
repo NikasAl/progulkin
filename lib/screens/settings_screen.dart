@@ -12,6 +12,7 @@ import 'storage_screen.dart';
 import 'route_planning_screen.dart';
 import 'profile_screen.dart';
 import 'privacy_policy_screen.dart';
+import 'habitat_debug_screen.dart';
 
 /// Экран настроек приложения
 class SettingsScreen extends StatefulWidget {
@@ -437,6 +438,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('Статистика, экспорт/импорт объектов карты'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _openStorage(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.bug_report),
+            title: const Text('Отладка Habitats'),
+            subtitle: const Text('Визуализация сред обитания на карте'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _openHabitatDebug(context),
           ),
           ListTile(
             leading: const Icon(Icons.map),
@@ -882,6 +890,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const RoutePlanningScreen()),
+    );
+  }
+
+  /// Открыть отладочный экран habitats
+  void _openHabitatDebug(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const HabitatDebugScreen()),
     );
   }
 
