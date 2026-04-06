@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/tile_color_habitat_service.dart';
-import '../services/habitat_service.dart';
 import '../services/creature_service.dart';
 import '../services/location_service.dart';
 import '../models/map_objects/creature.dart';

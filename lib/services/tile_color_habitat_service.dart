@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import '../models/map_objects/creature.dart';
@@ -49,9 +48,6 @@ class TileColorHabitatService {
   static final TileColorHabitatService _instance = TileColorHabitatService._internal();
   factory TileColorHabitatService() => _instance;
   TileColorHabitatService._internal();
-
-  /// Имя хранилища кэша тайлов
-  static const String _storeName = 'progulkin_map_cache';
 
   /// URL шаблон для тайлов OSM
   static const String _tileUrlTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -116,7 +112,7 @@ class TileColorHabitatService {
     }
   }
 
-  /// Загрузить тайл из кэша или скачать
+  /// Загрузить тайл по HTTP
   Future<Uint8List?> _loadTile(double lat, double lng, int zoom) async {
     // Вычисляем координаты тайла
     final tileCoords = _latLngToTileCoords(lat, lng, zoom);
@@ -127,23 +123,6 @@ class TileColorHabitatService {
 
     debugPrint('🗺️ Загрузка тайла: $tileUrl');
 
-    // Пробуем загрузить из кэша
-    try {
-      final cachedTile = await FMTCBackendAccess.internal.readTile(
-        url: tileUrl,
-        storeName: _storeName,
-      );
-
-      if (cachedTile != null) {
-        debugPrint('✅ Тайл найден в кэше');
-        return cachedTile.bytes;
-      }
-    } catch (e) {
-      debugPrint('⚠️ Ошибка чтения из кэша: $e');
-    }
-
-    // Если нет в кэше - скачиваем
-    debugPrint('⬇️ Скачиваем тайл...');
     try {
       final response = await http.get(
         Uri.parse(tileUrl),
