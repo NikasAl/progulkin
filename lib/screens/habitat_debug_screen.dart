@@ -188,6 +188,20 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
     }
   }
 
+  void _clearCache() {
+    _habitatService.clearCache();
+    setState(() {
+      _currentHabitat = null;
+      _habitatMarkers.clear();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Кэш habitats очищен'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -347,6 +361,12 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
                         backgroundColor: Colors.purple,
                         foregroundColor: Colors.white,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _clearCache,
+                      icon: const Icon(Icons.clear_all),
+                      label: const Text('Очистить кэш habitats'),
                     ),
 
                     // Ошибка

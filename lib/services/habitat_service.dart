@@ -96,17 +96,47 @@ class HabitatService {
     double latitude,
     double longitude,
   ) async {
+    // Улучшенный запрос: ищем и way, и node, и relation
+    // Увеличен радиус для более точного определения
     final query = '''
-[out:json][timeout:10];
+[out:json][timeout:15];
 (
+  // Природные объекты
   way["natural"](around:$searchRadius,$latitude,$longitude);
+  node["natural"](around:$searchRadius,$latitude,$longitude);
+  relation["natural"](around:$searchRadius,$latitude,$longitude);
+  
+  // Землепользование
   way["landuse"](around:$searchRadius,$latitude,$longitude);
+  node["landuse"](around:$searchRadius,$latitude,$longitude);
+  relation["landuse"](around:$searchRadius,$latitude,$longitude);
+  
+  // Здания
   way["building"](around:$searchRadius,$latitude,$longitude);
+  node["building"](around:$searchRadius,$latitude,$longitude);
+  
+  // Водные объекты
+  way["water"](around:$searchRadius,$latitude,$longitude);
   way["waterway"](around:$searchRadius,$latitude,$longitude);
+  relation["water"](around:$searchRadius,$latitude,$longitude);
+  node["natural"="spring"](around:$searchRadius,$latitude,$longitude);
+  
+  // Болота
   way["wetland"](around:$searchRadius,$latitude,$longitude);
+  node["natural"="wetland"](around:$searchRadius,$latitude,$longitude);
+  
+  // Парки и зоны отдыха
   way["leisure"](around:$searchRadius,$latitude,$longitude);
-  node["natural"="peak"](around:${searchRadius * 2},$latitude,$longitude);
-  way["place"](around:$searchRadius,$latitude,$longitude);
+  node["leisure"](around:$searchRadius,$latitude,$longitude);
+  relation["leisure"](around:$searchRadius,$latitude,$longitude);
+  
+  // Горы и возвышенности
+  node["natural"="peak"](around:${searchRadius * 3},$latitude,$longitude);
+  way["natural"="cliff"](around:${searchRadius * 2},$latitude,$longitude);
+  
+  // Населённые пункты
+  way["place"](around:${searchRadius * 2},$latitude,$longitude);
+  node["place"](around:${searchRadius * 2},$latitude,$longitude);
 );
 out tags;
 ''';
@@ -144,19 +174,38 @@ out tags;
     double longitude,
   ) {
     final scores = <CreatureHabitat, double>{};
+    final debugTags = <String>[]; // Для отладки
 
     for (final element in elements) {
       final tags = element['tags'] as Map<String, dynamic>? ?? {};
+      final type = element['type'] as String? ?? '';
+      
       final habitat = _mapTagsToHabitat(tags);
       if (habitat != null) {
         scores[habitat] = (scores[habitat] ?? 0) + 1;
       }
+      
+      // Собираем отладочную информацию
+      if (tags.isNotEmpty) {
+        final relevantTags = _getRelevantTags(tags);
+        if (relevantTags.isNotEmpty) {
+          debugTags.add('$type: $relevantTags');
+        }
+      }
+    }
+
+    // Логируем найденные теги для отладки
+    debugPrint('🗺️ OSM data for ($latitude, $longitude):');
+    debugPrint('   Found ${elements.length} elements');
+    if (debugTags.isNotEmpty) {
+      debugPrint('   Relevant tags: ${debugTags.take(10).join("; ")}');
     }
 
     // Если данных мало - добавляем базовые очки для города
     // (предполагаем что если нет явных тегов природы - это городская среда)
     final totalScore = scores.values.fold(0.0, (sum, v) => sum + v);
     if (totalScore < 3) {
+      debugPrint('   ⚠️ Low data ($totalScore), adding city fallback');
       scores[CreatureHabitat.city] = (scores[CreatureHabitat.city] ?? 0) + 2;
     }
 
@@ -170,11 +219,14 @@ out tags;
     CreatureHabitat primaryHabitat = CreatureHabitat.city;
     double maxFinalScore = 0;
     scores.forEach((habitat, score) {
+      debugPrint('   ${habitat.emoji} ${habitat.name}: ${score.toStringAsFixed(2)}');
       if (score > maxFinalScore) {
         maxFinalScore = score;
         primaryHabitat = habitat;
       }
     });
+    
+    debugPrint('   ✅ Primary: ${primaryHabitat.emoji} ${primaryHabitat.name}');
 
     return HabitatDetectionResult(
       primaryHabitat: primaryHabitat,
@@ -183,71 +235,126 @@ out tags;
     );
   }
 
+  /// Получить релевантные теги для отладки
+  String _getRelevantTags(Map<String, dynamic> tags) {
+    final relevantKeys = [
+      'natural', 'landuse', 'leisure', 'water', 'waterway', 
+      'building', 'place', 'wetland', 'amenity'
+    ];
+    final result = <String>[];
+    for (final key in relevantKeys) {
+      if (tags[key] != null) {
+        result.add('$key=${tags[key]}');
+      }
+    }
+    return result.join(', ');
+  }
+
   /// Маппинг тегов OSM на среды обитания
   CreatureHabitat? _mapTagsToHabitat(Map<String, dynamic> tags) {
-    // Лес
+    // === ЛЕС ===
     if (tags['natural'] == 'wood' ||
         tags['landuse'] == 'forest' ||
         tags['natural'] == 'tree_row' ||
-        tags['landuse'] == 'orchard') {
+        tags['landuse'] == 'orchard' ||
+        tags['landuse'] == 'vineyard' ||
+        tags['natural'] == 'tree' ||
+        tags['landuse'] == 'wood') {
       return CreatureHabitat.forest;
     }
 
-    // Вода
+    // === ВОДА ===
+    // Озёра, пруды, реки, ручьи
     if (tags['natural'] == 'water' ||
+        tags['natural'] == 'waterway' ||
         tags['water'] != null ||
         tags['waterway'] != null ||
-        tags['natural'] == 'spring') {
+        tags['natural'] == 'spring' ||
+        tags['water'] == 'lake' ||
+        tags['water'] == 'pond' ||
+        tags['water'] == 'reservoir' ||
+        tags['water'] == 'river' ||
+        tags['water'] == 'stream' ||
+        tags['water'] == 'canal' ||
+        tags['landuse'] == 'reservoir' ||
+        tags['landuse'] == 'basin' ||
+        tags['natural'] == 'bay' ||
+        tags['natural'] == 'strait') {
       return CreatureHabitat.water;
     }
 
-    // Болото
+    // === БОЛОТО ===
     if (tags['natural'] == 'wetland' ||
         tags['wetland'] != null ||
-        tags['natural'] == 'mud') {
+        tags['natural'] == 'mud' ||
+        tags['wetland'] == 'swamp' ||
+        tags['wetland'] == 'marsh' ||
+        tags['wetland'] == 'bog') {
       return CreatureHabitat.swamp;
     }
 
-    // Горы
+    // === ГОРЫ ===
     if (tags['natural'] == 'peak' ||
         tags['natural'] == 'cliff' ||
         tags['natural'] == 'scree' ||
         tags['natural'] == 'rock' ||
-        tags['natural'] == 'bare_rock') {
+        tags['natural'] == 'bare_rock' ||
+        tags['natural'] == 'ridge' ||
+        tags['natural'] == 'valley') {
       return CreatureHabitat.mountain;
     }
 
-    // Поле/поляна
+    // === ПОЛЕ / ОТКРЫТОЕ ПРОСТРАНСТВО ===
+    // Парки, поля, луга, сады
     if (tags['landuse'] == 'farmland' ||
         tags['landuse'] == 'meadow' ||
+        tags['landuse'] == 'grass' ||
+        tags['landuse'] == 'greenfield' ||
+        tags['landuse'] == 'village_green' ||
+        tags['landuse'] == 'recreation_ground' ||
+        tags['landuse'] == 'allotments' ||
         tags['natural'] == 'grassland' ||
         tags['natural'] == 'heath' ||
-        tags['landuse'] == 'grass') {
+        tags['natural'] == 'scrub' ||
+        tags['natural'] == 'sand' ||
+        tags['natural'] == 'beach' ||
+        // Парки и сады - как открытое пространство
+        tags['leisure'] == 'park' ||
+        tags['leisure'] == 'garden' ||
+        tags['leisure'] == 'playground' ||
+        tags['leisure'] == 'pitch' ||
+        tags['leisure'] == 'sports_centre' ||
+        tags['leisure'] == 'common' ||
+        tags['leisure'] == 'nature_reserve' ||
+        tags['boundary'] == 'national_park') {
       return CreatureHabitat.field;
     }
 
-    // Город
+    // === ГОРОД ===
+    // Здания и городская застройка
     if (tags['building'] != null ||
         tags['landuse'] == 'residential' ||
         tags['landuse'] == 'commercial' ||
         tags['landuse'] == 'industrial' ||
+        tags['landuse'] == 'retail' ||
+        tags['landuse'] == 'construction' ||
         tags['place'] != null ||
-        tags['landuse'] == 'retail') {
+        tags['highway'] != null) {
       return CreatureHabitat.city;
     }
 
-    // Парки и места отдыха (могут быть и в городе)
-    if (tags['leisure'] == 'park' ||
-        tags['leisure'] == 'garden' ||
-        tags['landuse'] == 'recreation_ground') {
-      return CreatureHabitat.city;
-    }
-
-    // Фермы/дачи (дом в пригороде)
+    // === ДОМ ===
+    // Частные дома, дачи, фермы
     if (tags['landuse'] == 'farmyard' ||
         tags['building'] == 'farm' ||
         tags['building'] == 'house' ||
-        tags['building'] == 'detached') {
+        tags['building'] == 'detached' ||
+        tags['building'] == 'semidetached_house' ||
+        tags['building'] == 'terrace' ||
+        tags['building'] == 'cabin' ||
+        tags['building'] == 'bungalow' ||
+        tags['place'] == 'hamlet' ||
+        tags['place'] == 'isolated_dwelling') {
       return CreatureHabitat.home;
     }
 
