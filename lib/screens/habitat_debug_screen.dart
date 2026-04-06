@@ -97,8 +97,8 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
     try {
       // Сканируем сетку точек вокруг центра карты
       final center = _mapCenter;
-      final step = 0.005; // ~500м между точками
-      final radius = 0.015; // ~1.5км от центра
+      const step = 0.005; // ~500м между точками
+      const radius = 0.015; // ~1.5км от центра
 
       final futures = <Future<_HabitatMarker>>[];
 
@@ -213,8 +213,8 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
                 initialZoom: _currentZoom,
                 onPositionChanged: (position, hasGesture) {
                   if (hasGesture) {
-                    _mapCenter = position.center;
-                    _currentZoom = position.zoom;
+                    _mapCenter = position.center ?? _mapCenter;
+                    _currentZoom = position.zoom ?? _currentZoom;
                   }
                 },
               ),
