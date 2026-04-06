@@ -119,15 +119,21 @@ class HabitatCacheService {
 
   /// Получить habitat для координаты с интерполяцией (ищем ближайшие тайлы)
   CreatureHabitat? getHabitatWithInterpolation(double lat, double lng, {int zoom = 15}) {
+    final tile = getTileWithInterpolation(lat, lng, zoom: zoom);
+    return tile?.habitat;
+  }
+
+  /// Получить полный tile с RGB для координаты с интерполяцией (ищем ближайшие тайлы)
+  CachedHabitatTile? getTileWithInterpolation(double lat, double lng, {int zoom = 15}) {
     // Сначала точное совпадение
     final exact = getHabitatForLocation(lat, lng, zoom: zoom);
     if (exact != null) {
-      return exact.habitat;
+      return exact;
     }
 
     // Ищем в соседних тайлах
     final coords = _latLngToTileCoords(lat, lng, zoom);
-    final neighbors = <CreatureHabitat>[];
+    final neighborTiles = <CachedHabitatTile>[];
 
     for (int dx = -1; dx <= 1; dx++) {
       for (int dy = -1; dy <= 1; dy++) {
@@ -135,31 +141,39 @@ class HabitatCacheService {
         final key = '${zoom}_${coords.x + dx}_${coords.y + dy}';
         final tile = _tilesCache[key];
         if (tile != null) {
-          neighbors.add(tile.habitat);
+          neighborTiles.add(tile);
         }
       }
     }
 
-    if (neighbors.isEmpty) {
+    if (neighborTiles.isEmpty) {
       return null;
     }
 
     // Возвращаем самый частый habitat среди соседей
     final counts = <CreatureHabitat, int>{};
-    for (final h in neighbors) {
-      counts[h] = (counts[h] ?? 0) + 1;
+    for (final tile in neighborTiles) {
+      counts[tile.habitat] = (counts[tile.habitat] ?? 0) + 1;
     }
 
-    CreatureHabitat best = neighbors.first;
+    CreatureHabitat bestHabitat = neighborTiles.first.habitat;
     int bestCount = 0;
     counts.forEach((h, c) {
       if (c > bestCount) {
         bestCount = c;
-        best = h;
+        bestHabitat = h;
       }
     });
 
-    return best;
+    // Возвращаем первый tile с наиболее частым habitat
+    // (его RGB будет использоваться для отображения)
+    for (final tile in neighborTiles) {
+      if (tile.habitat == bestHabitat) {
+        return tile;
+      }
+    }
+
+    return neighborTiles.first;
   }
 
   /// Скачать и проанализировать тайлы для области

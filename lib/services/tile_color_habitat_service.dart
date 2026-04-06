@@ -90,20 +90,23 @@ class TileColorHabitatService {
     }
 
     // Сначала пробуем получить из кэша habitats (офлайн)
-    final cachedHabitat = _habitatCache.getHabitatWithInterpolation(latitude, longitude);
-    if (cachedHabitat != null) {
-      debugPrint('🎯 Habitat из кэша: ${cachedHabitat.emoji} ${cachedHabitat.name}');
+    final cachedTile = _habitatCache.getTileWithInterpolation(latitude, longitude);
+    if (cachedTile != null) {
+      debugPrint('🎯 Habitat из кэша: ${cachedTile.habitat.emoji} ${cachedTile.habitat.name}');
+      
+      // Вычисляем HSL для RGB из кэша
+      final hsl = _rgbToHsl(cachedTile.red, cachedTile.green, cachedTile.blue);
       
       final result = TileColorHabitatResult(
-        primaryHabitat: cachedHabitat,
-        habitatScores: {cachedHabitat: 1.0},
+        primaryHabitat: cachedTile.habitat,
+        habitatScores: {cachedTile.habitat: 1.0},
         colorAnalysis: ColorAnalysis(
-          red: 0,
-          green: 0,
-          blue: 0,
-          hue: 0,
-          saturation: 0,
-          lightness: 0,
+          red: cachedTile.red,
+          green: cachedTile.green,
+          blue: cachedTile.blue,
+          hue: hsl.hue,
+          saturation: hsl.saturation,
+          lightness: hsl.lightness,
           colorName: 'cached',
         ),
         fromCache: true,
