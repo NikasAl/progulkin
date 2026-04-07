@@ -307,96 +307,90 @@ class TileColorHabitatService {
   }
 
   /// Маппинг цвета на среды обитания
-  /// Основано на стандартных цветах OpenStreetMap Carto
+  /// Основано на реальных цветах OpenStreetMap Carto:
+  /// - Лес: RGB(203,217,181)/RGB(176,211,163) → HSL(83-104°, 32-35%, 73-78%)
+  /// - Поле: RGB(236,236,208)/RGB(238,240,213) → HSL(60-64°, 42-47%, 87-89%)
+  /// - Город: RGB(212,198,205)/RGB(241,239,236) → HSL(36-337°, 14-17%, 80-94%)
+  /// - Вода: RGB(171,210,222)/RGB(170,211,223) → HSL(194°, 44-45%, 77%)
   Map<CreatureHabitat, double> _mapColorToHabitat(ColorAnalysis color) {
     final scores = <CreatureHabitat, double>{};
     final h = color.hue;
     final s = color.saturation;
     final l = color.lightness;
 
-    // === ЛЕС (густой зелёный) ===
-    // OSM: #A0D8A0, #8BC34A, #7DBD4C, #A0C890
-    if (h >= 75 && h <= 165 && s > 0.2 && l > 0.25 && l < 0.7) {
-      // Насыщенный зелёный - лес
-      if (s > 0.35 && l > 0.35 && l < 0.65) {
-        scores[CreatureHabitat.forest] = 1.0;
-        scores[CreatureHabitat.field] = 0.3;
-      } else {
-        // Менее насыщенный - поле/парк
-        scores[CreatureHabitat.field] = 0.8;
-        scores[CreatureHabitat.forest] = 0.3;
-      }
-    }
-
-    // === ВОДА (синий, голубой) ===
-    // OSM: #A0CFF0, #74B0E0, #9FC5E8, #7DC4E0
-    if (h >= 185 && h <= 250 && s > 0.15 && l > 0.3 && l < 0.8) {
+    // === ВОДА (голубой/синий) ===
+    // HSL(194°, 44-45%, 77%)
+    if (h >= 185 && h <= 215 && s > 0.30 && l > 0.65 && l < 0.85) {
       scores[CreatureHabitat.water] = 1.0;
+      return scores;
     }
 
-    // === БОЛОТО (болотистый зелёный/коричневый) ===
-    // OSM: #B8D0A0, #9DBD78 (wetland)
-    if (h >= 60 && h <= 100 && s > 0.1 && s < 0.5 && l > 0.4 && l < 0.7) {
-      // Тусклый жёлто-зелёный
-      scores[CreatureHabitat.swamp] = 0.7;
-      scores[CreatureHabitat.forest] = 0.3;
+    // === ЛЕС (зелёный) ===
+    // HSL(83-104°, 32-35%, 73-78%)
+    if (h >= 70 && h <= 130 && s >= 0.25 && s <= 0.50 && l >= 0.65 && l <= 0.85) {
+      scores[CreatureHabitat.forest] = 1.0;
+      scores[CreatureHabitat.field] = 0.2;
+      return scores;
     }
 
-    // === ПОЛЕ / ЛУГ (светло-зелёный, жёлто-зелёный) ===
-    // OSM: #CFD8A0, #C8D8B0, #E8E0B0 (farmland, meadow)
-    if (h >= 50 && h <= 100 && s > 0.05 && s < 0.4 && l > 0.5 && l < 0.85) {
+    // === ПОЛЕ (жёлто-зелёный, светло-жёлтый) ===
+    // HSL(60-64°, 42-47%, 87-89%)
+    if (h >= 50 && h <= 80 && s >= 0.30 && s <= 0.55 && l >= 0.80 && l <= 0.95) {
+      scores[CreatureHabitat.field] = 1.0;
+      return scores;
+    }
+
+    // Дополнительный зелёный для поля (менее насыщенный)
+    if (h >= 70 && h <= 130 && s >= 0.15 && s < 0.25 && l >= 0.70 && l <= 0.90) {
       scores[CreatureHabitat.field] = 0.9;
+      scores[CreatureHabitat.forest] = 0.3;
+      return scores;
     }
 
-    // === ПАРКИ (светлый зелёный) ===
-    // OSM: #C0E8B0, #D5E8D0 (leisure=park)
-    if (h >= 75 && h <= 150 && s > 0.1 && s < 0.45 && l > 0.6) {
-      scores[CreatureHabitat.field] = 0.7;
-      scores[CreatureHabitat.city] = 0.2;
+    // === БОЛОТО (тёмный жёлто-зелёный) ===
+    if (h >= 60 && h <= 100 && s >= 0.10 && s <= 0.40 && l >= 0.40 && l <= 0.65) {
+      scores[CreatureHabitat.swamp] = 0.8;
+      scores[CreatureHabitat.forest] = 0.2;
+      return scores;
     }
 
-    // === ГОРОД (серый, бежевый, розоватый) ===
-    // OSM: #D9D0C6, #E5D0C5, #E0D8D0 (residential)
-    // OSM: #CCCCCC, #D0D0D0 (industrial)
-    if (s < 0.15 && l > 0.5 && l < 0.9) {
-      // Ненасыщенный светлый - городская застройка
-      scores[CreatureHabitat.city] = 0.9;
+    // === ГОРОД (серый, бежевый, розоватый - низкая насыщенность) ===
+    // HSL(36-337°, 14-17%, 80-94%)
+    if (s <= 0.22 && l >= 0.70 && l <= 0.98) {
+      scores[CreatureHabitat.city] = 1.0;
       scores[CreatureHabitat.home] = 0.2;
+      return scores;
     }
 
-    // === ЗДАНИЯ (розоватый, коричневатый) ===
-    // OSM: #D99079, #CC7E6D, #D48D6D (buildings)
-    if (h >= 0 && h <= 40 && s > 0.2 && l > 0.4 && l < 0.7) {
-      scores[CreatureHabitat.city] = 0.8;
-      scores[CreatureHabitat.home] = 0.4;
-    }
-
-    // === ДОМА (более насыщенные розовые/коричневые) ===
-    if (h >= 10 && h <= 35 && s > 0.3 && l > 0.45 && l < 0.65) {
-      scores[CreatureHabitat.home] = 0.7;
-      scores[CreatureHabitat.city] = 0.5;
+    // === ЗДАНИЯ/ДОМА (розоватый, коричневатый - более насыщенные) ===
+    if (h >= 0 && h <= 40 && s > 0.22 && l > 0.40 && l < 0.70) {
+      if (s > 0.30 && l > 0.45 && l < 0.65) {
+        scores[CreatureHabitat.home] = 0.8;
+        scores[CreatureHabitat.city] = 0.4;
+      } else {
+        scores[CreatureHabitat.city] = 0.9;
+        scores[CreatureHabitat.home] = 0.3;
+      }
+      return scores;
     }
 
     // === ПЕСЧАНЫЕ / ПУСТЫННЫЕ (жёлтый, бежевый) ===
-    // OSM: #E8D8A0, #E0D090 (sand, beach)
-    if (h >= 35 && h <= 60 && s > 0.1 && s < 0.4 && l > 0.6) {
-      scores[CreatureHabitat.field] = 0.6;
-      scores[CreatureHabitat.mountain] = 0.2;
+    if (h >= 35 && h <= 60 && s > 0.10 && s <= 0.40 && l > 0.60) {
+      scores[CreatureHabitat.field] = 0.7;
+      scores[CreatureHabitat.mountain] = 0.3;
+      return scores;
     }
 
     // === ГОРЫ (серый, коричневатый серый) ===
-    // OSM: #C0C0C0, #B0A090 (bare_rock, scree)
-    if (s < 0.15 && l > 0.35 && l < 0.65) {
-      if ((scores[CreatureHabitat.city] ?? 0) < 0.5) {
-        scores[CreatureHabitat.mountain] = 0.3;
-      }
+    if (s < 0.20 && l > 0.35 && l < 0.65) {
+      scores[CreatureHabitat.mountain] = 0.6;
+      scores[CreatureHabitat.city] = 0.2;
+      return scores;
     }
 
     // Если ничего не определилось - город по умолчанию
-    if (scores.isEmpty) {
-      scores[CreatureHabitat.city] = 0.7;
-      scores[CreatureHabitat.anywhere] = 0.3;
-    }
+    scores[CreatureHabitat.city] = 0.7;
+    scores[CreatureHabitat.anywhere] = 0.3;
 
     // Нормализуем scores
     final maxScore = scores.values.fold(0.0, (max, v) => v > max ? v : max);
