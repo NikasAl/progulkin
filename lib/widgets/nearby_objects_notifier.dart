@@ -35,6 +35,9 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
   // Отслеживаем предыдущее количество объектов
   int _lastObjectCount = -1;
   Set<String> _lastObjectIds = {};
+  
+  // Флаг что звук уже воспроизводился для текущего набора объектов
+  bool _soundPlayedForCurrentSet = false;
 
   // Отслеживаем новые объекты для особых уведомлений
   final Set<String> _notifiedCreatureIds = {};
@@ -146,6 +149,7 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
                 _lastObjectCount = nearbyObjects.length;
                 _isVisible = true;
                 _initialized = true;
+                _soundPlayedForCurrentSet = false; // Сбрасываем флаг для нового набора
               });
               _startHideTimer();
             }
@@ -157,6 +161,7 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
           _lastObjectIds = currentIds;
           _lastObjectCount = nearbyObjects.length;
           _initialized = true;
+          _soundPlayedForCurrentSet = true; // Не воспроизводим звук при первом запуске
           // Не уведомляем о существах при первом запуске
           for (final creature in nearbyCreatures) {
             _notifiedCreatureIds.add(creature.id);
@@ -191,8 +196,11 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
     final secretCount = objects.where((o) => o.type == MapObjectType.secretMessage).length;
     final creatureCount = objects.where((o) => o.type == MapObjectType.creature).length;
 
-    // Воспроизводим звук при показе
-    _playNotificationSound();
+    // Воспроизводим звук только один раз при появлении уведомления
+    if (!_soundPlayedForCurrentSet) {
+      _soundPlayedForCurrentSet = true;
+      _playNotificationSound();
+    }
 
     return AnimatedBuilder(
       animation: _pulseAnimation,
