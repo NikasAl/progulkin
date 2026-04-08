@@ -77,6 +77,9 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Получаем нижний отступ для системной навигации
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    
     return Scaffold(
       body: Stack(
         children: [
@@ -90,7 +93,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
             },
             itemCount: _pages.length,
             itemBuilder: (context, index) {
-              return _buildPage(_pages[index]);
+              return _buildPage(_pages[index], bottomPadding);
             },
           ),
 
@@ -114,9 +117,9 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
             ),
           ),
 
-          // Индикатор страниц
+          // Индикатор страниц (выше кнопок с учётом SafeArea)
           Positioned(
-            bottom: 110,
+            bottom: 80 + bottomPadding,
             left: 0,
             right: 0,
             child: _buildPageIndicator(),
@@ -124,10 +127,16 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
 
           // Кнопки навигации
           Positioned(
-            bottom: 40,
-            left: 20,
-            right: 20,
-            child: _buildNavigationButtons(),
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: _buildNavigationButtons(),
+              ),
+            ),
           ),
 
           // Кнопка пропустить (только на первых страницах)
@@ -153,7 +162,10 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
     );
   }
 
-  Widget _buildPage(_PageContent page) {
+  Widget _buildPage(_PageContent page, double bottomPadding) {
+    // Место для индикатора (30) + кнопок (~60) + SafeArea
+    final bottomSpace = 100 + bottomPadding;
+    
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -254,7 +266,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 85), // Место для индикатора и кнопок
+                SizedBox(height: bottomSpace), // Место для индикатора и кнопок
               ],
             ),
           ),
