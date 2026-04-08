@@ -37,7 +37,8 @@
     <application
         android:label="Прогулкин"
         android:name="${applicationName}"
-        android:icon="@drawable/splash_icon">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
         <activity
             android:name=".MainActivity"
             android:exported="true"
