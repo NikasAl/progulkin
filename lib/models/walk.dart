@@ -90,6 +90,9 @@ class Walk {
   
   /// Длина шага в метрах (для расчёта расстояния)
   final double stepLength;
+  
+  /// Суммарное время паузы (для корректного расчёта скорости)
+  Duration totalPauseDuration;
 
   /// Статистика по объектам карты
   WalkObjectStats objectStats;
@@ -104,17 +107,19 @@ class Walk {
     this.notes,
     this.distanceSource = DistanceSource.pedometer,
     this.stepLength = 0.75,
+    this.totalPauseDuration = Duration.zero,
     WalkObjectStats? objectStats,
   })  : id = id ?? const Uuid().v4(),
         points = points ?? [],
         objectStats = objectStats ?? const WalkObjectStats();
 
-  /// Продолжительность прогулки
+  /// Продолжительность прогулки (с учётом паузы)
   Duration get duration {
-    if (endTime != null) {
-      return endTime!.difference(startTime);
-    }
-    return DateTime.now().difference(startTime);
+    final totalDuration = endTime != null
+        ? endTime!.difference(startTime)
+        : DateTime.now().difference(startTime);
+    // Вычитаем время паузы
+    return totalDuration - totalPauseDuration;
   }
 
   /// Форматированная продолжительность
@@ -244,6 +249,7 @@ class Walk {
       'notes': notes,
       'distanceSource': distanceSource.index,
       'stepLength': stepLength,
+      'totalPauseDuration': totalPauseDuration.inSeconds,
       'objectStats': objectStats.toMap(),
     };
   }
@@ -264,6 +270,7 @@ class Walk {
       notes: map['notes'] as String?,
       distanceSource: DistanceSource.values[map['distanceSource'] as int? ?? 1],
       stepLength: (map['stepLength'] as num?)?.toDouble() ?? 0.75,
+      totalPauseDuration: Duration(seconds: map['totalPauseDuration'] as int? ?? 0),
       objectStats: map['objectStats'] != null
           ? WalkObjectStats.fromMap(map['objectStats'] as Map<String, dynamic>)
           : null,
@@ -281,6 +288,7 @@ class Walk {
     String? notes,
     DistanceSource? distanceSource,
     double? stepLength,
+    Duration? totalPauseDuration,
     WalkObjectStats? objectStats,
   }) {
     return Walk(
@@ -293,6 +301,7 @@ class Walk {
       notes: notes ?? this.notes,
       distanceSource: distanceSource ?? this.distanceSource,
       stepLength: stepLength ?? this.stepLength,
+      totalPauseDuration: totalPauseDuration ?? this.totalPauseDuration,
       objectStats: objectStats ?? this.objectStats,
     );
   }

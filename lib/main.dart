@@ -18,6 +18,7 @@ import 'providers/theme_provider.dart';
 import 'services/incoming_file_service.dart';
 import 'services/sync_service.dart';
 import 'services/p2p/p2p.dart';
+import 'services/tile_color_habitat_service.dart';
 import 'screens/home_screen.dart';
 import 'models/map_objects/map_objects.dart'; // Инициализация фабрики объектов
 
@@ -35,6 +36,9 @@ void main() async {
 
   // Инициализация локали для форматирования дат
   await initializeDateFormatting('ru_RU', null);
+
+  // Инициализация сервиса определения среды обитания (загрузка кэша)
+  await TileColorHabitatService().init();
 
   // Инициализация сервиса входящих файлов
   IncomingFileService().init();

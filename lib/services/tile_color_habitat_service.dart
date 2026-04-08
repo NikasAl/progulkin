@@ -58,6 +58,17 @@ class TileColorHabitatService {
 
   /// Сервис кэша habitats
   final HabitatCacheService _habitatCache = HabitatCacheService();
+  
+  /// Инициализирован ли сервис
+  bool _isInitialized = false;
+
+  /// Инициализировать сервис (загрузить кэш habitats)
+  Future<void> init() async {
+    if (_isInitialized) return;
+    await _habitatCache.init();
+    _isInitialized = true;
+    debugPrint('TileColorHabitatService: инициализирован');
+  }
 
   /// Время жизни кэша (10 минут)
   static const Duration cacheLifetime = Duration(minutes: 10);

@@ -188,6 +188,13 @@ class WalkProvider extends ChangeNotifier {
 
       _currentWalk!.endTime = DateTime.now();
       _currentWalk!.steps = steps;
+      
+      // Сохраняем суммарное время паузы для корректного расчёта скорости
+      // Если сейчас на паузе - добавляем текущую паузу
+      if (_pauseStartTime != null) {
+        _totalPauseDuration += DateTime.now().difference(_pauseStartTime!);
+      }
+      _currentWalk!.totalPauseDuration = _totalPauseDuration;
 
       // Сохраняем прогулку
       await _storageService.saveWalk(_currentWalk!);
