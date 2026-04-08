@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Launch background для Android 9-11 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white"/>
+    <!-- Темный фон -->
+    <item android:drawable="@android:color/black"/>
+    <!-- Увеличенная splash иконка со скруглёнными углами -->
     <item>
         <bitmap
             android:gravity="center"
-            android:src="@mipmap/ic_launcher"/>
+            android:src="@drawable/splash_icon"/>
     </item>
 </layer-list>
