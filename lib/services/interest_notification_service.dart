@@ -110,7 +110,7 @@ class InterestNotificationService {
       importance: Importance.high,
       priority: Priority.high,
       showWhen: true,
-      icon: '@mipmap/ic_launcher',
+      icon: '@drawable/splash_icon',
     );
 
     const iosDetails = DarwinNotificationDetails(

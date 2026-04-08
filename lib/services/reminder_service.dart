@@ -159,7 +159,7 @@ class ReminderService extends ChangeNotifier {
       channelDescription: 'Гео-напоминания от Смешариков',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: '@drawable/splash_icon',
     );
 
     const iosDetails = DarwinNotificationDetails(
