@@ -4,8 +4,8 @@
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <!-- Темный фон splash экрана -->
         <item name="android:windowSplashScreenBackground">#000000</item>
-        <!-- Увеличенная splash иконка со скруглёнными углами -->
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+        <!-- Splash иконка с отступами для круглой маски Android 12+ -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_android12</item>
         <!-- Длительность анимации (мс) -->
         <item name="android:windowSplashScreenAnimationDuration">200</item>
         <!-- Темный статус бар и навигация -->
