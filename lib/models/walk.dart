@@ -197,9 +197,59 @@ class Walk {
     return (totalDistance / 1000) / hours;
   }
 
+  /// Скорость за последние N минут (более отзывчивая)
+  /// Использует скользящее окно по точкам GPS
+  double recentSpeed([int minutes = 5]) {
+    if (points.length < 2) return 0;
+    
+    final now = DateTime.now();
+    final cutoff = now.subtract(Duration(minutes: minutes));
+    
+    // Находим точки за последние N минут
+    final recentPoints = points.where((p) => p.timestamp.isAfter(cutoff)).toList();
+    
+    if (recentPoints.length < 2) {
+      // Если мало точек - берём последние 2-3 точки
+      final lastPoints = points.length >= 3 
+          ? points.sublist(points.length - 3) 
+          : points;
+      return _calculateSpeedFromPoints(lastPoints);
+    }
+    
+    return _calculateSpeedFromPoints(recentPoints);
+  }
+  
+  /// Расчёт скорости по списку точек
+  double _calculateSpeedFromPoints(List<WalkPoint> pts) {
+    if (pts.length < 2) return 0;
+    
+    // Считаем расстояние между точками
+    double distance = 0;
+    for (int i = 1; i < pts.length; i++) {
+      distance += _haversineDistance(
+        pts[i - 1].latitude,
+        pts[i - 1].longitude,
+        pts[i].latitude,
+        pts[i].longitude,
+      );
+    }
+    
+    // Время между первой и последней точкой
+    final timeDiff = pts.last.timestamp.difference(pts.first.timestamp);
+    final hours = timeDiff.inSeconds / 3600.0;
+    
+    if (hours <= 0) return 0;
+    return (distance / 1000) / hours;
+  }
+
   /// Форматированная средняя скорость
   String get formattedSpeed {
     return '${averageSpeed.toStringAsFixed(1)} км/ч';
+  }
+  
+  /// Форматированная текущая скорость (за последние 5 минут)
+  String get formattedRecentSpeed {
+    return '${recentSpeed(5).toStringAsFixed(1)} км/ч';
   }
 
   /// Источник расстояния (для отображения)

@@ -452,10 +452,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   color: Colors.orange,
                 ),
                 _buildVerticalDivider(height: 32),
-                // Скорость
+                // Скорость (за последние 5 минут)
                 _buildCompactStatItem(
                   icon: Icons.speed_outlined,
-                  value: walk?.formattedSpeed ?? '0 км/ч',
+                  value: walk?.formattedRecentSpeed ?? '0 км/ч',
                   label: 'скорость',
                   color: Colors.purple,
                 ),
@@ -746,10 +746,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _spawnCreatures() async {
     if (_currentLocation == null) return;
     
-    final creatureProvider = context.read<CreatureProvider>();
+    final mapObjectProvider = context.read<MapObjectProvider>();
     
-    final spawned = await creatureProvider.spawnCreaturesAroundPlayer(
-      generateId: () => DateTime.now().millisecondsSinceEpoch.toString(),
+    final spawned = await mapObjectProvider.spawnCreaturesAroundPlayer(
       playerLat: _currentLocation!.latitude,
       playerLng: _currentLocation!.longitude,
       maxCreatures: 2,
