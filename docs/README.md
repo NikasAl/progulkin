@@ -2,6 +2,21 @@
 
 Приложение для отслеживания прогулок с элементами дополненной реальности и славянской мифологии.
 
+## Статус рефакторинга (2026-04-16)
+
+✅ **Основной рефакторинг завершён**
+- DI миграция через GetIt (30+ использований)
+- God Widgets разделены (HomeScreen, SettingsScreen, AddObjectScreen, ObjectDetailsSheet)
+- MapObjectProvider → Facade + 8 провайдеров
+- Интерфейсы сервисов созданы
+- Гео-утилиты централизованы
+
+⏳ **P3 отложен** - MapObjectStorage разделение
+
+Подробнее: [REFACTORING_PLAN_2026.md](./REFACTORING_PLAN_2026.md)
+
+---
+
 ## Структура документации
 
 ### RPG-система
@@ -17,6 +32,7 @@
 | Файл | Описание |
 |------|----------|
 | [ARCHITECTURE_ANALYSIS.md](./ARCHITECTURE_ANALYSIS.md) | Анализ архитектуры проекта |
+| [REFACTORING_PLAN_2026.md](./REFACTORING_PLAN_2026.md) | План и статус рефакторинга 2026 |
 | [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) | План реализации функций |
 | [MAP_OBJECTS_CONCEPT.md](./MAP_OBJECTS_CONCEPT.md) | Концепция объектов на карте |
 
