@@ -6,6 +6,7 @@ import '../providers/map_object_provider.dart';
 import '../services/p2p/map_object_storage.dart';
 import '../services/sync_service.dart';
 import '../widgets/sync_dialog.dart';
+import '../widgets/stats_widget.dart';
 
 /// Экран хранилища объектов
 class StorageScreen extends StatefulWidget {
@@ -150,63 +151,25 @@ class _StorageScreenState extends State<StorageScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _buildStatItem(
+                  child: StatsWidget.card(
                     icon: Icons.place,
                     label: 'Всего объектов',
                     value: '$total',
-                    color: Colors.blue,
+                    iconColor: Colors.blue,
                   ),
                 ),
                 Expanded(
-                  child: _buildStatItem(
+                  child: StatsWidget.card(
                     icon: Icons.sd_storage,
                     label: 'Размер БД',
                     value: _dbSize,
-                    color: Colors.green,
+                    iconColor: Colors.green,
                   ),
                 ),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  /// Элемент статистики
-  Widget _buildStatItem({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color.withValues(alpha: 0.8),
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }
@@ -378,19 +341,19 @@ class _StorageScreenState extends State<StorageScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _buildStatItem(
+                  child: StatsWidget.card(
                     icon: Icons.image,
                     label: 'Фото',
                     value: '$count',
-                    color: Colors.purple,
+                    iconColor: Colors.purple,
                   ),
                 ),
                 Expanded(
-                  child: _buildStatItem(
+                  child: StatsWidget.card(
                     icon: Icons.compress,
                     label: 'Размер (WebP)',
                     value: _formatBytes(size),
-                    color: Colors.teal,
+                    iconColor: Colors.teal,
                   ),
                 ),
               ],

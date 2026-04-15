@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/walk_provider.dart';
 import '../models/walk.dart';
+import '../widgets/stats_widget.dart';
 import 'walk_detail_screen.dart';
 
 /// Экран истории прогулок
@@ -228,61 +229,33 @@ class HistoryScreen extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _buildStatItem(
-                context,
+              child: StatsWidget.compact(
                 icon: Icons.directions_walk,
                 value: '$walks',
                 label: 'Прогулок',
-                color: color,
+                iconColor: color,
+                expanded: true,
               ),
             ),
             Expanded(
-              child: _buildStatItem(
-                context,
+              child: StatsWidget.compact(
                 icon: Icons.route,
                 value: _formatDistance(distance),
                 label: 'Километров',
-                color: color,
+                iconColor: color,
+                expanded: true,
               ),
             ),
             Expanded(
-              child: _buildStatItem(
-                context,
+              child: StatsWidget.compact(
                 icon: Icons.directions_walk,
                 value: _formatNumber(steps),
                 label: 'Шагов',
-                color: color,
+                iconColor: color,
+                expanded: true,
               ),
             ),
           ],
-        ),
-      ],
-    );
-  }
-  
-  /// Элемент статистики
-  Widget _buildStatItem(
-    BuildContext context, {
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-  }) {
-    return Column(
-      children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.grey[600],
-          ),
         ),
       ],
     );

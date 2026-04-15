@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/walk_provider.dart';
 import '../../providers/pedometer_provider.dart';
+import '../../widgets/stats_widget.dart';
+import '../../utils/panel_decorations.dart';
 
 /// Верхняя панель со статистикой прогулки
 /// Отображает шаги, расстояние, время и скорость
@@ -14,17 +16,7 @@ class WalkStatsPanel extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.all(12),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+        decoration: topPanelDecoration(context),
         child: Consumer2<WalkProvider, PedometerProvider>(
           builder: (context, walkProvider, pedometerProvider, child) {
             final walk = walkProvider.currentWalk;
@@ -32,90 +24,40 @@ class WalkStatsPanel extends StatelessWidget {
             return Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildStatItem(
-                  context: context,
+                StatsWidget.inline(
                   icon: Icons.directions_walk,
                   value: '${pedometerProvider.steps}',
                   label: 'шагов',
-                  color: Colors.green,
+                  iconColor: Colors.green,
                 ),
-                _buildVerticalDivider(context, height: 32),
-                _buildStatItem(
-                  context: context,
+                verticalDivider(height: 32),
+                StatsWidget.inline(
                   icon: Icons.straighten,
                   value: pedometerProvider.formattedDistance,
                   label: 'пройдено',
-                  color: Colors.blue,
+                  iconColor: Colors.blue,
                 ),
-                _buildVerticalDivider(context, height: 32),
-                _buildStatItem(
-                  context: context,
+                verticalDivider(height: 32),
+                StatsWidget.inline(
                   icon: Icons.timer_outlined,
                   value: walkProvider.hasCurrentWalk
                       ? walkProvider.currentWalkFormattedDuration
                       : '0:00',
                   label: 'время',
-                  color: Colors.orange,
+                  iconColor: Colors.orange,
                 ),
-                _buildVerticalDivider(context, height: 32),
-                _buildStatItem(
-                  context: context,
+                verticalDivider(height: 32),
+                StatsWidget.inline(
                   icon: Icons.speed_outlined,
                   value: walk?.formattedRecentSpeed ?? '0 км/ч',
                   label: 'скорость',
-                  color: Colors.purple,
+                  iconColor: Colors.purple,
                 ),
               ],
             );
           },
         ),
       ),
-    );
-  }
-
-  Widget _buildStatItem({
-    required BuildContext context,
-    required IconData icon,
-    required String value,
-    required String label,
-    Color? color,
-  }) {
-    return Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 18,
-            color: color ?? Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
-                  fontSize: 10,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVerticalDivider(BuildContext context, {double height = 40}) {
-    return Container(
-      height: height,
-      width: 1,
-      color: Colors.grey[300],
     );
   }
 }
