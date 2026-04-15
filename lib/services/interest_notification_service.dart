@@ -8,10 +8,6 @@ import '../di/service_locator.dart';
 /// Сервис уведомлений о "Интересно"
 /// Отправляет push-уведомления авторам заметок когда кто-то отмечает "Интересно"
 class InterestNotificationService {
-  static final InterestNotificationService _instance = InterestNotificationService._internal();
-  factory InterestNotificationService() => _instance;
-  InterestNotificationService._internal();
-
   final MapObjectStorage _storage = getIt<MapObjectStorage>();
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   final Uuid _uuid = const Uuid();

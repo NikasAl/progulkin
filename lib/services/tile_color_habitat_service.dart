@@ -46,10 +46,6 @@ class ColorAnalysis {
 /// Сервис для определения среды обитания по цвету пикселей на тайлах карты
 /// Использует кэш habitats (для офлайн) или загружает тайлы по HTTP
 class TileColorHabitatService {
-  static final TileColorHabitatService _instance = TileColorHabitatService._internal();
-  factory TileColorHabitatService() => _instance;
-  TileColorHabitatService._internal();
-
   /// URL шаблон для тайлов OSM
   static const String _tileUrlTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 

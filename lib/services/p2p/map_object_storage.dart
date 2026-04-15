@@ -7,10 +7,6 @@ import '../../models/map_objects/map_objects.dart';
 
 /// Локальное хранилище объектов карты
 class MapObjectStorage {
-  static final MapObjectStorage _instance = MapObjectStorage._internal();
-  factory MapObjectStorage() => _instance;
-  MapObjectStorage._internal();
-
   Database? _database;
   final StreamController<List<MapObject>> _objectsController =
       StreamController<List<MapObject>>.broadcast();

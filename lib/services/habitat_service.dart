@@ -33,10 +33,6 @@ class HabitatDetectionResult {
 /// Сервис для определения среды обитания по координатам
 /// Использует OpenStreetMap данные через Overpass API
 class HabitatService {
-  static final HabitatService _instance = HabitatService._internal();
-  factory HabitatService() => _instance;
-  HabitatService._internal();
-
   /// Кэш результатов по geohash (первые 6 символов ~ 1.2km x 0.6km)
   final Map<String, HabitatDetectionResult> _cache = {};
 

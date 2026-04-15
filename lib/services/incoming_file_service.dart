@@ -6,10 +6,6 @@ import '../di/service_locator.dart';
 
 /// Сервис для обработки входящих файлов (открытие через "Открыть с помощью")
 class IncomingFileService {
-  static final IncomingFileService _instance = IncomingFileService._internal();
-  factory IncomingFileService() => _instance;
-  IncomingFileService._internal();
-
   static const MethodChannel _channel = MethodChannel('ru.kreagenium.progulkin/incoming_file');
   
   final SyncService _syncService = getIt<SyncService>();

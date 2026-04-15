@@ -7,10 +7,6 @@ import 'tile_color_habitat_service.dart';
 
 /// Сервис для спавна и управления существами
 class CreatureService {
-  static final CreatureService _instance = CreatureService._internal();
-  factory CreatureService() => _instance;
-  CreatureService._internal();
-
   final _random = Random();
   final _uuid = const Uuid();
   final TileColorHabitatService _tileColorService = TileColorHabitatService();

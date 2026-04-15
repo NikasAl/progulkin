@@ -9,10 +9,6 @@ import '../models/map_objects/creature.dart';
 /// Сервис для кэширования тайлов карт для оффлайн использования
 /// Использует Singleton паттерн для избежания повторной инициализации
 class TileCacheService {
-  static final TileCacheService _instance = TileCacheService._internal();
-  factory TileCacheService() => _instance;
-  TileCacheService._internal();
-  
   static const String _storeName = 'progulkin_map_cache';
   static const String _tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   

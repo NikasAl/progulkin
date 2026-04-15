@@ -5,10 +5,6 @@ import '../models/walk.dart';
 
 /// Сервис для хранения данных прогулок
 class StorageService {
-  static final StorageService _instance = StorageService._internal();
-  factory StorageService() => _instance;
-  StorageService._internal();
-
   static const String _walksKey = 'saved_walks';
   static const String _settingsKey = 'app_settings';
   

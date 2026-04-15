@@ -9,10 +9,6 @@ import '../models/walk_point.dart';
 
 /// Сервис геолокации для трекинга маршрута с продвинутой фильтрацией
 class LocationService {
-  static final LocationService _instance = LocationService._internal();
-  factory LocationService() => _instance;
-  LocationService._internal();
-
   StreamSubscription<Position>? _positionStreamSubscription;
   final StreamController<WalkPoint> _positionController = 
       StreamController<WalkPoint>.broadcast();

@@ -59,10 +59,6 @@ class ImportResult {
 
 /// Сервис экспорта/импорта объектов карты в человекочитаемом формате
 class MapObjectExportService {
-  static final MapObjectExportService _instance = MapObjectExportService._internal();
-  factory MapObjectExportService() => _instance;
-  MapObjectExportService._internal();
-
   final MapObjectStorage _storage = getIt<MapObjectStorage>();
 
   /// Версия формата экспорта

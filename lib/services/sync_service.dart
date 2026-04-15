@@ -63,10 +63,6 @@ class ZipImportResult {
 
 /// Сервис синхронизации объектов карты через ZIP-архивы
 class SyncService {
-  static final SyncService _instance = SyncService._internal();
-  factory SyncService() => _instance;
-  SyncService._internal();
-
   final MapObjectStorage _storage = getIt<MapObjectStorage>();
   final MergeEngine _mergeEngine = MergeEngine();
 

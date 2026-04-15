@@ -53,10 +53,6 @@ class _CircularBuffer {
 /// Сервис для подсчёта шагов с адаптивной чувствительностью
 /// Реализация основана на алгоритме, проверенном на устройствах с датчиком ускорения
 class PedometerService {
-  static final PedometerService _instance = PedometerService._internal();
-  factory PedometerService() => _instance;
-  PedometerService._internal();
-
   StreamSubscription<StepCount>? _stepCountSubscription;
   StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
   

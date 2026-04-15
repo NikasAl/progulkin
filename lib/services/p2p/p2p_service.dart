@@ -64,10 +64,6 @@ class SyncResult {
 /// P2P сервис
 /// Полная реализация peer-to-peer синхронизации
 class P2PService {
-  static final P2PService _instance = P2PService._internal();
-  factory P2PService() => _instance;
-  P2PService._internal();
-
   final MapObjectStorage _storage = getIt<MapObjectStorage>();
 
   P2PConfig? _config;

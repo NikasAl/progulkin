@@ -113,10 +113,6 @@ class MergeResult {
 
 /// Движок мержа объектов карты
 class MergeEngine {
-  static final MergeEngine _instance = MergeEngine._internal();
-  factory MergeEngine() => _instance;
-  MergeEngine._internal();
-
   /// Стратегия по умолчанию
   MergeStrategy defaultStrategy = MergeStrategy.newerWins;
 

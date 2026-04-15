@@ -58,10 +58,6 @@ class CachedHabitatTile {
 /// Сервис для кэширования результатов анализа habitats
 /// Позволяет предварительно проанализировать область и использовать результаты офлайн
 class HabitatCacheService {
-  static final HabitatCacheService _instance = HabitatCacheService._internal();
-  factory HabitatCacheService() => _instance;
-  HabitatCacheService._internal();
-
   /// Ключ для SharedPreferences
   static const String _prefsKey = 'habitat_tiles_cache';
 
