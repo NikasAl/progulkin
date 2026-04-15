@@ -14,7 +14,6 @@ import '../services/incoming_file_service.dart';
 import '../services/interest_notification_service.dart';
 import '../services/map_object_export_service.dart';
 import '../services/photo_compression_service.dart';
-import '../services/reminder_service.dart';
 import '../services/p2p/p2p_service.dart';
 import '../services/p2p/map_object_storage.dart';
 
@@ -41,7 +40,6 @@ Future<void> setupDependencies() async {
   getIt.registerSingleton<PedometerService>(PedometerService());
   getIt.registerSingleton<PhotoCompressionService>(PhotoCompressionService());
   getIt.registerSingleton<ObjectActionService>(ObjectActionService());
-  getIt.registerSingleton<ReminderService>(ReminderService());
 
   // === Сервисы с зависимостями ===
   // Порядок важен - сначала регистрируем зависимости

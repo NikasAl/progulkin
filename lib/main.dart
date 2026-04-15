@@ -17,6 +17,7 @@ import 'providers/pedometer_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/incoming_file_service.dart';
+import 'services/sync_service.dart';
 import 'services/tile_color_habitat_service.dart';
 import 'services/location_service.dart';
 import 'services/storage_service.dart';
