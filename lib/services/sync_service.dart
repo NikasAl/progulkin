@@ -8,6 +8,7 @@ import 'package:archive/archive.dart';
 import '../models/map_objects/map_objects.dart';
 import 'p2p/map_object_storage.dart';
 import 'merge_engine.dart';
+import '../di/service_locator.dart';
 
 /// Результат экспорта в ZIP
 class ZipExportResult {
@@ -66,7 +67,7 @@ class SyncService {
   factory SyncService() => _instance;
   SyncService._internal();
 
-  final MapObjectStorage _storage = MapObjectStorage();
+  final MapObjectStorage _storage = getIt<MapObjectStorage>();
   final MergeEngine _mergeEngine = MergeEngine();
 
   /// Версия формата экспорта

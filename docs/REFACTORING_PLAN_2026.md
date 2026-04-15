@@ -1,14 +1,14 @@
 # План рефакторинга Прогулкин - 2026
 
 **Дата создания:** 2026-04-15
-**Последнее обновление:** 2026-04-15
+**Последнее обновление:** 2026-04-16
 **Статус:** В процессе выполнения
 
 ---
 
 ## 1. Текущее состояние архитектуры
 
-### 1.1. Размеры основных файлов (актуально на 2026-04-15)
+### 1.1. Размеры основных файлов (актуально на 2026-04-16)
 
 | Файл | Строк | Статус | Изменение |
 |------|-------|--------|-----------|
@@ -98,8 +98,32 @@ lib/repositories/
 
 ### 2.2. Приоритет P2
 
-- [ ] Внедрение GetIt для DI
-- [ ] Абстракции сервисов для тестирования
+#### ✅ DI Migration: GetIt внедрён (завершён)
+**Статус:** Завершён
+
+**Выполнено:**
+- ✅ `lib/di/service_locator.dart` создан (92 строки, 17 сервисов)
+- ✅ GetIt инициализируется в `main.dart` через `setupDependencies()`
+- ✅ **19 использований `getIt<>`** (было 8)
+- ✅ **Singleton factory pattern удалён** из всех сервисов
+
+**Мигрированные файлы:**
+
+| Категория | Файлы | Статус |
+|-----------|-------|--------|
+| **Сервисы** | `interest_notification_service.dart`, `sync_service.dart`, `map_object_export_service.dart`, `p2p_service.dart`, `incoming_file_service.dart` | ✅ Завершено |
+| **Провайдеры** | `creature_provider.dart`, `p2p_provider.dart`, `chat_provider.dart`, `map_object_provider.dart`, `notification_provider.dart`, `walk_provider.dart`, `pedometer_provider.dart` | ✅ Завершено |
+| **main.dart** | Инициализация DI, инъекция в провайдеры | ✅ Завершено |
+
+**Оставшиеся файлы (низкий приоритет):**
+- Экраны: `home_screen.dart`, `settings_screen.dart`, `habitat_debug_screen.dart`, `route_planning_screen.dart`, `walk_detail_screen.dart`, `storage_screen.dart`, `profile_screen.dart`
+- Виджеты: `photo_capture_widget.dart`, `sync_dialog.dart`, `object_details_sheet.dart`
+- Сервисы: `creature_service.dart`, `tile_cache_service.dart`, `tile_color_habitat_service.dart`
+
+---
+
+#### Другие задачи P2
+- [ ] Абстракции сервисов для тестирования (интерфейсы)
 - [ ] Вынести гео-утилиты в `lib/utils/geo_utils.dart`
 
 ---
@@ -150,6 +174,8 @@ StatsWidget.inline(...)
 ```
 lib/
 ├── main.dart
+├── di/
+│   └── service_locator.dart (DI контейнер)
 ├── config/
 │   ├── constants.dart
 │   └── version.dart
@@ -181,7 +207,8 @@ lib/
 │   │   └── photo_gallery.dart
 │   └── stats_widget.dart
 ├── services/
-│   └── p2p/map_object_storage.dart (783 строк)
+│   ├── p2p/map_object_storage.dart (783 строк)
+│   └── ... (17 сервисов в DI)
 └── utils/
     ├── snackbar_helper.dart
     └── panel_decorations.dart
@@ -197,6 +224,7 @@ lib/
 | Файлов > 500 строк | 8 | **5** | 2-3 |
 | Средний размер экрана | 800 | **~350** | 250 |
 | Дублирование кода | Высокое | **Низкое** | Минимальное |
+| Использований DI | 8 | **19+** | 30+ |
 
 ---
 
@@ -208,7 +236,11 @@ lib/
 | 2026-04-15 | `b91373f` | Устранение дублирования кода |
 | 2026-04-15 | `0788cb4` | Разделение AddObjectScreen |
 | 2026-04-15 | `32d4026` | Обновление документации |
-| 2026-04-15 | `1edcdb` | Разделение ObjectDetailsSheet |
+| 2026-04-15 | `f1edcdb` | Разделение ObjectDetailsSheet |
+| 2026-04-15 | `b2fdee0` | Анализ DI и план миграции |
+| 2026-04-16 | `b5e7a9f` | Миграция на DI через GetIt |
+| 2026-04-16 | `babd0c9` | Продолжение миграции на DI |
+| 2026-04-16 | `9d024e6` | Удаление singleton factory pattern |
 
 ---
 
@@ -219,10 +251,13 @@ lib/
 - **0 файлов** больше 1000 строк
 - Устранено дублирование кода
 - Созданы переиспользуемые утилиты
+- **DI миграция** сервисов и провайдеров завершена (19+ использований getIt)
+- **Singleton factory pattern** полностью удалён из сервисов
 
 ### ⏳ Отложено:
 - MapObjectStorage (God Service) - требует изменения архитектуры БД
+- DI миграция экранов и виджетов - низкий приоритет
 
 ---
 
-*Документ обновлён: 2026-04-15*
+*Документ обновлён: 2026-04-16*

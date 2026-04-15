@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
 import 'p2p/map_object_storage.dart';
+import '../di/service_locator.dart';
 
 /// Сервис уведомлений о "Интересно"
 /// Отправляет push-уведомления авторам заметок когда кто-то отмечает "Интересно"
@@ -11,7 +12,7 @@ class InterestNotificationService {
   factory InterestNotificationService() => _instance;
   InterestNotificationService._internal();
 
-  final MapObjectStorage _storage = MapObjectStorage();
+  final MapObjectStorage _storage = getIt<MapObjectStorage>();
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   final Uuid _uuid = const Uuid();
 

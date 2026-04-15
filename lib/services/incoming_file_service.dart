@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'sync_service.dart';
+import '../di/service_locator.dart';
 
 /// Сервис для обработки входящих файлов (открытие через "Открыть с помощью")
 class IncomingFileService {
@@ -11,7 +12,7 @@ class IncomingFileService {
 
   static const MethodChannel _channel = MethodChannel('ru.kreagenium.progulkin/incoming_file');
   
-  final SyncService _syncService = SyncService();
+  final SyncService _syncService = getIt<SyncService>();
   
   /// Callback при получении файла для импорта
   void Function(ZipImportResult result)? onFileReceived;

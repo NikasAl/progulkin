@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/map_objects/map_objects.dart';
 import '../services/p2p/map_object_storage.dart';
+import '../di/service_locator.dart';
 
 /// Результат экспорта
 class ExportResult {
@@ -62,7 +63,7 @@ class MapObjectExportService {
   factory MapObjectExportService() => _instance;
   MapObjectExportService._internal();
 
-  final MapObjectStorage _storage = MapObjectStorage();
+  final MapObjectStorage _storage = getIt<MapObjectStorage>();
 
   /// Версия формата экспорта
   static const int formatVersion = 1;

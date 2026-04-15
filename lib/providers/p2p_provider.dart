@@ -2,11 +2,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/map_objects/map_objects.dart';
 import '../services/p2p/p2p.dart';
+import '../di/service_locator.dart';
 
 /// Провайдер для управления P2P соединением
 /// Отвечает за синхронизацию объектов между устройствами
 class P2PProvider extends ChangeNotifier {
-  final P2PService _p2pService = P2PService();
+  final P2PService _p2pService = getIt<P2PService>();
 
   bool _isEnabled = true;
   String? _error;

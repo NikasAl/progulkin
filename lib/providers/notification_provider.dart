@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../services/interest_notification_service.dart';
+import '../di/service_locator.dart';
 
 /// Провайдер для управления уведомлениями
 /// Отвечает за уведомления о заинтересованности в заметках
 class NotificationProvider extends ChangeNotifier {
-  final InterestNotificationService _notificationService = InterestNotificationService();
+  final InterestNotificationService _notificationService = getIt<InterestNotificationService>();
 
   bool _initialized = false;
 

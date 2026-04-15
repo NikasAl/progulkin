@@ -2,12 +2,13 @@ import 'package:flutter/foundation.dart';
 import '../models/map_objects/map_objects.dart';
 import '../services/p2p/p2p.dart';
 import '../services/creature_service.dart';
+import '../di/service_locator.dart';
 
 /// Провайдер для управления существами
 /// Отвечает за спавн, поимку и коллекцию существ
 class CreatureProvider extends ChangeNotifier {
   final MapObjectStorage _storage;
-  final CreatureService _creatureService = CreatureService();
+  final CreatureService _creatureService = getIt<CreatureService>();
 
   /// Callback для трансляции обновлений через P2P
   Future<void> Function(MapObject object)? broadcastUpdate;

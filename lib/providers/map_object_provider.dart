@@ -7,6 +7,7 @@ import '../services/p2p/p2p.dart';
 import '../services/map_object_export_service.dart';
 import '../services/creature_service.dart';
 import '../services/interest_notification_service.dart';
+import '../di/service_locator.dart';
 import 'creature_provider.dart';
 import 'p2p_provider.dart';
 import 'moderation_provider.dart';
@@ -21,8 +22,8 @@ import 'foraging_provider.dart';
 /// Служит фасадом для специализированных провайдеров.
 /// Делегирует специфичные операции соответствующим провайдерам.
 class MapObjectProvider extends ChangeNotifier {
-  final MapObjectStorage _storage = MapObjectStorage();
-  final MapObjectExportService _exportService = MapObjectExportService();
+  final MapObjectStorage _storage = getIt<MapObjectStorage>();
+  final MapObjectExportService _exportService = getIt<MapObjectExportService>();
   final Uuid _uuid = const Uuid();
 
   /// Доступ к хранилищу

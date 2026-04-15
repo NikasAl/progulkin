@@ -5,6 +5,7 @@ import 'map_object_storage.dart';
 import 'signaling_client.dart';
 import 'p2p_connection.dart';
 import 'sync_protocol.dart';
+import '../../di/service_locator.dart';
 
 /// Конфигурация P2P
 class P2PConfig {
@@ -67,7 +68,7 @@ class P2PService {
   factory P2PService() => _instance;
   P2PService._internal();
 
-  final MapObjectStorage _storage = MapObjectStorage();
+  final MapObjectStorage _storage = getIt<MapObjectStorage>();
 
   P2PConfig? _config;
   bool _isRunning = false;

@@ -3,10 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/p2p_message.dart' as model;
 import '../services/p2p/p2p.dart';
+import '../di/service_locator.dart';
 
 /// Провайдер для управления P2P чатами
 class ChatProvider extends ChangeNotifier {
-  final MapObjectStorage _storage = MapObjectStorage();
+  final MapObjectStorage _storage = getIt<MapObjectStorage>();
   final Uuid _uuid = const Uuid();
 
   List<model.Chat> _chats = [];
