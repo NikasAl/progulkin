@@ -34,6 +34,7 @@ class MapObjectsLayer extends StatelessWidget {
     final isInInteractionRange = _isObjectInRange(obj);
 
     return Marker(
+      key: ValueKey('marker_${obj.id}'),
       point: LatLng(obj.latitude, obj.longitude),
       width: _getMarkerSize(obj),
       height: _getMarkerSize(obj),
@@ -41,6 +42,7 @@ class MapObjectsLayer extends StatelessWidget {
         onTap: onObjectTap != null ? () => onObjectTap!(obj) : null,
         onLongPress: onObjectLongPress != null ? () => onObjectLongPress!(obj) : null,
         child: _MarkerWidget(
+          key: ValueKey('marker_widget_${obj.id}'),
           object: obj,
           highlight: isInInteractionRange,
         ),
@@ -94,6 +96,7 @@ class _MarkerWidget extends StatefulWidget {
   final bool highlight;
 
   const _MarkerWidget({
+    super.key,
     required this.object,
     this.highlight = false,
   });
