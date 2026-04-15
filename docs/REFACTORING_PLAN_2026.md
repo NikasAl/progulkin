@@ -12,14 +12,14 @@
 
 | Файл | Строк | Статус | Изменение |
 |------|-------|--------|-----------|
-| `object_details_sheet.dart` | 1120 | ⏳ Частично разделён | Был 1138 |
-| `add_object_screen.dart` | 372 | ✅ **Разделён** | ~~1021~~ → 372 (-64%) |
 | `home_screen.dart` | 846 | ✅ **Разделён** | ~~1415~~ → 846 (-40%) |
-| `settings_screen.dart` | 461 | ✅ **Разделён** | ~~1217~~ → 461 (-62%) |
 | `map_object_storage.dart` | 783 | ⏳ Не разделён | God Service |
 | `map_objects_layer.dart` | 777 | ✅ Исправлено | Баг с артефактами |
 | `history_screen.dart` | 776 | ✅ Оптимизирован | Убрано дублирование |
 | `storage_screen.dart` | 733 | ✅ Оптимизирован | Убрано дублирование |
+| `add_object_screen.dart` | 372 | ✅ **Разделён** | ~~1021~~ → 372 (-64%) |
+| `object_details_sheet.dart` | 370 | ✅ **Разделён** | ~~1120~~ → 370 (-67%) |
+| `settings_screen.dart` | 461 | ✅ **Разделён** | ~~1217~~ → 461 (-62%) |
 | `map_object_provider.dart` | 668 | ✅ Рефакторинг завершён | Facade pattern |
 
 ### 1.2. Выполненные улучшения
@@ -33,7 +33,7 @@
   - `contact_author_sheet.dart` (170 строк)
   - `object_options_sheet.dart` (115 строк)
 
-#### ✅ **Фаза 2.3: AddObjectScreen (завершён)**
+#### ✅ **Фаза 2.2: AddObjectScreen (завершён)**
 - 1021 → 372 строк (64% сокращение)
 - Создана папка `lib/screens/add_object/`
 - Вынесены формы:
@@ -42,6 +42,17 @@
   - `interest_note_form.dart` (206 строк)
   - `reminder_form.dart` (119 строк)
   - `foraging_spot_form.dart` (281 строк)
+
+#### ✅ **Фаза 2.3: ObjectDetailsSheet (завершён)**
+- 1120 → 370 строк (67% сокращение)
+- Создана папка `lib/widgets/object_details/details/`
+- Вынесены компоненты:
+  - `trash_monster_details.dart` (70 строк)
+  - `secret_message_details.dart` (43 строки)
+  - `creature_details.dart` (53 строки)
+  - `interest_note_details.dart` (35 строк)
+  - `reminder_details.dart` (197 строк)
+  - `info_row.dart` (42 строки)
 
 #### ✅ **MapObjectProvider → Facade + 8 провайдеров**
 - CreatureProvider (267 строк) - спавн/поимка существ
@@ -73,22 +84,6 @@
 
 ### 2.1. Приоритет P1
 
-#### ObjectDetailsSheet (1120 строк)
-**Текущий статус:** Частично разделён, есть папка `object_details/`
-
-**План:**
-```
-lib/widgets/object_details/
-├── object_details_sheet.dart  (~200 строк - структура)
-├── details/
-│   ├── trash_monster_details.dart
-│   ├── creature_details.dart
-│   ├── secret_message_details.dart
-│   ├── interest_note_details.dart
-│   └── reminder_details.dart
-└── photo_gallery_widget.dart (уже существует)
-```
-
 #### MapObjectStorage (783 строки) - God Service
 **План:** Разделить на репозитории
 ```
@@ -98,6 +93,8 @@ lib/repositories/
 ├── message_repository.dart
 └── contact_repository.dart
 ```
+
+**Примечание:** Требует существенных изменений архитектуры и может быть отложен.
 
 ### 2.2. Приоритет P2
 
@@ -173,11 +170,14 @@ lib/
 │   │   ├── trash_monster_form.dart
 │   │   ├── secret_message_form.dart
 │   │   └── ... (5 форм)
-│   └── settings/
-│       └── settings_screen.dart (461 строк)
+│   └── settings_screen.dart (461 строк)
 ├── widgets/
 │   ├── object_details/
-│   │   ├── object_details_sheet.dart (1120 строк)
+│   │   ├── object_details_sheet.dart (370 строк)
+│   │   ├── details/
+│   │   │   ├── trash_monster_details.dart
+│   │   │   ├── creature_details.dart
+│   │   │   └── ... (6 файлов)
 │   │   └── photo_gallery.dart
 │   └── stats_widget.dart
 ├── services/
@@ -193,9 +193,9 @@ lib/
 
 | Метрика | До | Сейчас | Цель |
 |---------|-----|--------|------|
-| Файлов > 1000 строк | 4 | **0** | 0 ✅ |
+| Файлов > 1000 строк | 4 | **0** ✅ | 0 ✅ |
 | Файлов > 500 строк | 8 | **5** | 2-3 |
-| Средний размер экрана | 800 | **~400** | 250 |
+| Средний размер экрана | 800 | **~350** | 250 |
 | Дублирование кода | Высокое | **Низкое** | Минимальное |
 
 ---
@@ -207,6 +207,21 @@ lib/
 | 2026-04-15 | `600b16e` | Разделение HomeScreen |
 | 2026-04-15 | `b91373f` | Устранение дублирования кода |
 | 2026-04-15 | `0788cb4` | Разделение AddObjectScreen |
+| 2026-04-15 | `32d4026` | Обновление документации |
+| 2026-04-15 | `1edcdb` | Разделение ObjectDetailsSheet |
+
+---
+
+## 7. Итоги
+
+### ✅ Достигнуто:
+- **4 God Widget** успешно разделены (HomeScreen, AddObjectScreen, ObjectDetailsSheet, SettingsScreen)
+- **0 файлов** больше 1000 строк
+- Устранено дублирование кода
+- Созданы переиспользуемые утилиты
+
+### ⏳ Отложено:
+- MapObjectStorage (God Service) - требует изменения архитектуры БД
 
 ---
 
