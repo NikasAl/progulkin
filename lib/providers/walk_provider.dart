@@ -9,9 +9,18 @@ import '../services/pedometer_service.dart';
 
 /// Провайдер для управления прогулками
 class WalkProvider extends ChangeNotifier {
-  final LocationService _locationService = LocationService();
-  final StorageService _storageService = StorageService();
-  final PedometerService _pedometerService = PedometerService();
+  final LocationService _locationService;
+  final StorageService _storageService;
+  final PedometerService _pedometerService;
+
+  /// Конструктор с инъекцией зависимостей
+  WalkProvider({
+    required LocationService locationService,
+    required StorageService storageService,
+    required PedometerService pedometerService,
+  })  : _locationService = locationService,
+        _storageService = storageService,
+        _pedometerService = pedometerService;
 
   Walk? _currentWalk;
   List<Walk> _walksHistory = [];

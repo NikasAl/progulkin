@@ -31,6 +31,9 @@ dependencies:
 
   # Состояние
   provider: ^6.1.1
+  
+  # Dependency Injection
+  get_it: ^7.6.0
 
   # Локальное хранилище
   shared_preferences: ^2.2.2

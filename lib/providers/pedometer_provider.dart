@@ -3,7 +3,11 @@ import '../services/pedometer_service.dart';
 
 /// Провайдер для управления подсчётом шагов
 class PedometerProvider extends ChangeNotifier {
-  final PedometerService _pedometerService = PedometerService();
+  final PedometerService _pedometerService;
+
+  /// Конструктор с инъекцией зависимостей
+  PedometerProvider({required PedometerService pedometerService})
+      : _pedometerService = pedometerService;
 
   int _steps = 0;
   double _distance = 0;

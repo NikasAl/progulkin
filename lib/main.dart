@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'di/service_locator.dart';
 import 'providers/map_object_provider.dart';
 import 'providers/creature_provider.dart';
 import 'providers/p2p_provider.dart';
@@ -16,20 +17,22 @@ import 'providers/pedometer_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/incoming_file_service.dart';
-import 'services/sync_service.dart';
-import 'services/p2p/p2p.dart';
 import 'services/tile_color_habitat_service.dart';
+import 'services/location_service.dart';
+import 'services/storage_service.dart';
+import 'services/pedometer_service.dart';
+import 'services/p2p/map_object_storage.dart';
 import 'screens/home_screen.dart';
 import 'models/map_objects/map_objects.dart'; // Инициализация фабрики объектов
 
 /// Глобальный ключ навигатора для показа диалогов из сервиса
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-/// Общее хранилище объектов (Singleton)
-final MapObjectStorage _sharedStorage = MapObjectStorage();
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Инициализация Dependency Injection
+  await setupDependencies();
 
   // Инициализация фабрики объектов карты (обязательно до использования)
   initMapObjectFactory();
@@ -38,13 +41,13 @@ void main() async {
   await initializeDateFormatting('ru_RU', null);
 
   // Инициализация сервиса определения среды обитания (загрузка кэша)
-  await TileColorHabitatService().init();
+  await getIt<TileColorHabitatService>().init();
 
   // Инициализация сервиса входящих файлов
-  IncomingFileService().init();
+  getIt<IncomingFileService>().init();
 
   // Настраиваем callback для показа результата импорта
-  IncomingFileService().onFileReceived = (result) {
+  getIt<IncomingFileService>().onFileReceived = (result) {
     _showImportResult(result);
   };
 
@@ -116,15 +119,18 @@ class _ProgulkinAppState extends State<ProgulkinApp> {
   }
 
   void _createProviders() {
-    // Создаём специализированные провайдеры
-    _creatureProvider = CreatureProvider(storage: _sharedStorage);
+    // Получаем хранилище из DI
+    final storage = getIt<MapObjectStorage>();
+
+    // Создаём специализированные провайдеры с инъекцией зависимостей
+    _creatureProvider = CreatureProvider(storage: storage);
     _p2pProvider = P2PProvider();
-    _moderationProvider = ModerationProvider(storage: _sharedStorage);
+    _moderationProvider = ModerationProvider(storage: storage);
     _notificationProvider = NotificationProvider();
-    _contactProvider = ContactProvider(storage: _sharedStorage);
-    _interestProvider = InterestProvider(storage: _sharedStorage);
-    _reminderProvider = ReminderProvider(storage: _sharedStorage);
-    _foragingProvider = ForagingProvider(storage: _sharedStorage);
+    _contactProvider = ContactProvider(storage: storage);
+    _interestProvider = InterestProvider(storage: storage);
+    _reminderProvider = ReminderProvider(storage: storage);
+    _foragingProvider = ForagingProvider(storage: storage);
 
     // Создаём MapObjectProvider (координатор/фасад)
     _mapObjectProvider = MapObjectProvider.withProviders(
@@ -272,8 +278,14 @@ class _ProgulkinAppState extends State<ProgulkinApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => WalkProvider()),
-        ChangeNotifierProvider(create: (_) => PedometerProvider()),
+        ChangeNotifierProvider(create: (_) => WalkProvider(
+          locationService: getIt<LocationService>(),
+          storageService: getIt<StorageService>(),
+          pedometerService: getIt<PedometerService>(),
+        )),
+        ChangeNotifierProvider(create: (_) => PedometerProvider(
+          pedometerService: getIt<PedometerService>(),
+        )),
         ChangeNotifierProvider.value(value: _mapObjectProvider),
         ChangeNotifierProvider.value(value: _creatureProvider),
         ChangeNotifierProvider.value(value: _p2pProvider),
