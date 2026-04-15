@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/map_objects/map_objects.dart';
 import '../services/p2p/map_object_storage.dart';
+import 'object_details/object_details.dart';
 
 /// Единый виджет для отображения деталей объекта в BottomSheet
 ///
@@ -668,35 +669,16 @@ class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
 
   /// Фото-галерея с модерацией
   Widget _buildPhotoGallery(BuildContext context) {
-    if (_isLoadingPhotos) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (_photos.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 150,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: _photos.length,
-            itemBuilder: (context, index) {
-              return _buildPhotoCard(context, index);
-            },
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
+    return PhotoGallery(
+      photos: _photos,
+      photoIds: _photoIds,
+      photoStatuses: _photoStatuses,
+      photoVoteStats: _photoVoteStats,
+      userPhotoVotes: _userPhotoVotes,
+      userId: widget.userId,
+      objectOwnerId: widget.object.ownerId,
+      onPhotoVote: widget.onPhotoVote,
+      isLoading: _isLoadingPhotos,
     );
   }
 
