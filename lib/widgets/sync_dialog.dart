@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../di/service_locator.dart';
 import '../services/sync_service.dart';
 import '../services/merge_engine.dart';
 import '../providers/map_object_provider.dart';
@@ -13,7 +14,7 @@ class SyncDialog extends StatefulWidget {
 }
 
 class _SyncDialogState extends State<SyncDialog> {
-  final SyncService _syncService = SyncService();
+  final SyncService _syncService = getIt<SyncService>();
   bool _isLoading = false;
   String? _statusMessage;
   ZipExportResult? _exportResult;

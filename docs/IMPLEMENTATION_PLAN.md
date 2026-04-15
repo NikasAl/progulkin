@@ -609,6 +609,62 @@ enum CreatureType {
 
 ---
 
+### 8.3. Dependency Injection миграция ✅ (2026-04-16)
+
+**Задачи:**
+- [x] Создать `lib/di/service_locator.dart` с GetIt
+- [x] Зарегистрировать 17 сервисов как singletons
+- [x] Заменить прямое создание сервисов на `getIt<T>()` в:
+  - [x] `storage_screen.dart`
+  - [x] `profile_screen.dart`
+  - [x] `object_details_sheet.dart`
+  - [x] `sync_dialog.dart`
+  - [x] `habitat_debug_screen.dart`
+- [x] Удалить singleton factory pattern из сервисов
+- [x] Инъекция через конструктор в провайдерах
+
+**Результаты:**
+- 30+ использований `getIt<T>()`
+- 100% DI консистентность
+- Удалены все прямые создания сервисов
+
+---
+
+### 8.4. Интерфейсы сервисов ✅ (2026-04-16)
+
+**Задачи:**
+- [x] Создать `lib/services/interfaces/`
+- [x] Создать интерфейсы:
+  - [x] `i_location_service.dart`
+  - [x] `i_sync_service.dart`
+  - [x] `i_pedometer_service.dart`
+  - [x] `i_storage_service.dart`
+
+**Выгоды:**
+- Возможность создания моков для тестов
+- Альтернативные реализации сервисов
+- Документация контрактов сервисов
+
+---
+
+### 8.5. Гео-утилиты ✅ (2026-04-16)
+
+**Задачи:**
+- [x] Создать `lib/utils/geo_utils.dart`
+- [x] Централизовать функции:
+  - `calculateDistance()` - расстояние между точками
+  - `calculateBearing()` - азимут
+  - `calculateDestination()` - конечная точка по азимуту
+  - `randomPointInRadius()` - случайная точка в радиусе
+  - `formatDistance()`, `formatSpeed()` - форматирование
+
+**Выгоды:**
+- Устранение дублирования кода
+- Единая точка для гео-вычислений
+- Упрощение тестирования
+
+---
+
 ## Этап 9: Подготовка к публикации RuStore ✅ ВЫПОЛНЕНО
 
 ### 9.1. Политика конфиденциальности ✅

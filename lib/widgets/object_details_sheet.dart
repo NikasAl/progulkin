@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/map_objects/map_objects.dart';
+import '../di/service_locator.dart';
 import '../services/p2p/map_object_storage.dart';
 import 'object_details/object_details.dart';
 import 'object_details/details/details.dart';
@@ -48,7 +49,7 @@ class ObjectDetailsSheet extends StatefulWidget {
 }
 
 class _ObjectDetailsSheetState extends State<ObjectDetailsSheet> {
-  final MapObjectStorage _storage = MapObjectStorage();
+  final MapObjectStorage _storage = getIt<MapObjectStorage>();
   List<Uint8List> _photos = [];
   List<String> _photoIds = [];
   List<String> _photoStatuses = [];

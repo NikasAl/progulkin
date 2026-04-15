@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/map_objects/map_objects.dart';
 import '../providers/map_object_provider.dart';
+import '../di/service_locator.dart';
 import '../services/p2p/map_object_storage.dart';
 import '../services/sync_service.dart';
 import '../widgets/sync_dialog.dart';
@@ -54,7 +55,7 @@ class _StorageScreenState extends State<StorageScreen> {
 
   Future<int> _getDatabaseSize() async {
     try {
-      final db = await MapObjectStorage().database;
+      final db = await getIt<MapObjectStorage>().database;
       final path = db.path;
       final file = File(path);
       if (await file.exists()) {
@@ -68,7 +69,7 @@ class _StorageScreenState extends State<StorageScreen> {
 
   Future<Map<String, dynamic>> _getPhotoStats() async {
     try {
-      final db = await MapObjectStorage().database;
+      final db = await getIt<MapObjectStorage>().database;
       final results = await db.rawQuery('SELECT COUNT(*) as count, SUM(length(webp_data)) as size FROM photos');
       if (results.isNotEmpty) {
         return {
@@ -595,7 +596,7 @@ class _StorageScreenState extends State<StorageScreen> {
     );
 
     try {
-      final syncService = SyncService();
+      final syncService = getIt<SyncService>();
       final result = await syncService.exportToZip();
 
       if (!mounted) return;
@@ -634,7 +635,7 @@ class _StorageScreenState extends State<StorageScreen> {
     );
 
     try {
-      final syncService = SyncService();
+      final syncService = getIt<SyncService>();
       final result = await syncService.importFromZip();
 
       if (!mounted) return;

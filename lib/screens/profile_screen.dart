@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/contact_profile.dart';
+import '../di/service_locator.dart';
 import '../services/user_id_service.dart';
 import '../services/p2p/map_object_storage.dart';
 
@@ -14,8 +15,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final UserIdService _userIdService = UserIdService();
-  final MapObjectStorage _storage = MapObjectStorage();
+  late final UserIdService _userIdService = getIt<UserIdService>();
+  late final MapObjectStorage _storage = getIt<MapObjectStorage>();
   
   late Future<_ProfileData> _profileFuture;
   

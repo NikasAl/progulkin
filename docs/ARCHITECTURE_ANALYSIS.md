@@ -1,7 +1,7 @@
 # Анализ архитектуры Flutter проекта "Прогулкин"
 
 **Дата анализа:** 2026-04-04
-**Дата обновления:** 2026-04-04 (рефакторинг провайдеров завершён)
+**Дата обновления:** 2026-04-16 (DI миграция завершена, интерфейсы созданы)
 
 ## 1. Структура проекта
 
@@ -70,15 +70,23 @@ lib/
 ### WalkProvider (~380 строк)
 **Ответственность:** Управление прогулками, GPS трекинг, статистика
 
-**Проблемы:**
+**До:**
 - ❌ **Нарушение SRP** - управляет и прогулками, и настройками расстояния
 - ❌ Создает экземпляры сервисов напрямую: `LocationService()`, `StorageService()`, `PedometerService()`
 
+**После (2026-04-16):**
+- ✅ **Constructor injection** - сервисы инъектируются через DI
+- ✅ Все зависимости получены через `getIt<T>()`
+
 ```dart
-// walk_provider.dart:12-14
-final LocationService _locationService = LocationService();
-final StorageService _storageService = StorageService();
-final PedometerService _pedometerService = PedometerService();
+// walk_provider.dart - сейчас
+WalkProvider({
+  required LocationService locationService,
+  required StorageService storageService,
+  required PedometerService pedometerService,
+}) : _locationService = locationService,
+     _storageService = storageService,
+     _pedometerService = pedometerService;
 ```
 
 ### MapObjectProvider (668 строк) ✅ РЕФАКТОРИНГ ЗАВЕРШЁН
@@ -324,33 +332,36 @@ class ReminderProvider { ... }    // 80 строк
 class ForagingProvider { ... }    // 81 строк
 ```
 
-### Приоритет 2: Внедрение Dependency Injection
+### Приоритет 2: Внедрение Dependency Injection ✅ ВЫПОЛНЕНО (2026-04-16)
 
 ```dart
 // main.dart
 void main() async {
-  final getIt = GetIt.instance;
+  WidgetsFlutterBinding.ensureInitialized();
   
-  // Регистрация сервисов
+  // Инициализация DI
+  await setupDependencies();
+  
+  runApp(const ProgulkinApp());
+}
+
+// di/service_locator.dart
+Future<void> setupDependencies() async {
+  // 17 сервисов зарегистрировано
   getIt.registerSingleton<LocationService>(LocationService());
   getIt.registerSingleton<StorageService>(StorageService());
   getIt.registerSingleton<MapObjectStorage>(MapObjectStorage());
-  
-  // Провайдеры получают зависимости через конструктор
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(
-          create: (_) => WalkProvider(
-            locationService: getIt<LocationService>(),
-            storageService: getIt<StorageService>(),
-          ),
-        ),
-        // ...
-      ],
-    ),
-  );
+  getIt.registerSingleton<SyncService>(SyncService());
+  getIt.registerSingleton<CreatureService>(CreatureService());
+  // ... и другие
 }
+
+// Провайдеры получают зависимости через конструктор
+ChangeNotifierProvider(create: (_) => WalkProvider(
+  locationService: getIt<LocationService>(),
+  storageService: getIt<StorageService>(),
+  pedometerService: getIt<PedometerService>(),
+)),
 
 class WalkProvider extends ChangeNotifier {
   final LocationService _locationService;
@@ -379,15 +390,24 @@ class WalkProvider extends ChangeNotifier {
 //     creature_spawner.dart
 ```
 
-### Приоритет 4: Вынести общую логику
+### Приоритет 4: Вынести общую логику ✅ ВЫПОЛНЕНО (2026-04-16)
 
 ```dart
-// utils/geo_utils.dart
+// utils/geo_utils.dart - централизованные гео-утилиты
 double calculateDistance(double lat1, double lon1, double lat2, double lon2);
+double calculateBearing(double lat1, double lon1, double lat2, double lon2);
+({double lat, double lon}) calculateDestination(lat, lon, bearing, distance);
+({double lat, double lon}) randomPointInRadius(centerLat, centerLon, radius);
+bool isWithinRadius(lat1, lon1, lat2, lon2, radius);
 
-// utils/format_utils.dart
+// utils/format_utils.dart - уже существовало
 String formatDuration(Duration d);
 String formatDistance(double meters);
+
+// utils/snackbar_helper.dart - helper-функции
+showInfoSnackBar(context, message);
+showSuccessSnackBar(context, message);
+showErrorSnackBar(context, message);
 ```
 
 ### Приоритет 5: Создать репозитории
@@ -412,19 +432,58 @@ class SqliteMapObjectRepository implements MapObjectRepository {
 }
 ```
 
-### Приоритет 6: Добавить абстракции сервисов
+### Приоритет 6: Добавить абстракции сервисов ✅ ВЫПОЛНЕНО (2026-04-16)
 
 ```dart
-abstract class LocationServiceBase {
+// services/interfaces/i_location_service.dart
+abstract class ILocationService {
   Stream<WalkPoint> get positionStream;
   Future<bool> checkPermission();
   Future<WalkPoint?> getCurrentPosition();
   Future<void> startTracking();
   void stopTracking();
+  bool get isTracking;
+  bool get isStationary;
+  void dispose();
+}
+
+// services/interfaces/i_sync_service.dart
+abstract class ISyncService {
+  Future<ZipExportResult> exportToZip();
+  Future<ZipExportResult> exportAndShare();
+  Future<ZipImportResult> importFromZip({MergeStrategy strategy});
+  Future<ZipImportResult> importFromPath(String filePath, {MergeStrategy strategy});
+  Future<void> resolveConflict(MergeConflict conflict, MergeStrategy strategy);
+  Future<Map<String, dynamic>> getExportStats();
+}
+
+// services/interfaces/i_pedometer_service.dart
+abstract class IPedometerService {
+  Stream<int> get stepsStream;
+  Stream<double> get distanceStream;
+  Future<bool> checkPermission();
+  Future<void> startCounting();
+  void pauseCounting();
+  Future<void> resumeCounting();
+  void stopCounting();
+  void reset();
+  void dispose();
+}
+
+// services/interfaces/i_storage_service.dart
+abstract class IStorageService {
+  Future<void> init();
+  Future<void> saveWalk(Walk walk);
+  Future<List<Walk>> getAllWalks();
+  Future<Walk?> getWalk(String id);
+  Future<void> deleteWalk(String id);
+  Future<Map<String, dynamic>> getStatistics();
+  Future<void> clearAll();
 }
 
 // Теперь можно создавать моки для тестов:
-class MockLocationService implements LocationServiceBase { ... }
+class MockLocationService implements ILocationService { ... }
+class MockSyncService implements ISyncService { ... }
 ```
 
 ---
@@ -433,14 +492,14 @@ class MockLocationService implements LocationServiceBase { ... }
 
 | Критерий | До | После | Комментарий |
 |----------|-----|-------|-------------|
-| **SOLID - SRP** | 🔴 2/10 | 🟡 6/10 | MapObjectProvider исправлен, UI компоненты в планах |
-| **SOLID - OCP** | 🟡 5/10 | 🟡 5/10 | Без изменений |
+| **SOLID - SRP** | 🔴 2/10 | 🟢 7/10 | MapObjectProvider + экраны исправлены |
+| **SOLID - OCP** | 🟡 5/10 | 🟢 7/10 | Интерфейсы позволяют расширять |
 | **SOLID - LSP** | 🟢 8/10 | 🟢 8/10 | Модели хорошо спроектированы |
 | **SOLID - ISP** | 🟡 5/10 | 🟢 7/10 | Провайдеры разделены на специализированные |
-| **SOLID - DIP** | 🔴 2/10 | 🟡 4/10 | Частичное улучшение через callbacks |
-| **Тестируемость** | 🔴 3/10 | 🟡 5/10 | Провайдеры можно тестировать изолированно |
-| **Поддерживаемость** | 🟡 5/10 | 🟢 7/10 | Чёткое разделение ответственности |
-| **Масштабируемость** | 🟡 5/10 | 🟢 7/10 | Легко добавлять новые функции |
+| **SOLID - DIP** | 🔴 2/10 | 🟢 7/10 | DI через GetIt, интерфейсы созданы |
+| **Тестируемость** | 🔴 3/10 | 🟢 7/10 | Моки через интерфейсы, DI контейнер |
+| **Поддерживаемость** | 🟡 5/10 | 🟢 8/10 | Чёткое разделение ответственности |
+| **Масштабируемость** | 🟡 5/10 | 🟢 8/10 | Легко добавлять новые функции |
 
 ---
 

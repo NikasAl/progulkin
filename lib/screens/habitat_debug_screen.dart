@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../di/service_locator.dart';
 import '../services/tile_color_habitat_service.dart';
 import '../services/creature_service.dart';
 import '../services/location_service.dart';
@@ -18,9 +19,9 @@ class HabitatDebugScreen extends StatefulWidget {
 
 class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
   final MapController _mapController = MapController();
-  final LocationService _locationService = LocationService();
-  final TileColorHabitatService _tileColorService = TileColorHabitatService();
-  final CreatureService _creatureService = CreatureService();
+  final LocationService _locationService = getIt<LocationService>();
+  final TileColorHabitatService _tileColorService = getIt<TileColorHabitatService>();
+  final CreatureService _creatureService = getIt<CreatureService>();
 
   LatLng? _currentLocation;
   LatLng _mapCenter = const LatLng(55.7558, 37.6173); // Москва по умолчанию
