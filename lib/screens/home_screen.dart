@@ -386,6 +386,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                     ),
+                    // Кнопка перехода в планировщик маршрутов
+                    IconButton(
+                      icon: const Icon(Icons.add_road),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const RoutePlannerScreen()),
+                        );
+                      },
+                      tooltip: 'Планировщик маршрутов',
+                    ),
                     if (routeProvider.hasSelectedRoute)
                       TextButton(
                         onPressed: () {

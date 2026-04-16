@@ -17,6 +17,7 @@ class RoutePlannerScreen extends StatefulWidget {
 }
 
 class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final MapController _mapController = MapController();
   final LocationService _locationService = getIt<LocationService>();
 
@@ -252,6 +253,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     }
 
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -262,7 +264,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
           // Кнопка открытия бокового меню с маршрутами
           IconButton(
             icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             tooltip: 'Мои маршруты',
           ),
           if (_currentWaypoints.isNotEmpty) ...[
