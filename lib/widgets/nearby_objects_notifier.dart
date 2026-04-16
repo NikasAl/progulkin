@@ -195,11 +195,22 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
     final trashCount = objects.where((o) => o.type == MapObjectType.trashMonster).length;
     final secretCount = objects.where((o) => o.type == MapObjectType.secretMessage).length;
     final creatureCount = objects.where((o) => o.type == MapObjectType.creature).length;
+    
+    // Напоминания - фильтруем активные
+    final reminders = objects
+        .whereType<ReminderCharacter>()
+        .where((r) => r.shouldTrigger(widget.currentLat, widget.currentLng))
+        .toList();
 
     // Воспроизводим звук только один раз при появлении уведомления
     if (!_soundPlayedForCurrentSet) {
       _soundPlayedForCurrentSet = true;
       _playNotificationSound();
+    }
+
+    // Если есть активные напоминания, показываем специальное уведомление
+    if (reminders.isNotEmpty) {
+      return _buildReminderNotification(context, reminders);
     }
 
     return AnimatedBuilder(
@@ -286,6 +297,125 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
                             if (secretCount > 0) Text('📜', style: const TextStyle(fontSize: 18)),
                             if (creatureCount > 0) Text('🦊', style: const TextStyle(fontSize: 18)),
                           ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Специальное уведомление для напоминаний
+  Widget _buildReminderNotification(BuildContext context, List<ReminderCharacter> reminders) {
+    final reminder = reminders.first;
+    final distance = calculateDistance(
+      widget.currentLat,
+      widget.currentLng,
+      reminder.latitude,
+      reminder.longitude,
+    );
+
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final maxWidth = constraints.maxWidth > 400 ? 400.0 : constraints.maxWidth;
+            return Center(
+              child: SizedBox(
+                width: maxWidth,
+                child: Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.amber.shade300,
+                          Colors.orange.shade400,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.amber.withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        // Персонаж
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              reminder.characterType.emoji,
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+
+                        // Текст напоминания
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${reminder.characterType.name} напоминает:',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                reminder.reminderText.isNotEmpty 
+                                    ? reminder.reminderText 
+                                    : 'Напоминание',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        // Расстояние
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${distance.toInt()} м',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ],
                     ),
