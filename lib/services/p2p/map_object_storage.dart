@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../../models/map_objects/map_objects.dart';
+import '../../models/planned_route.dart';
 
 /// Локальное хранилище объектов карты
 class MapObjectStorage {
@@ -24,7 +25,7 @@ class MapObjectStorage {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: (db, version) async {
         await _createTables(db);
       },
@@ -37,6 +38,9 @@ class MapObjectStorage {
         }
         if (oldVersion < 4) {
           await _createV4Tables(db);
+        }
+        if (oldVersion < 5) {
+          await _createV5Tables(db);
         }
       },
     );
@@ -73,6 +77,7 @@ class MapObjectStorage {
     await _createV2Tables(db);
     await _createV3Tables(db);
     await _createV4Tables(db);
+    await _createV5Tables(db);
   }
 
   /// Создать таблицы версии 2 (фото, интересы, сообщения)
@@ -187,6 +192,25 @@ class MapObjectStorage {
       )
     ''');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_notification_read ON notifications(read)');
+  }
+
+  /// Создать таблицы версии 5 (запланированные маршруты)
+  Future<void> _createV5Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS planned_routes (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        waypoints TEXT NOT NULL,
+        distance REAL NOT NULL,
+        estimated_minutes INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        last_used_at TEXT,
+        color INTEGER NOT NULL,
+        is_favorite INTEGER DEFAULT 0
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_route_favorite ON planned_routes(is_favorite)');
   }
 
   /// Сохранить объект
@@ -771,6 +795,100 @@ class MapObjectStorage {
     );
     if (results.isEmpty) return null;
     return results.first;
+  }
+
+  // ==================== PLANNED ROUTE METHODS ====================
+
+  /// Сохранить запланированный маршрут
+  Future<void> savePlannedRoute(PlannedRoute route) async {
+    final db = await database;
+    await db.insert(
+      'planned_routes',
+      route.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Получить все маршруты
+  Future<List<PlannedRoute>> getAllRoutes() async {
+    final db = await database;
+    try {
+      final results = await db.query(
+        'planned_routes',
+        orderBy: 'is_favorite DESC, created_at DESC',
+      );
+      return results.map((row) => PlannedRoute.fromMap(row)).toList();
+    } catch (e) {
+      debugPrint('⚠️ Ошибка getAllRoutes: $e');
+      return [];
+    }
+  }
+
+  /// Получить маршрут по ID
+  Future<PlannedRoute?> getRoute(String id) async {
+    final db = await database;
+    try {
+      final results = await db.query(
+        'planned_routes',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (results.isEmpty) return null;
+      return PlannedRoute.fromMap(results.first);
+    } catch (e) {
+      debugPrint('⚠️ Ошибка getRoute: $e');
+      return null;
+    }
+  }
+
+  /// Обновить маршрут
+  Future<void> updateRoute(PlannedRoute route) async {
+    await savePlannedRoute(route);
+  }
+
+  /// Удалить маршрут
+  Future<void> deleteRoute(String id) async {
+    final db = await database;
+    await db.delete(
+      'planned_routes',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Обновить время последнего использования маршрута
+  Future<void> markRouteUsed(String id) async {
+    final db = await database;
+    await db.update(
+      'planned_routes',
+      {'last_used_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Переключить избранное
+  Future<void> toggleRouteFavorite(String id) async {
+    final route = await getRoute(id);
+    if (route != null) {
+      await savePlannedRoute(route.copyWith(isFavorite: !route.isFavorite));
+    }
+  }
+
+  /// Получить избранные маршруты
+  Future<List<PlannedRoute>> getFavoriteRoutes() async {
+    final db = await database;
+    try {
+      final results = await db.query(
+        'planned_routes',
+        where: 'is_favorite = 1',
+        orderBy: 'created_at DESC',
+      );
+      return results.map((row) => PlannedRoute.fromMap(row)).toList();
+    } catch (e) {
+      debugPrint('⚠️ Ошибка getFavoriteRoutes: $e');
+      return [];
+    }
   }
 
   void dispose() {

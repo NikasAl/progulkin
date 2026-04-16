@@ -16,6 +16,7 @@ import 'providers/walk_provider.dart';
 import 'providers/pedometer_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/route_provider.dart';
 import 'services/incoming_file_service.dart';
 import 'services/sync_service.dart';
 import 'services/tile_color_habitat_service.dart';
@@ -297,6 +298,7 @@ class _ProgulkinAppState extends State<ProgulkinApp> {
         ChangeNotifierProvider.value(value: _reminderProvider),
         ChangeNotifierProvider.value(value: _foragingProvider),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => RouteProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {

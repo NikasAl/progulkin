@@ -9,6 +9,7 @@ import '../config/version.dart';
 import 'settings/settings.dart';
 import 'storage_screen.dart';
 import 'route_planning_screen.dart';
+import 'cache_maps_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'habitat_debug_screen.dart';
 
@@ -389,13 +390,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         ListTile(
-          leading: const Icon(Icons.map),
-          title: const Text('Кеширование карт'),
-          subtitle: const Text('Управление кешем тайлов OpenStreetMap'),
+          leading: const Icon(Icons.route),
+          title: const Text('Планирование маршрутов'),
+          subtitle: const Text('Создание и сохранение маршрутов прогулок'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const RoutePlanningScreen()),
+            MaterialPageRoute(builder: (context) => const RoutePlannerScreen()),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.map),
+          title: const Text('Кеширование карт'),
+          subtitle: const Text('Загрузка карт для оффлайн-доступа'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CacheMapsScreen()),
           ),
         ),
       ],
