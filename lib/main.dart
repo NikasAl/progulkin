@@ -23,6 +23,7 @@ import 'services/tile_color_habitat_service.dart';
 import 'services/location_service.dart';
 import 'services/storage_service.dart';
 import 'services/pedometer_service.dart';
+import 'services/notification_settings_service.dart';
 import 'services/p2p/map_object_storage.dart';
 import 'screens/home_screen.dart';
 import 'models/map_objects/map_objects.dart'; // Инициализация фабрики объектов
@@ -44,6 +45,9 @@ void main() async {
 
   // Инициализация сервиса определения среды обитания (загрузка кэша)
   await getIt<TileColorHabitatService>().init();
+
+  // Инициализация настроек уведомлений
+  await getIt<NotificationSettingsService>().init();
 
   // Инициализация сервиса входящих файлов
   getIt<IncomingFileService>().init();

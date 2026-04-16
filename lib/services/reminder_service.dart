@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/map_objects/map_objects.dart';
 import '../providers/map_object_provider.dart';
+import 'notification_settings_service.dart';
 
 /// Результат срабатывания напоминания
 class ReminderTrigger {
@@ -21,6 +23,7 @@ class ReminderTrigger {
 /// Отслеживает позицию пользователя и генерирует уведомления при приближении к напоминаниям
 class ReminderService extends ChangeNotifier {
   final MapObjectProvider _mapObjectProvider;
+  final NotificationSettingsService _notificationSettings;
   final FlutterLocalNotificationsPlugin _notifications;
 
   // Пользовательские напоминания (только свои)
@@ -53,14 +56,18 @@ class ReminderService extends ChangeNotifier {
   List<ReminderCharacter> get snoozedReminders =>
       _myReminders.where((r) => r.snoozedUntil != null && DateTime.now().isBefore(r.snoozedUntil!)).toList();
 
-  ReminderService(this._mapObjectProvider)
+  ReminderService(this._mapObjectProvider, this._notificationSettings)
       : _notifications = FlutterLocalNotificationsPlugin() {
     _initNotifications();
   }
 
   Future<void> _initNotifications() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings();
+    const iosSettings = DarwinInitializationSettings(
+      defaultPresentSound: true,
+      defaultPresentAlert: true,
+      defaultPresentBadge: true,
+    );
 
     const settings = InitializationSettings(
       android: androidSettings,
@@ -71,6 +78,29 @@ class ReminderService extends ChangeNotifier {
       settings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
+    
+    // Создаём канал уведомлений с настройками звука и вибрации
+    await _createNotificationChannel();
+  }
+
+  /// Создать канал уведомлений Android с настройками
+  Future<void> _createNotificationChannel() async {
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'reminders',
+          'Напоминания',
+          description: 'Гео-напоминания от Смешариков',
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+          enableLights: true,
+        ),
+      );
+    }
   }
 
   void _onNotificationTapped(NotificationResponse response) {
@@ -153,6 +183,9 @@ class ReminderService extends ChangeNotifier {
 
   /// Показать уведомление
   Future<void> _showNotification(ReminderCharacter reminder, double distance) async {
+    final soundEnabled = _notificationSettings.soundEnabled;
+    final vibrationEnabled = _notificationSettings.vibrationEnabled;
+    
     final androidDetails = AndroidNotificationDetails(
       'reminders',
       'Напоминания',
@@ -160,12 +193,18 @@ class ReminderService extends ChangeNotifier {
       importance: Importance.high,
       priority: Priority.high,
       icon: '@drawable/splash_icon',
+      playSound: soundEnabled,
+      enableVibration: vibrationEnabled,
+      vibrationPattern: vibrationEnabled ? Int64List.fromList([0, 500, 200, 500]) : null,
+      // Используем стандартный звук уведомления
+      sound: soundEnabled ? const RawResourceAndroidNotificationSound('notification') : null,
     );
 
-    const iosDetails = DarwinNotificationDetails(
+    final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
-      presentSound: true,
+      presentSound: soundEnabled,
+      soundName: soundEnabled ? 'default' : null,
     );
 
     final details = NotificationDetails(

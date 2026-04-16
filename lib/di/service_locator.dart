@@ -14,6 +14,7 @@ import '../services/incoming_file_service.dart';
 import '../services/interest_notification_service.dart';
 import '../services/map_object_export_service.dart';
 import '../services/photo_compression_service.dart';
+import '../services/notification_settings_service.dart';
 import '../services/p2p/p2p_service.dart';
 import '../services/p2p/map_object_storage.dart';
 
@@ -75,6 +76,7 @@ Future<void> setupDependencies() async {
 
   // === Сервисы уведомлений и экспорта ===
 
+  getIt.registerSingleton<NotificationSettingsService>(NotificationSettingsService());
   getIt.registerSingleton<InterestNotificationService>(InterestNotificationService());
   getIt.registerSingleton<MapObjectExportService>(MapObjectExportService());
 }

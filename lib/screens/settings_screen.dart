@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import '../services/location_service.dart';
 import '../services/pedometer_service.dart';
 import '../services/user_id_service.dart';
+import '../services/notification_settings_service.dart';
 import '../models/walk.dart';
 import '../providers/walk_provider.dart';
 import '../config/version.dart';
+import '../di/service_locator.dart';
 import 'settings/settings.dart';
 import 'storage_screen.dart';
 import 'route_planner_screen.dart';
@@ -25,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final LocationService _locationService = LocationService();
   final PedometerService _pedometerService = PedometerService();
   final UserIdService _userIdService = UserIdService();
+  final NotificationSettingsService _notificationSettings = getIt<NotificationSettingsService>();
 
   // Настройки GPS
   late double _maxSpeed;
@@ -144,6 +147,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Внешний вид
           const SectionHeader(title: 'Внешний вид'),
           const ThemeSelectorCard(),
+          const Divider(height: 32),
+
+          // Уведомления
+          const SectionHeader(title: 'Уведомления'),
+          _buildNotificationsSection(),
           const Divider(height: 32),
 
           // Управление данными
@@ -361,6 +369,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
             });
             context.read<WalkProvider>().saveSettings(stepLength: value);
           },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotificationsSection() {
+    return Column(
+      children: [
+        SwitchListTile(
+          secondary: const Icon(Icons.notifications_active),
+          title: const Text('Уведомления'),
+          subtitle: const Text('Показывать уведомления при приближении к объектам'),
+          value: _notificationSettings.enabled,
+          onChanged: (value) {
+            setState(() {
+              _notificationSettings.setEnabled(value);
+            });
+          },
+        ),
+        if (_notificationSettings.enabled) ...[
+          SwitchListTile(
+            secondary: const Icon(Icons.volume_up),
+            title: const Text('Звук уведомления'),
+            subtitle: const Text('Звуковой сигнал при уведомлении'),
+            value: _notificationSettings.soundEnabled,
+            onChanged: (value) {
+              setState(() {
+                _notificationSettings.setSoundEnabled(value);
+              });
+            },
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.vibration),
+            title: const Text('Вибрация'),
+            subtitle: const Text('Вибрация при уведомлении'),
+            value: _notificationSettings.vibrationEnabled,
+            onChanged: (value) {
+              setState(() {
+                _notificationSettings.setVibrationEnabled(value);
+              });
+            },
+          ),
+        ],
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: InfoCard(
+            text: 'Для работы уведомлений в фоновом режиме разрешите '
+                'приложению отправлять уведомления в настройках Android.',
+          ),
         ),
       ],
     );
