@@ -259,6 +259,12 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         ),
         title: Text(_isEditing ? 'Редактирование: ${_editingRoute?.name}' : 'Планирование маршрутов'),
         actions: [
+          // Кнопка открытия бокового меню с маршрутами
+          IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            tooltip: 'Мои маршруты',
+          ),
           if (_currentWaypoints.isNotEmpty) ...[
             IconButton(
               icon: const Icon(Icons.undo),
@@ -397,22 +403,38 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Icon(Icons.route, size: 20, color: Theme.of(context).colorScheme.primary),
-                              const SizedBox(width: 8),
-                              Text('Точек: ${_currentWaypoints.length}'),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.route, size: 20, color: Theme.of(context).colorScheme.primary),
+                                  const SizedBox(width: 4),
+                                  Text('Точек: ${_currentWaypoints.length}'),
+                                ],
+                              ),
                               if (_currentWaypoints.length >= 2) ...[
-                                const SizedBox(width: 16),
-                                Icon(Icons.straighten, size: 20, color: Theme.of(context).colorScheme.primary),
-                                const SizedBox(width: 4),
-                                Text(_formatDistance(_calculateDistance()),
-                                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 16),
-                                Icon(Icons.access_time, size: 20, color: Colors.orange[700]),
-                                const SizedBox(width: 4),
-                                Text(_estimateTime(_calculateDistance()),
-                                    style: TextStyle(color: Colors.orange[700])),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.straighten, size: 20, color: Theme.of(context).colorScheme.primary),
+                                    const SizedBox(width: 4),
+                                    Text(_formatDistance(_calculateDistance()),
+                                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.access_time, size: 20, color: Colors.orange[700]),
+                                    const SizedBox(width: 4),
+                                    Text(_estimateTime(_calculateDistance()),
+                                        style: TextStyle(color: Colors.orange[700])),
+                                  ],
+                                ),
                               ],
                             ],
                           ),
