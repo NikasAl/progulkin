@@ -253,6 +253,10 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(_isEditing ? 'Редактирование: ${_editingRoute?.name}' : 'Планирование маршрутов'),
         actions: [
           if (_currentWaypoints.isNotEmpty) ...[

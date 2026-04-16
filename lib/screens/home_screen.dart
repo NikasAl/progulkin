@@ -226,19 +226,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const WalkStatsPanel(),
           _buildBottomControls(),
           _buildSideButtons(),
-          // Информационная панель выбранного маршрута
-          Consumer<RouteProvider>(
-            builder: (context, routeProvider, child) {
-              final route = routeProvider.selectedRoute;
-              if (route == null) return const SizedBox.shrink();
-              return Positioned(
-                left: 16,
-                right: 16,
-                top: 80,
-                child: _buildRouteInfoPanel(route, routeProvider),
-              );
-            },
-          ),
           if (_showFilters)
             const Positioned(
               left: 16,
@@ -262,79 +249,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// Панель информации о выбранном маршруте
-  Widget _buildRouteInfoPanel(PlannedRoute route, RouteProvider routeProvider) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(
-          color: Color(route.colorValue).withValues(alpha: 0.5),
-          width: 2,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Color(route.colorValue),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.route, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  route.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '${route.formattedDistance} • ${route.formattedTime}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 20),
-            onPressed: () {
-              routeProvider.clearSelectedRoute();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Маршрут отключён'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            },
-            tooltip: 'Отключить маршрут',
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSideButtons() {
     return Positioned(
       right: 16,
@@ -346,46 +260,98 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           Consumer<RouteProvider>(
             builder: (context, routeProvider, child) {
               final hasRoute = routeProvider.hasSelectedRoute;
-              return SizedBox(
-                width: 40,
-                height: 40,
-                child: FloatingActionButton(
-                  mini: true,
-                  onPressed: () => _showRouteSelectionSheet(routeProvider),
-                  backgroundColor: hasRoute
-                      ? Color(routeProvider.selectedRoute!.colorValue)
-                      : Colors.grey[300],
-                  child: Icon(
-                    Icons.route,
-                    size: 22,
-                    color: hasRoute ? Colors.white : Colors.grey[700],
-                  ),
-                ),
+              final routeColor = hasRoute
+                  ? Color(routeProvider.selectedRoute!.colorValue)
+                  : null;
+              return _buildSideButton(
+                icon: Icons.route,
+                onPressed: () => _showRouteSelectionSheet(routeProvider),
+                backgroundColor: hasRoute ? routeColor : null,
+                iconColor: hasRoute ? Colors.white : null,
+                tooltip: 'Выбрать маршрут',
               );
             },
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: FilterToggleButton(
-              mini: true,
-              onTap: () => setState(() => _showFilters = !_showFilters),
-              activeFilters: _getActiveFiltersCount(),
-            ),
+          const SizedBox(height: 10),
+          // Кнопка фильтров
+          _buildSideButton(
+            icon: Icons.tune,
+            onPressed: () => setState(() => _showFilters = !_showFilters),
+            tooltip: 'Фильтры объектов',
+            badge: _getActiveFiltersCount() > 0 ? '$_getActiveFiltersCount()' : null,
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: FloatingActionButton(
-              mini: true,
-              onPressed: _openAddObject,
-              backgroundColor: Theme.of(context).colorScheme.secondary,
-              child: const Icon(Icons.add_location_alt, size: 22),
-            ),
+          const SizedBox(height: 10),
+          // Кнопка добавления объекта
+          _buildSideButton(
+            icon: Icons.add_location_alt,
+            onPressed: _openAddObject,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            iconColor: Theme.of(context).colorScheme.onPrimary,
+            tooltip: 'Добавить объект',
           ),
         ],
+      ),
+    );
+  }
+
+  /// Унифицированная боковая кнопка
+  Widget _buildSideButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    Color? backgroundColor,
+    Color? iconColor,
+    String? badge,
+    String? tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip ?? '',
+      child: GestureDetector(
+        onTap: onPressed,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: backgroundColor ?? Theme.of(context).colorScheme.surface,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: iconColor ?? Theme.of(context).colorScheme.primary,
+              ),
+              if (badge != null)
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      badge,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
