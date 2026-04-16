@@ -168,7 +168,7 @@ class CreatureService {
         ? TileColorHabitatResult(
             primaryHabitat: forceHabitat,
             habitatScores: {forceHabitat: 1.0},
-            colorAnalysis: ColorAnalysis(
+            colorAnalysis: const ColorAnalysis(
               red: 128,
               green: 128,
               blue: 128,

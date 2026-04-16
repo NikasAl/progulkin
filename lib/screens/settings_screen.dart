@@ -5,8 +5,6 @@ import '../services/pedometer_service.dart';
 import '../services/user_id_service.dart';
 import '../models/walk.dart';
 import '../providers/walk_provider.dart';
-import '../providers/map_object_provider.dart';
-import '../providers/theme_provider.dart';
 import '../config/version.dart';
 import 'settings/settings.dart';
 import 'storage_screen.dart';
@@ -424,9 +422,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: const TextStyle(fontFamily: 'monospace'),
           ),
         ),
-        ListTile(
-          leading: const Icon(Icons.code),
-          title: const Text('Исходный код'),
+        const ListTile(
+          leading: Icon(Icons.code),
+          title: Text('Исходный код'),
           subtitle: const Text('github.com/NikasAl/progulkin'),
         ),
         ListTile(

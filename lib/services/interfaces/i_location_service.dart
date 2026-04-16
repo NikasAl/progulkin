@@ -1,4 +1,4 @@
-import '../walk_point.dart';
+import '../../models/walk_point.dart';
 
 /// Интерфейс сервиса геолокации для тестирования и расширяемости
 ///

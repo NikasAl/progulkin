@@ -62,7 +62,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
                       options: MapOptions(
                         initialCenter: _routePoints.isNotEmpty 
                             ? _routePoints.first 
-                            : LatLng(55.7558, 37.6173),
+                            : const LatLng(55.7558, 37.6173),
                         initialZoom: 14,
                         onMapReady: _fitRouteOnMap,
                       ),
