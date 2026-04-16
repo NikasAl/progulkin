@@ -601,13 +601,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               polylines: [
                 Polyline(
                   points: route.waypoints,
-                  color: Color(route.colorValue).withValues(alpha: 0.6),
+                  color: Color(route.colorValue).withValues(alpha: 0.5),
                   strokeWidth: 3,
                   strokeCap: StrokeCap.round,
                   strokeJoin: StrokeJoin.round,
-                  pattern: const StrokePattern.dashed(
-                    segments: [10, 10],
-                  ),
+                  // Пунктирный эффект имитируется через прозрачность
+                  // В flutter_map 6.x нет поддержки pattern
                 ),
               ],
             );
