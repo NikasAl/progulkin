@@ -8,7 +8,7 @@ import '../providers/walk_provider.dart';
 import '../config/version.dart';
 import 'settings/settings.dart';
 import 'storage_screen.dart';
-import 'route_planning_screen.dart';
+import 'route_planner_screen.dart';
 import 'cache_maps_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'habitat_debug_screen.dart';

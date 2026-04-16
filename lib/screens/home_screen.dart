@@ -10,8 +10,10 @@ import '../providers/creature_provider.dart';
 import '../providers/moderation_provider.dart';
 import '../providers/interest_provider.dart';
 import '../providers/reminder_provider.dart';
+import '../providers/route_provider.dart';
 import '../models/walk_point.dart';
 import '../models/map_objects/map_objects.dart';
+import '../models/planned_route.dart';
 import '../services/location_service.dart';
 import '../services/user_id_service.dart';
 import '../services/tile_cache_service.dart';
@@ -29,6 +31,7 @@ import 'add_object_screen.dart';
 import 'creature_collection_screen.dart';
 import 'chat_list_screen.dart';
 import 'about_app_screen.dart';
+import 'route_planner_screen.dart';
 
 /// Главный экран с картой OpenStreetMap
 class HomeScreen extends StatefulWidget {
@@ -223,6 +226,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const WalkStatsPanel(),
           _buildBottomControls(),
           _buildSideButtons(),
+          // Информационная панель выбранного маршрута
+          Consumer<RouteProvider>(
+            builder: (context, routeProvider, child) {
+              final route = routeProvider.selectedRoute;
+              if (route == null) return const SizedBox.shrink();
+              return Positioned(
+                left: 16,
+                right: 16,
+                top: 80,
+                child: _buildRouteInfoPanel(route, routeProvider),
+              );
+            },
+          ),
           if (_showFilters)
             const Positioned(
               left: 16,
@@ -246,6 +262,79 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Панель информации о выбранном маршруте
+  Widget _buildRouteInfoPanel(PlannedRoute route, RouteProvider routeProvider) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(
+          color: Color(route.colorValue).withValues(alpha: 0.5),
+          width: 2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Color(route.colorValue),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.route, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  route.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${route.formattedDistance} • ${route.formattedTime}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            onPressed: () {
+              routeProvider.clearSelectedRoute();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Маршрут отключён'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            },
+            tooltip: 'Отключить маршрут',
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSideButtons() {
     return Positioned(
       right: 16,
@@ -253,6 +342,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Кнопка выбора маршрута
+          Consumer<RouteProvider>(
+            builder: (context, routeProvider, child) {
+              final hasRoute = routeProvider.hasSelectedRoute;
+              return SizedBox(
+                width: 40,
+                height: 40,
+                child: FloatingActionButton(
+                  mini: true,
+                  onPressed: () => _showRouteSelectionSheet(routeProvider),
+                  backgroundColor: hasRoute
+                      ? Color(routeProvider.selectedRoute!.colorValue)
+                      : Colors.grey[300],
+                  child: Icon(
+                    Icons.route,
+                    size: 22,
+                    color: hasRoute ? Colors.white : Colors.grey[700],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
           SizedBox(
             width: 40,
             height: 40,
@@ -278,6 +390,183 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Показать панель выбора маршрута
+  void _showRouteSelectionSheet(RouteProvider routeProvider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.8,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Заголовок
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.route),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Выбор маршрута',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    if (routeProvider.hasSelectedRoute)
+                      TextButton(
+                        onPressed: () {
+                          routeProvider.clearSelectedRoute();
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Маршрут отключён'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        },
+                        child: const Text('Отключить'),
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Список маршрутов
+              Expanded(
+                child: routeProvider.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : routeProvider.routes.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.route_outlined, size: 48, color: Colors.grey[400]),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Нет сохранённых маршрутов',
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const RoutePlannerScreen(),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Создать маршрут'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            itemCount: routeProvider.routes.length,
+                            itemBuilder: (context, index) {
+                              final route = routeProvider.routes[index];
+                              final isSelected = routeProvider.selectedRoute?.id == route.id;
+                              return _buildRouteSelectionTile(route, isSelected, routeProvider);
+                            },
+                          ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRouteSelectionTile(
+    PlannedRoute route,
+    bool isSelected,
+    RouteProvider routeProvider,
+  ) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Color(route.colorValue),
+          shape: BoxShape.circle,
+          border: isSelected
+              ? Border.all(color: Colors.black, width: 2)
+              : null,
+        ),
+        child: Icon(
+          route.isFavorite ? Icons.star : Icons.route,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+      title: Text(
+        route.name,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : null,
+        ),
+      ),
+      subtitle: Text(
+        '${route.formattedDistance} • ${route.formattedTime} • ${route.waypointCount} точек',
+      ),
+      trailing: isSelected
+          ? const Icon(Icons.check_circle, color: Colors.green)
+          : null,
+      selected: isSelected,
+      onTap: () async {
+        await routeProvider.selectRoute(route);
+        if (context.mounted) {
+          Navigator.pop(context);
+          // Центрируем карту на маршруте
+          if (route.waypoints.isNotEmpty) {
+            _fitMapToRoute(route.waypoints);
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Маршрут "${route.name}" выбран'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  /// Центрировать карту на маршруте
+  void _fitMapToRoute(List<LatLng> waypoints) {
+    if (waypoints.isEmpty) return;
+
+    if (waypoints.length == 1) {
+      _mapController.move(waypoints.first, 15);
+      return;
+    }
+
+    double minLat = waypoints.first.latitude;
+    double maxLat = waypoints.first.latitude;
+    double minLon = waypoints.first.longitude;
+    double maxLon = waypoints.first.longitude;
+
+    for (final point in waypoints) {
+      if (point.latitude < minLat) minLat = point.latitude;
+      if (point.latitude > maxLat) maxLat = point.latitude;
+      if (point.longitude < minLon) minLon = point.longitude;
+      if (point.longitude > maxLon) maxLon = point.longitude;
+    }
+
+    final center = LatLng((minLat + maxLat) / 2, (minLon + maxLon) / 2);
+    _mapController.move(center, 13);
+  }
+
   Widget _buildMap() {
     return FlutterMap(
       mapController: _mapController,
@@ -301,6 +590,95 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ? _tileCacheService.getTileProvider()
               : null,
         ),
+        // Запланированный маршрут (пунктирная линия)
+        Consumer<RouteProvider>(
+          builder: (context, routeProvider, child) {
+            final route = routeProvider.selectedRoute;
+            if (route == null || route.waypoints.length < 2) {
+              return const SizedBox.shrink();
+            }
+            return PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: route.waypoints,
+                  color: Color(route.colorValue).withValues(alpha: 0.6),
+                  strokeWidth: 3,
+                  strokeCap: StrokeCap.round,
+                  strokeJoin: StrokeJoin.round,
+                  pattern: const StrokePattern.dashed(
+                    segments: [10, 10],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        // Маркеры начальной и конечной точек запланированного маршрута
+        Consumer<RouteProvider>(
+          builder: (context, routeProvider, child) {
+            final route = routeProvider.selectedRoute;
+            if (route == null || route.waypoints.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return MarkerLayer(
+              markers: [
+                // Начальная точка (зелёная)
+                if (route.start != null)
+                  Marker(
+                    point: route.start!,
+                    width: 28,
+                    height: 28,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.8),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.flag,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                // Конечная точка (красная)
+                if (route.end != null && route.waypoints.length > 1)
+                  Marker(
+                    point: route.end!,
+                    width: 28,
+                    height: 28,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.8),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.location_on,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        // Текущий маршрут прогулки (сплошная линия)
         if (_routePoints.length >= 2)
           PolylineLayer(
             polylines: [
