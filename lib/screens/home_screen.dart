@@ -674,11 +674,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _initMapObjects();
               });
             }
-            return MapObjectsLayer(
-              objects: mapObjectProvider.objects,
-              onObjectTap: (obj) => _showObjectDetails(obj),
-              onObjectLongPress: (obj) => _showObjectOptions(obj),
-              userLocation: _currentLocation,
+            return RepaintBoundary(
+              child: MapObjectsLayer(
+                objects: mapObjectProvider.objects,
+                onObjectTap: (obj) => _showObjectDetails(obj),
+                onObjectLongPress: (obj) => _showObjectOptions(obj),
+                userLocation: _currentLocation,
+              ),
             );
           },
         ),

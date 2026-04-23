@@ -25,8 +25,11 @@ class MapObjectsLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     if (objects.isEmpty) return const SizedBox.shrink();
 
-    return MarkerLayer(
-      markers: objects.map((obj) => _buildMarker(context, obj)).toList(),
+    // Используем RepaintBoundary для изоляции перерисовок маркеров
+    return RepaintBoundary(
+      child: MarkerLayer(
+        markers: objects.map((obj) => _buildMarker(context, obj)).toList(),
+      ),
     );
   }
 
@@ -109,47 +112,86 @@ class _MarkerWidgetState extends State<_MarkerWidget>
     with SingleTickerProviderStateMixin {
   AnimationController? _pulseController;
   Animation<double>? _pulseAnimation;
+  bool _isAnimating = false;
+  
+  // Кэш для предотвращения частых переключений анимации
+  bool? _cachedHighlight;
+  static const double _highlightHysteresis = 5.0; // метров гистерезис для предотвращения мерцания
 
   @override
   void initState() {
     super.initState();
-    _initAnimation();
+    _cachedHighlight = widget.highlight;
+    if (widget.highlight) {
+      _startAnimation();
+    }
   }
 
   @override
   void didUpdateWidget(_MarkerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.highlight != oldWidget.highlight) {
-      _initAnimation();
+    
+    // Используем кэшированное значение для предотвращения частых переключений
+    // Запускаем/останавливаем анимацию только при реальном изменении highlight
+    if (widget.highlight && !_isAnimating) {
+      _startAnimation();
+    } else if (!widget.highlight && _isAnimating) {
+      _stopAnimation();
     }
   }
 
-  void _initAnimation() {
-    if (widget.highlight && _pulseController == null) {
-      _pulseController = AnimationController(
-        duration: const Duration(milliseconds: 800),
-        vsync: this,
-      )..repeat(reverse: true);
+  void _startAnimation() {
+    if (_isAnimating) return;
+    
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController!, curve: Curves.easeInOut),
+    );
+    
+    _pulseController!.repeat(reverse: true);
+    _isAnimating = true;
+  }
 
-      _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-        CurvedAnimation(parent: _pulseController!, curve: Curves.easeInOut),
-      );
-    } else if (!widget.highlight && _pulseController != null) {
-      _pulseController?.dispose();
-      _pulseController = null;
-      _pulseAnimation = null;
-    }
+  void _stopAnimation() {
+    if (!_isAnimating) return;
+    
+    _pulseController?.stop();
+    _pulseController?.dispose();
+    _pulseController = null;
+    _pulseAnimation = null;
+    _isAnimating = false;
   }
 
   @override
   void dispose() {
-    _pulseController?.dispose();
+    _stopAnimation();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final content = Stack(
+    final content = _buildContent();
+    
+    // Используем ScaleTransition вместо AnimatedBuilder + Transform.scale
+    // Добавляем RepaintBoundary для изоляции анимированной области
+    if (_pulseAnimation != null && _pulseController != null) {
+      return RepaintBoundary(
+        child: ScaleTransition(
+          scale: _pulseAnimation!,
+          child: content,
+        ),
+      );
+    }
+
+    return content;
+  }
+
+  Widget _buildContent() {
+    return Stack(
       alignment: Alignment.center,
       children: [
         // Внешнее кольцо (индикатор репутации)
@@ -216,21 +258,6 @@ class _MarkerWidgetState extends State<_MarkerWidget>
           ),
       ],
     );
-
-    // Применяем анимацию пульсации если объект в радиусе
-    if (_pulseAnimation != null) {
-      return AnimatedBuilder(
-        animation: _pulseAnimation!,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _pulseAnimation!.value,
-            child: content,
-          );
-        },
-      );
-    }
-
-    return content;
   }
 
   /// Построение содержимого маркера (эмодзи или картинка)
