@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
+import '../di/service_locator.dart';
 import '../models/walk.dart';
 import '../services/tile_cache_service.dart';
 
@@ -18,7 +19,7 @@ class WalkDetailScreen extends StatefulWidget {
 
 class _WalkDetailScreenState extends State<WalkDetailScreen> {
   final MapController _mapController = MapController();
-  final TileCacheService _tileCacheService = TileCacheService();
+  final TileCacheService _tileCacheService = getIt<TileCacheService>();
   List<LatLng> _routePoints = [];
 
   @override

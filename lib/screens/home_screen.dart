@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../di/service_locator.dart';
 import '../providers/walk_provider.dart';
 import '../providers/pedometer_provider.dart';
 import '../providers/map_object_provider.dart';
@@ -43,10 +44,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
-  final LocationService _locationService = LocationService();
-  final UserIdService _userIdService = UserIdService();
-  final TileCacheService _tileCacheService = TileCacheService();
-  final ObjectActionService _actionService = ObjectActionService();
+  final LocationService _locationService = getIt<LocationService>();
+  final UserIdService _userIdService = getIt<UserIdService>();
+  final TileCacheService _tileCacheService = getIt<TileCacheService>();
+  final ObjectActionService _actionService = getIt<ObjectActionService>();
   final List<LatLng> _routePoints = [];
   bool _initialized = false;
   bool _mapObjectsInitialized = false;

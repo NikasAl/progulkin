@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../di/service_locator.dart';
 import '../services/tile_cache_service.dart';
 import '../services/location_service.dart';
 
@@ -14,8 +15,8 @@ class RoutePlanningScreen extends StatefulWidget {
 
 class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   final MapController _mapController = MapController();
-  final TileCacheService _tileCacheService = TileCacheService();
-  final LocationService _locationService = LocationService();
+  final TileCacheService _tileCacheService = getIt<TileCacheService>();
+  final LocationService _locationService = getIt<LocationService>();
   final Distance _distanceCalculator = Distance();
   
   final List<LatLng> _waypoints = [];

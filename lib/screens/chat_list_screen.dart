@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import '../di/service_locator.dart';
 import '../models/p2p_message.dart' as model;
 import '../providers/chat_provider.dart';
 import '../services/user_id_service.dart';
@@ -15,7 +16,7 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  final UserIdService _userIdService = UserIdService();
+  final UserIdService _userIdService = getIt<UserIdService>();
   String? _userId;
 
   @override

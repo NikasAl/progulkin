@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../di/service_locator.dart';
 import '../services/location_service.dart';
 import '../services/photo_compression_service.dart';
 import '../config/constants.dart';
@@ -63,8 +64,8 @@ class PhotoCaptureWidget extends StatefulWidget {
 }
 
 class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
-  final _locationService = LocationService();
-  final _photoCompressionService = PhotoCompressionService();
+  final _locationService = getIt<LocationService>();
+  final _photoCompressionService = getIt<PhotoCompressionService>();
   final _imagePicker = ImagePicker();
   bool _isCapturing = false;
 

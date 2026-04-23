@@ -24,9 +24,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final LocationService _locationService = LocationService();
-  final PedometerService _pedometerService = PedometerService();
-  final UserIdService _userIdService = UserIdService();
+  final LocationService _locationService = getIt<LocationService>();
+  final PedometerService _pedometerService = getIt<PedometerService>();
+  final UserIdService _userIdService = getIt<UserIdService>();
   final NotificationSettingsService _notificationSettings = getIt<NotificationSettingsService>();
 
   // Настройки GPS

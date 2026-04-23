@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../di/service_locator.dart';
 import '../models/map_objects/creature.dart';
 import '../providers/creature_provider.dart';
 import '../services/user_id_service.dart';
@@ -13,7 +14,7 @@ class CreatureCollectionScreen extends StatefulWidget {
 }
 
 class _CreatureCollectionScreenState extends State<CreatureCollectionScreen> {
-  final UserIdService _userIdService = UserIdService();
+  final UserIdService _userIdService = getIt<UserIdService>();
   String? _userId;
 
   @override
