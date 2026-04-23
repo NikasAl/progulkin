@@ -196,15 +196,15 @@ class ReminderService extends ChangeNotifier {
       playSound: soundEnabled,
       enableVibration: vibrationEnabled,
       vibrationPattern: vibrationEnabled ? Int64List.fromList([0, 500, 200, 500]) : null,
-      // Используем стандартный звук уведомления
-      sound: soundEnabled ? const RawResourceAndroidNotificationSound('notification') : null,
+      // Используем системный звук уведомления (null = звук канала по умолчанию)
+      sound: null,
     );
 
     final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: soundEnabled,
-      soundName: soundEnabled ? 'default' : null,
+      sound: soundEnabled ? 'default' : null,
     );
 
     final details = NotificationDetails(

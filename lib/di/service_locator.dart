@@ -15,8 +15,10 @@ import '../services/interest_notification_service.dart';
 import '../services/map_object_export_service.dart';
 import '../services/photo_compression_service.dart';
 import '../services/notification_settings_service.dart';
+import '../services/reminder_service.dart';
 import '../services/p2p/p2p_service.dart';
 import '../services/p2p/map_object_storage.dart';
+import '../providers/map_object_provider.dart';
 
 /// Глобальный экземпляр GetIt
 final GetIt getIt = GetIt.instance;

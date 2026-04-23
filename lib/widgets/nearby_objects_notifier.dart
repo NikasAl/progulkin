@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/map_objects/map_objects.dart';
 import '../providers/map_object_provider.dart';
 import '../config/constants.dart';
+import '../di/service_locator.dart';
+import '../services/notification_settings_service.dart';
 
 /// Виджет уведомлений о близлежащих объектах
 class NearbyObjectsNotifier extends StatefulWidget {
@@ -41,7 +45,13 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
 
   // Отслеживаем новые объекты для особых уведомлений
   final Set<String> _notifiedCreatureIds = {};
+  final Set<String> _notifiedReminderIds = {}; // Уже отправленные напоминания
   bool _initialized = false;
+  
+  // Системные уведомления
+  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final NotificationSettingsService _notificationSettings = getIt<NotificationSettingsService>();
+  bool _notificationsInitialized = false;
   
   @override
   void initState() {
@@ -54,6 +64,86 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    
+    _initNotifications();
+  }
+  
+  Future<void> _initNotifications() async {
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosSettings = DarwinInitializationSettings(
+      defaultPresentSound: true,
+      defaultPresentAlert: true,
+      defaultPresentBadge: true,
+    );
+
+    const settings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
+    await _notifications.initialize(settings);
+    
+    // Создаём канал уведомлений
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'reminders',
+          'Напоминания',
+          description: 'Гео-напоминания от Смешариков',
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+          enableLights: true,
+        ),
+      );
+    }
+    
+    _notificationsInitialized = true;
+  }
+  
+  /// Показать системное уведомление о напоминании
+  Future<void> _showReminderNotification(ReminderCharacter reminder, double distance) async {
+    if (!_notificationsInitialized) return;
+    
+    final soundEnabled = _notificationSettings.soundEnabled;
+    final vibrationEnabled = _notificationSettings.vibrationEnabled;
+    
+    final androidDetails = AndroidNotificationDetails(
+      'reminders',
+      'Напоминания',
+      channelDescription: 'Гео-напоминания от Смешариков',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@drawable/splash_icon',
+      playSound: soundEnabled,
+      enableVibration: vibrationEnabled,
+      vibrationPattern: vibrationEnabled ? Int64List.fromList([0, 500, 200, 500]) : null,
+    );
+
+    final iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: soundEnabled,
+      sound: soundEnabled ? 'default' : null,
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _notifications.show(
+      reminder.id.hashCode,
+      '${reminder.characterType.emoji} ${reminder.characterType.name}',
+      reminder.reminderText.isNotEmpty ? reminder.reminderText : 'Напоминание!',
+      details,
+      payload: reminder.id,
+    );
+    
+    debugPrint('🔔 Системное уведомление: ${reminder.characterType.emoji} ${reminder.reminderText}');
   }
   
   @override
@@ -139,6 +229,9 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
         // Удаляем из памяти существ, которые больше не рядом
         _notifiedCreatureIds.removeWhere((id) => !currentIds.contains(id));
         
+        // Удаляем из памяти напоминания, которые больше не рядом
+        _notifiedReminderIds.removeWhere((id) => !currentIds.contains(id));
+        
         // Обновляем состояние при изменении объектов
         if (hasChanges && currentIds.isNotEmpty) {
           // Отложенное обновление состояния
@@ -206,6 +299,20 @@ class _NearbyObjectsNotifierState extends State<NearbyObjectsNotifier>
     if (!_soundPlayedForCurrentSet) {
       _soundPlayedForCurrentSet = true;
       _playNotificationSound();
+    }
+
+    // Отправляем системные уведомления для новых напоминаний
+    for (final reminder in reminders) {
+      if (!_notifiedReminderIds.contains(reminder.id)) {
+        final distance = calculateDistance(
+          widget.currentLat,
+          widget.currentLng,
+          reminder.latitude,
+          reminder.longitude,
+        );
+        _showReminderNotification(reminder, distance);
+        _notifiedReminderIds.add(reminder.id);
+      }
     }
 
     // Если есть активные напоминания, показываем специальное уведомление
