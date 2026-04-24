@@ -19,7 +19,7 @@ set -euo pipefail
 SSH_USER="${SSH_USER:-nikas}"
 SSH_HOST="${SSH_HOST:-turbo}"
 SSH_PORT="${SSH_PORT:-22}"
-REMOTE_BASE="${REMOTE_BASE:-/home/nikas/prjs/cm-server}"
+REMOTE_BASE="${REMOTE_BASE:-/home/nikas/prjs/cmserver}"
 SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
 
 # Конфигурация проекта
