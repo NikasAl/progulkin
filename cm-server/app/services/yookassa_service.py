@@ -27,6 +27,20 @@ class PaymentError(Exception):
     pass
 
 
+def to_iso_string(value) -> Optional[str]:
+    """
+    Безопасно преобразует дату в ISO строку.
+    YooKassa может вернуть строку или datetime объект.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if hasattr(value, 'isoformat'):
+        return value.isoformat()
+    return str(value)
+
+
 def get_app_scheme(app_name: str) -> Optional[str]:
     """Получить URL-схему для приложения"""
     return settings.APP_SCHEMES.get(app_name)
@@ -244,8 +258,8 @@ def get_invoice_status(invoice_id: str) -> Dict[str, Any]:
             "status": invoice.status,
             "amount": amount,
             "currency": currency,
-            "created_at": invoice.created_at.isoformat() if invoice.created_at else None,
-            "expires_at": invoice.expires_at.isoformat() if invoice.expires_at else None,
+            "created_at": to_iso_string(invoice.created_at),
+            "expires_at": to_iso_string(invoice.expires_at),
             "metadata": dict(invoice.metadata) if invoice.metadata else {},
             "description": invoice.description,
         }
@@ -281,7 +295,7 @@ def get_payment_status(payment_id: str) -> Dict[str, Any]:
             "status": payment.status,
             "amount": float(payment.amount.value) if payment.amount else 0,
             "currency": payment.amount.currency if payment.amount else "RUB",
-            "created_at": payment.created_at.isoformat() if payment.created_at else None,
+            "created_at": to_iso_string(payment.created_at),
             "metadata": dict(payment.metadata) if payment.metadata else {},
             "description": payment.description,
             "is_paid": payment.status == "succeeded",
