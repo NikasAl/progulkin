@@ -309,18 +309,39 @@ def get_payment_status(payment_id: str) -> Dict[str, Any]:
         raise PaymentError(f"Ошибка получения статуса платежа: {e}")
 
 
-def is_payment_successful(invoice_id: str) -> bool:
+def is_payment_successful(payment_id: str) -> bool:
     """
-    Проверяет, оплачен ли счёт.
+    Проверяет, оплачен ли платёж или счёт.
+
+    Автоматически определяет тип ID:
+    - Payment ID (без префикса): пробует Payment API
+    - Invoice ID (с префиксом 'in-'): пробует Invoice API
 
     Args:
-        invoice_id: ID счёта в YooKassa
+        payment_id: ID платежа или счёта в YooKassa
 
     Returns:
-        True если счёт оплачен, False иначе
+        True если оплачено, False иначе
     """
-    try:
-        status = get_invoice_status(invoice_id)
-        return status.get("status") == "succeeded"
-    except PaymentError:
-        return False
+    # Определяем тип по формату ID
+    is_invoice = payment_id.startswith("in-")
+
+    if is_invoice:
+        # Invoice ID - используем Invoice API
+        try:
+            status = get_invoice_status(payment_id)
+            return status.get("status") == "succeeded"
+        except PaymentError:
+            return False
+    else:
+        # Payment ID - используем Payment API
+        try:
+            status = get_payment_status(payment_id)
+            return status.get("status") == "succeeded"
+        except PaymentError:
+            # Fallback: может это Invoice ID без префикса
+            try:
+                status = get_invoice_status(payment_id)
+                return status.get("status") == "succeeded"
+            except PaymentError:
+                return False

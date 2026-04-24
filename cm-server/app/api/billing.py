@@ -237,14 +237,24 @@ async def create_starflow_payment(request: PaymentCreateRequest):
 @router.get("/billing/status/{invoice_id}", response_model=PaymentStatusResponse)
 async def check_payment_status(invoice_id: str):
     """
-    Проверяет статус оплаты счёта.
+    Проверяет статус оплаты счёта или платежа.
 
-    - **invoice_id**: ID счёта из YooKassa
+    - **invoice_id**: ID счёта (in-...) или платежа из YooKassa
 
-    Возвращает текущий статус и информацию о счёте.
+    Автоматически определяет тип ID:
+    - Invoice ID (префикс 'in-'): использует Invoice API
+    - Payment ID (без префикса): использует Payment API
+
+    Возвращает текущий статус и информацию о платеже.
     """
+    # Определяем тип по формату ID
+    is_invoice = invoice_id.startswith("in-")
+
     try:
-        status_info = get_invoice_status(invoice_id)
+        if is_invoice:
+            status_info = get_invoice_status(invoice_id)
+        else:
+            status_info = get_payment_status(invoice_id)
 
         return PaymentStatusResponse(
             invoice_id=status_info["id"],
@@ -265,8 +275,9 @@ async def check_payment_status(invoice_id: str):
 @router.get("/billing/check/{invoice_id}")
 async def check_is_paid(invoice_id: str):
     """
-    Быстрая проверка - оплачен ли счёт.
+    Быстрая проверка - оплачен ли счёт или платёж.
 
+    Автоматически определяет тип ID (Invoice или Payment).
     Возвращает только boolean is_paid.
     """
     try:
