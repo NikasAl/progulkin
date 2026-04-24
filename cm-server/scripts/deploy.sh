@@ -131,11 +131,11 @@ if [[ -n "\${PID}" ]] && kill -0 \${PID} 2>/dev/null; then
 
     if kill -0 \${PID} 2>/dev/null; then
         kill -KILL \${PID} 2>/dev/null || true
-        pkill -f "gunicorn.*${UVICORN_APP}" 2>/dev/null || true
+        pkill -f "${REMOTE_BASE}/.venv/bin/gunicorn" 2>/dev/null || true
         sleep 1
     fi
 else
-    pkill -f "gunicorn.*${UVICORN_APP}" 2>/dev/null || true
+    pkill -f "${REMOTE_BASE}/.venv/bin/gunicorn" 2>/dev/null || true
 fi
 
 # Запускаем gunicorn
@@ -153,7 +153,7 @@ echo \$! > gunicorn.pid
 sleep 2
 NEW_PID=\$(cat gunicorn.pid 2>/dev/null || true)
 if [[ -n "\${NEW_PID}" ]] && kill -0 \${NEW_PID} 2>/dev/null; then
-    WORKERS=\$(pgrep -f "gunicorn.*${UVICORN_APP}" | wc -l)
+    WORKERS=\$(pgrep -f "${REMOTE_BASE}/.venv/bin/gunicorn" | wc -l)
     echo "✅ CM Server запущен (PID: \${NEW_PID}, Processes: \${WORKERS})"
     echo "   URL: https://kreagenium.ru/cm/"
 else
