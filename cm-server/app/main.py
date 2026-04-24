@@ -11,6 +11,8 @@ from app.config import settings
 from app.api import api_router
 from app.services.redis_service import redis_service
 
+from fastapi.middleware.cors import CORSMiddleware
+
 # Настройка логирования
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
@@ -56,6 +58,12 @@ app = FastAPI(
 # Подключаем роутеры
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # или указать конкретные origins
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 # ============================================================================
 # КОРНЕВОЙ ENDPOINT
