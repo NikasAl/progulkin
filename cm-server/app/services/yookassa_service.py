@@ -223,11 +223,27 @@ def get_invoice_status(invoice_id: str) -> Dict[str, Any]:
     try:
         invoice = Invoice.find_one(invoice_id)
 
+        # Извлекаем сумму из payment_data или cart
+        amount = 0.0
+        currency = "RUB"
+        
+        # payment_data.amount - основной способ
+        if hasattr(invoice, 'payment_data') and invoice.payment_data:
+            if hasattr(invoice.payment_data, 'amount') and invoice.payment_data.amount:
+                amount = float(invoice.payment_data.amount.value)
+                currency = getattr(invoice.payment_data.amount, 'currency', 'RUB')
+        
+        # Fallback: cart[0].price
+        if amount == 0.0 and hasattr(invoice, 'cart') and invoice.cart:
+            if len(invoice.cart) > 0 and hasattr(invoice.cart[0], 'price'):
+                amount = float(invoice.cart[0].price.value)
+                currency = getattr(invoice.cart[0].price, 'currency', 'RUB')
+
         result = {
             "id": invoice.id,
             "status": invoice.status,
-            "amount": float(invoice.amount.value) if invoice.amount else 0,
-            "currency": invoice.amount.currency if invoice.amount else "RUB",
+            "amount": amount,
+            "currency": currency,
             "created_at": invoice.created_at.isoformat() if invoice.created_at else None,
             "expires_at": invoice.expires_at.isoformat() if invoice.expires_at else None,
             "metadata": dict(invoice.metadata) if invoice.metadata else {},
