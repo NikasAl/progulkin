@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.prod
+
+# Logs
+*.log
+gunicorn.log
+gunicorn.pid
+
+# Requirements hash
+.requirements_hash
+
+# OS
+.DS_Store
+Thumbs.db
