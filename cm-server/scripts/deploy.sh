@@ -140,12 +140,19 @@ fi
 
 # Запускаем gunicorn
 echo "🚀 Запуск CM Server на порту ${UVICORN_PORT}..."
+
+# Загружаем переменные из .env файла
+if [[ -f ".env" ]]; then
+    echo "📝 Загрузка переменных из .env"
+    set -a
+    source .env
+    set +a
+fi
+
 export UVICORN_BIND="${UVICORN_HOST}:${UVICORN_PORT}"
 export UVICORN_WORKERS="${UVICORN_WORKERS}"
 export UVICORN_TIMEOUT="${UVICORN_TIMEOUT}"
 export UVICORN_LOG_LEVEL="info"
-export ENV="prod"
-export DEBUG="false"
 
 nohup gunicorn -c gunicorn_conf.py ${UVICORN_APP} > gunicorn.log 2>&1 &
 echo \$! > gunicorn.pid
