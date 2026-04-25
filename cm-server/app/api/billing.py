@@ -7,12 +7,11 @@ import logging
 from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from app.config import settings
 from app.services.yookassa_service import (
-    create_invoice,
-    create_payment_with_redirect,
-    get_invoice_status,
+    create_payment,
     get_payment_status,
     is_payment_successful,
     PaymentError,
@@ -27,27 +26,23 @@ router = APIRouter()
 # DTO
 # ============================================================================
 
-from pydantic import BaseModel, Field
-
-
 class PaymentCreateRequest(BaseModel):
-    """Базовый запрос на создание платежа"""
+    """Запрос на создание платежа"""
     device_id: str
     amount: float
-    app: str = "progulkin"  # Имя приложения
+    app: str = "progulkin"
 
 
 class PaymentCreateResponse(BaseModel):
     """Ответ на создание платежа"""
-    invoice_id: str
+    payment_id: str
     payment_url: str
     amount: float
-    expires_in_hours: int = 24
 
 
 class PaymentStatusResponse(BaseModel):
     """Ответ со статусом платежа"""
-    invoice_id: str
+    payment_id: str
     status: str
     amount: float
     currency: str
@@ -74,10 +69,6 @@ APP_PRODUCTS: Dict[str, Dict[int, Dict[str, Any]]] = {
     },
     # Добавляйте новые приложения здесь
 }
-
-# Приложения, использующие Payment API (вместо Invoice API)
-# Payment API лучше подходит для mobile apps с deep links
-USE_PAYMENT_API: set = {"starflow"}
 
 
 def get_product_info(app: str, amount: float) -> Optional[Dict[str, Any]]:
@@ -123,15 +114,15 @@ async def list_apps():
 
 
 @router.post("/billing/create", response_model=PaymentCreateResponse)
-async def create_payment(request: PaymentCreateRequest):
+async def create_payment_endpoint(request: PaymentCreateRequest):
     """
-    Создаёт счёт для оплаты.
+    Создаёт платёж.
 
     - **device_id**: ID устройства (UUID)
     - **amount**: Сумма в рублях
     - **app**: Имя приложения (progulkin, starflow, etc.)
 
-    Возвращает invoice_id (или payment_id) и payment_url для оплаты.
+    Возвращает payment_id и payment_url для оплаты.
     """
     # Проверяем что приложение поддерживается
     if request.app not in APP_PRODUCTS:
@@ -162,30 +153,18 @@ async def create_payment(request: PaymentCreateRequest):
         metadata["energy_amount"] = str(product["energy"])
 
     try:
-        # Выбираем API в зависимости от приложения
-        if request.app in USE_PAYMENT_API:
-            # Payment API - лучше для mobile apps с deep links
-            payment_id, payment_url = create_payment_with_redirect(
-                amount=request.amount,
-                description=description,
-                device_id=request.device_id,
-                app_name=request.app,
-                metadata=metadata,
-            )
-        else:
-            # Invoice API - для веб-приложений
-            payment_id, payment_url = create_invoice(
-                amount=request.amount,
-                description=description,
-                device_id=request.device_id,
-                app_name=request.app,
-                metadata=metadata,
-            )
+        payment_id, payment_url = create_payment(
+            amount=request.amount,
+            description=description,
+            device_id=request.device_id,
+            app_name=request.app,
+            metadata=metadata,
+        )
 
         logger.info(f"Payment created: {payment_id} for {request.app}/{request.device_id[:8]}...")
 
         return PaymentCreateResponse(
-            invoice_id=payment_id,
+            payment_id=payment_id,
             payment_url=payment_url,
             amount=request.amount,
         )
@@ -198,38 +177,28 @@ async def create_payment(request: PaymentCreateRequest):
 @router.post("/billing/create/{app_name}", response_model=PaymentCreateResponse)
 async def create_app_payment(app_name: str, request: PaymentCreateRequest):
     """
-    Создаёт счёт для конкретного приложения.
+    Создаёт платёж для конкретного приложения.
 
     URL: /billing/create/starflow
     """
     request.app = app_name
-    return await create_payment(request)
+    return await create_payment_endpoint(request)
 
 
-@router.get("/billing/status/{invoice_id}", response_model=PaymentStatusResponse)
-async def check_payment_status(invoice_id: str):
+@router.get("/billing/status/{payment_id}", response_model=PaymentStatusResponse)
+async def check_payment_status(payment_id: str):
     """
-    Проверяет статус оплаты счёта или платежа.
+    Проверяет статус платежа.
 
-    - **invoice_id**: ID счёта (in-...) или платежа из YooKassa
-
-    Автоматически определяет тип ID:
-    - Invoice ID (префикс 'in-'): использует Invoice API
-    - Payment ID (без префикса): использует Payment API
+    - **payment_id**: ID платежа из YooKassa
 
     Возвращает текущий статус и информацию о платеже.
     """
-    # Определяем тип по формату ID
-    is_invoice = invoice_id.startswith("in-")
-
     try:
-        if is_invoice:
-            status_info = get_invoice_status(invoice_id)
-        else:
-            status_info = get_payment_status(invoice_id)
+        status_info = get_payment_status(payment_id)
 
         return PaymentStatusResponse(
-            invoice_id=status_info["id"],
+            payment_id=status_info["id"],
             status=status_info["status"],
             amount=status_info["amount"],
             currency=status_info["currency"],
@@ -240,24 +209,22 @@ async def check_payment_status(invoice_id: str):
         )
 
     except PaymentError as e:
-        logger.error(f"Status check failed for {invoice_id}: {e}")
+        logger.error(f"Status check failed for {payment_id}: {e}")
         raise HTTPException(500, str(e))
 
 
-@router.get("/billing/check/{invoice_id}")
-async def check_is_paid(invoice_id: str):
+@router.get("/billing/check/{payment_id}")
+async def check_is_paid(payment_id: str):
     """
-    Быстрая проверка - оплачен ли счёт или платёж.
+    Быстрая проверка - оплачен ли платёж.
 
-    Автоматически определяет тип ID (Invoice или Payment).
-    Возвращает только boolean is_paid.
+    Возвращает payment_id и boolean is_paid.
     """
     try:
-        is_paid = is_payment_successful(invoice_id)
-        return {"invoice_id": invoice_id, "is_paid": is_paid}
-
+        is_paid = is_payment_successful(payment_id)
+        return {"payment_id": payment_id, "is_paid": is_paid}
     except PaymentError:
-        return {"invoice_id": invoice_id, "is_paid": False}
+        return {"payment_id": payment_id, "is_paid": False}
 
 
 @router.get("/billing/prices")
