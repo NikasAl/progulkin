@@ -46,24 +46,26 @@ def get_app_scheme(app_name: str) -> Optional[str]:
     return settings.APP_SCHEMES.get(app_name)
 
 
-def build_return_url(app_name: str, invoice_id: str) -> str:
+def build_return_url(app_name: str) -> str:
     """
     Строит return_url для YooKassa на основе приложения.
 
     Args:
         app_name: Имя приложения (progulkin, starflow, etc.)
-        invoice_id: ID счёта
 
     Returns:
         URL для возврата после оплаты
+
+    Note:
+        payment_id не включается в URL - приложение знает его из ответа create.
     """
     scheme = get_app_scheme(app_name)
     if scheme:
         # Deep link для мобильного приложения
-        return f"{scheme}://payment/success?invoice_id={invoice_id}"
+        return f"{scheme}://payment/success"
     else:
         # Fallback на веб
-        return f"{settings.BASE_URL}/payment/success?invoice_id={invoice_id}"
+        return f"{settings.BASE_URL}/payment/success"
 
 
 def create_invoice(
@@ -105,8 +107,7 @@ def create_invoice(
 
         # Генерируем return_url если не передан
         if return_url is None:
-            # Временно используем placeholder (обновим после создания invoice)
-            return_url = f"{settings.BASE_URL}/payment/pending"
+            return_url = build_return_url(app_name)
 
         invoice_data = {
             "payment_data": {
@@ -183,7 +184,7 @@ def create_payment_with_redirect(
         idempotence_key = str(uuid.uuid4())
 
         # Генерируем return_url
-        return_url = build_return_url(app_name, "PENDING")  # Будет заменён
+        return_url = build_return_url(app_name)
 
         payment_data = {
             "amount": {"value": f"{amount:.2f}", "currency": "RUB"},

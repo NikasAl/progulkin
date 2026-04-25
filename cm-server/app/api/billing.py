@@ -75,6 +75,10 @@ APP_PRODUCTS: Dict[str, Dict[int, Dict[str, Any]]] = {
     # Добавляйте новые приложения здесь
 }
 
+# Приложения, использующие Payment API (вместо Invoice API)
+# Payment API лучше подходит для mobile apps с deep links
+USE_PAYMENT_API: set = {"starflow"}
+
 
 def get_product_info(app: str, amount: float) -> Optional[Dict[str, Any]]:
     """Получить информацию о продукте по приложению и сумме"""
@@ -127,7 +131,7 @@ async def create_payment(request: PaymentCreateRequest):
     - **amount**: Сумма в рублях
     - **app**: Имя приложения (progulkin, starflow, etc.)
 
-    Возвращает invoice_id и payment_url для оплаты.
+    Возвращает invoice_id (или payment_id) и payment_url для оплаты.
     """
     # Проверяем что приложение поддерживается
     if request.app not in APP_PRODUCTS:
@@ -148,28 +152,40 @@ async def create_payment(request: PaymentCreateRequest):
     if not product:
         logger.warning(f"Unknown product: {request.app}/{request.amount}")
 
+    description = build_description(request.app, request.amount, request.device_id)
+
+    metadata = {
+        "type": product.get("type", "unknown") if product else "custom",
+    }
+
+    if product and "energy" in product:
+        metadata["energy_amount"] = str(product["energy"])
+
     try:
-        description = build_description(request.app, request.amount, request.device_id)
+        # Выбираем API в зависимости от приложения
+        if request.app in USE_PAYMENT_API:
+            # Payment API - лучше для mobile apps с deep links
+            payment_id, payment_url = create_payment_with_redirect(
+                amount=request.amount,
+                description=description,
+                device_id=request.device_id,
+                app_name=request.app,
+                metadata=metadata,
+            )
+        else:
+            # Invoice API - для веб-приложений
+            payment_id, payment_url = create_invoice(
+                amount=request.amount,
+                description=description,
+                device_id=request.device_id,
+                app_name=request.app,
+                metadata=metadata,
+            )
 
-        metadata = {
-            "type": product.get("type", "unknown") if product else "custom",
-        }
-
-        if product and "energy" in product:
-            metadata["energy_amount"] = str(product["energy"])
-
-        invoice_id, payment_url = create_invoice(
-            amount=request.amount,
-            description=description,
-            device_id=request.device_id,
-            app_name=request.app,
-            metadata=metadata,
-        )
-
-        logger.info(f"Payment created: {invoice_id} for {request.app}/{request.device_id[:8]}...")
+        logger.info(f"Payment created: {payment_id} for {request.app}/{request.device_id[:8]}...")
 
         return PaymentCreateResponse(
-            invoice_id=invoice_id,
+            invoice_id=payment_id,
             payment_url=payment_url,
             amount=request.amount,
         )
@@ -188,50 +204,6 @@ async def create_app_payment(app_name: str, request: PaymentCreateRequest):
     """
     request.app = app_name
     return await create_payment(request)
-
-
-@router.post("/billing/create-starflow", response_model=PaymentCreateResponse)
-async def create_starflow_payment(request: PaymentCreateRequest):
-    """
-    Специализированный endpoint для Star Flow.
-    Покупка энергии в игре.
-    """
-    products = {
-        10:  {"energy": 10,  "name": "Разведчик"},
-        25:  {"energy": 30,  "name": "Командир"},
-        79:  {"energy": 100, "name": "Адмирал"},
-    }
-
-    product = products.get(int(request.amount))
-    if not product:
-        raise HTTPException(400, f"Неверная сумма. Доступные: {list(products.keys())}₽")
-
-    description = f"Star Flow: {product['name']} ({product['energy']} энергии)"
-
-    try:
-        # Используем Payment API с редиректом для deep link
-        payment_id, payment_url = create_payment_with_redirect(
-            amount=request.amount,
-            description=description,
-            device_id=request.device_id,
-            app_name="starflow",
-            metadata={
-                "type": "starflow_energy",
-                "energy_amount": str(product["energy"]),
-            }
-        )
-
-        logger.info(f"Starflow payment created: {payment_id} for {request.device_id[:8]}...")
-
-        return PaymentCreateResponse(
-            invoice_id=payment_id,
-            payment_url=payment_url,
-            amount=request.amount,
-        )
-
-    except PaymentError as e:
-        logger.error(f"Starflow payment failed: {e}")
-        raise HTTPException(500, str(e))
 
 
 @router.get("/billing/status/{invoice_id}", response_model=PaymentStatusResponse)
