@@ -2,7 +2,6 @@
 Конфигурация CM Server (Connection Manager).
 Общий сервер для signaling и billing нескольких приложений.
 """
-import os
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,33 +12,33 @@ class Settings(BaseSettings):
     # ========================================================================
     # ОКРУЖЕНИЕ
     # ========================================================================
-    ENV: str = os.getenv("ENV", "dev")
-    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+    ENV: str = "dev"
+    DEBUG: bool = False
 
     # ========================================================================
     # API
     # ========================================================================
-    API_PREFIX: str = "/cm"  # Changed from /pg to /cm
+    API_PREFIX: str = "/cm"
     HOST: str = "0.0.0.0"
     PORT: int = 8002
 
     # ========================================================================
     # YOOKASSA (ПЛАТЕЖИ)
     # ========================================================================
-    YOOKASSA_SHOP_ID: Optional[str] = os.getenv("YOOKASSA_SHOP_ID")
-    YOOKASSA_SECRET_KEY: Optional[str] = os.getenv("YOOKASSA_SECRET_KEY")
+    YOOKASSA_SHOP_ID: Optional[str] = None
+    YOOKASSA_SECRET_KEY: Optional[str] = None
 
     # ========================================================================
     # REDIS (СИГНАЛЬНЫЙ СЕРВЕР)
     # ========================================================================
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/2")
+    REDIS_URL: str = "redis://localhost:6379/2"
     REDIS_PREFIX: str = "cm:"
 
     # ========================================================================
     # SIGNALING SERVER
     # ========================================================================
-    SIGNALING_PORT: int = int(os.getenv("SIGNALING_PORT", "9001"))
-    SIGNALING_HOST: str = os.getenv("SIGNALING_HOST", "0.0.0.0")
+    SIGNALING_PORT: int = 9001
+    SIGNALING_HOST: str = "0.0.0.0"
 
     # ========================================================================
     # БАЗОВЫЕ ЦЕНЫ
@@ -49,7 +48,6 @@ class Settings(BaseSettings):
     # ========================================================================
     # APP DEEP LINKS (для return_url в YooKassa)
     # ========================================================================
-    # Формат: {app_name: deep_link_scheme}
     APP_SCHEMES: dict = {
         "progulkin": "progulkin",
         "starflow": "starflow",
@@ -58,7 +56,7 @@ class Settings(BaseSettings):
     # ========================================================================
     # BASE URL для веб-версий (опционально)
     # ========================================================================
-    BASE_URL: str = os.getenv("BASE_URL", "https://kreagenium.ru")
+    BASE_URL: str = "https://kreagenium.ru"
 
     model_config = SettingsConfigDict(
         env_file=".env",
