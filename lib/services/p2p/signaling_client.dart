@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Состояние подключения к сигнальному серверу
 enum SignalingState {
@@ -29,8 +29,8 @@ class PeerInfo {
     return PeerInfo(
       deviceId: json['deviceId'] as String,
       zone: json['zone'] as String,
-      ip: json['ip'] as String,
-      port: json['port'] as int,
+      ip: json['ip'] as String? ?? '',
+      port: json['port'] as int? ?? 9001,
     );
   }
 
@@ -38,19 +38,40 @@ class PeerInfo {
   String toString() => 'Peer($deviceId at $ip:$port, zone=$zone)';
 }
 
-/// Клиент сигнального сервера
-/// Управляет подключением и получает информацию о пирах
-class SignalingClient {
-  final String serverHost;
-  final int serverPort;
+/// Конфигурация WebSocket signaling клиента
+class SignalingConfig {
+  final String serverUrl;      // e.g., wss://kreagenium.ru/cm/ws/signaling
   final String deviceId;
+  final String app;
   final String zone;
   final int listenPort;
+  final Duration heartbeatInterval;
+  final int maxReconnectAttempts;
+  final Duration reconnectDelay;
 
-  Socket? _socket;
+  const SignalingConfig({
+    required this.serverUrl,
+    required this.deviceId,
+    this.app = 'progulkin',
+    required this.zone,
+    this.listenPort = 9001,
+    this.heartbeatInterval = const Duration(seconds: 30),
+    this.maxReconnectAttempts = 5,
+    this.reconnectDelay = const Duration(seconds: 3),
+  });
+}
+
+/// WebSocket клиент сигнального сервера
+/// Работает через HTTPS 443 (wss://)
+class SignalingClient {
+  final SignalingConfig config;
+
+  WebSocketChannel? _channel;
   SignalingState _state = SignalingState.disconnected;
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  StreamSubscription? _subscription;
 
   final StreamController<SignalingState> _stateController =
       StreamController<SignalingState>.broadcast();
@@ -62,6 +83,8 @@ class SignalingClient {
       StreamController<String>.broadcast();
   final StreamController<String> _errorController =
       StreamController<String>.broadcast();
+  final StreamController<Map<String, dynamic>> _signalController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   /// Поток изменений состояния
   Stream<SignalingState> get stateStream => _stateController.stream;
@@ -78,19 +101,45 @@ class SignalingClient {
   /// Поток ошибок
   Stream<String> get errorStream => _errorController.stream;
 
+  /// Поток входящих сигналов (offer, answer, ice-candidate)
+  Stream<Map<String, dynamic>> get signalStream => _signalController.stream;
+
   /// Текущее состояние
   SignalingState get state => _state;
 
   /// Подключен ли к серверу
   bool get isConnected => _state == SignalingState.connected;
 
-  SignalingClient({
-    required this.serverHost,
-    this.serverPort = 9000,
-    required this.deviceId,
-    required this.zone,
-    this.listenPort = 9001,
-  });
+  SignalingClient({required this.config});
+
+  /// Создать клиент с legacy параметрами (для совместимости)
+  factory SignalingClient.legacy({
+    required String serverHost,
+    int serverPort = 9000,
+    required String deviceId,
+    required String zone,
+    int listenPort = 9001,
+    String app = 'progulkin',
+    bool useWss = true,
+  }) {
+    final protocol = useWss ? 'wss' : 'ws';
+    final url = '$protocol://$serverPort/cm/ws/signaling';
+    // Если порт 443 или 80, не включаем его в URL
+    final defaultPort = useWss ? 443 : 80;
+    final urlWithPort = serverPort == defaultPort
+        ? '$protocol://$serverHost/cm/ws/signaling'
+        : '$protocol://$serverHost:$serverPort/cm/ws/signaling';
+
+    return SignalingClient(
+      config: SignalingConfig(
+        serverUrl: urlWithPort,
+        deviceId: deviceId,
+        app: app,
+        zone: zone,
+        listenPort: listenPort,
+      ),
+    );
+  }
 
   /// Подключиться к сигнальному серверу
   Future<bool> connect() async {
@@ -102,16 +151,17 @@ class SignalingClient {
     _updateState(SignalingState.connecting);
 
     try {
-      debugPrint('🔌 Подключение к сигнальному серверу $serverHost:$serverPort');
+      debugPrint('🔌 Подключение к сигнальному серверу: ${config.serverUrl}');
 
-      _socket = await Socket.connect(
-        serverHost,
-        serverPort,
-        timeout: const Duration(seconds: 10),
+      _channel = WebSocketChannel.connect(
+        Uri.parse(config.serverUrl),
       );
 
-      // Обработка входящих данных
-      _socket!.listen(
+      // Ждем подключения
+      await _channel!.ready;
+
+      // Подписываемся на сообщения
+      _subscription = _channel!.stream.listen(
         _handleData,
         onError: _handleError,
         onDone: _handleDone,
@@ -123,6 +173,7 @@ class SignalingClient {
       // Запускаем heartbeat
       _startHeartbeat();
 
+      _reconnectAttempts = 0;
       _updateState(SignalingState.connected);
       debugPrint('✅ Подключен к сигнальному серверу');
 
@@ -132,7 +183,6 @@ class SignalingClient {
       _updateState(SignalingState.error);
       _errorController.add('Ошибка подключения: $e');
 
-      // Планируем переподключение
       _scheduleReconnect();
 
       return false;
@@ -144,16 +194,15 @@ class SignalingClient {
     _heartbeatTimer?.cancel();
     _reconnectTimer?.cancel();
 
-    if (_socket != null) {
+    if (_channel != null) {
       try {
-        // Отправляем сообщение о выходе
-        _send({'type': 'leave', 'deviceId': deviceId});
-        await Future.delayed(const Duration(milliseconds: 100));
-        await _socket!.close();
+        await _subscription?.cancel();
+        await _channel!.sink.close();
       } catch (e) {
         debugPrint('⚠️ Ошибка при отключении: $e');
       }
-      _socket = null;
+      _channel = null;
+      _subscription = null;
     }
 
     _updateState(SignalingState.disconnected);
@@ -163,10 +212,17 @@ class SignalingClient {
   /// Запросить список пиров
   void requestPeers() {
     if (!isConnected) return;
+    _send({'type': 'get_peers'});
+  }
+
+  /// Отправить signaling сообщение (offer, answer, ice-candidate)
+  void sendSignal(String targetDeviceId, String signalType, Map<String, dynamic> data) {
+    if (!isConnected) return;
     _send({
-      'type': 'get_peers',
-      'deviceId': deviceId,
-      'zone': zone,
+      'type': 'signal',
+      'to': targetDeviceId,
+      'signalType': signalType,
+      'data': data,
     });
   }
 
@@ -174,16 +230,17 @@ class SignalingClient {
   Future<void> _register() async {
     _send({
       'type': 'register',
-      'deviceId': deviceId,
-      'zone': zone,
-      'port': listenPort,
+      'deviceId': config.deviceId,
+      'app': config.app,
+      'zone': config.zone,
+      'port': config.listenPort,
     });
   }
 
   /// Обработка входящих данных
-  void _handleData(List<int> data) {
+  void _handleData(dynamic data) {
     try {
-      final message = jsonDecode(utf8.decode(data)) as Map<String, dynamic>;
+      final message = jsonDecode(data as String) as Map<String, dynamic>;
       _handleMessage(message);
     } catch (e) {
       debugPrint('⚠️ Ошибка разбора сообщения: $e');
@@ -195,6 +252,15 @@ class SignalingClient {
     final type = message['type'] as String?;
 
     switch (type) {
+      case 'registered':
+        // Подтверждение регистрации
+        final peers = (message['peers'] as List? ?? [])
+            .map((p) => PeerInfo.fromJson(p as Map<String, dynamic>))
+            .toList();
+        debugPrint('📋 Зарегистрирован, пиров в зоне: ${peers.length}');
+        _peersController.add(peers);
+        break;
+
       case 'peers':
         _handlePeersList(message);
         break;
@@ -205,6 +271,22 @@ class SignalingClient {
 
       case 'peer_left':
         _handlePeerLeft(message);
+        break;
+
+      case 'signal':
+        // Входящий сигнал от другого пира
+        debugPrint('📡 Получен сигнал от ${message['from']}: ${message['signalType']}');
+        _signalController.add(message);
+        break;
+
+      case 'heartbeat_ack':
+        // Heartbeat подтверждён
+        break;
+
+      case 'error':
+        final errorMsg = message['message'] as String?;
+        debugPrint('❌ Ошибка от сервера: $errorMsg');
+        _errorController.add(errorMsg ?? 'Unknown error');
         break;
 
       default:
@@ -225,12 +307,8 @@ class SignalingClient {
 
   /// Обработка подключения нового пира
   void _handlePeerJoined(Map<String, dynamic> message) {
-    final peer = PeerInfo(
-      deviceId: message['deviceId'] as String,
-      zone: message['zone'] as String,
-      ip: message['ip'] as String,
-      port: message['port'] as int,
-    );
+    final peerData = message['peer'] as Map<String, dynamic>? ?? message;
+    final peer = PeerInfo.fromJson(peerData);
 
     debugPrint('👋 Новый пир: $peer');
     _peerJoinedController.add(peer);
@@ -243,11 +321,11 @@ class SignalingClient {
     _peerLeftController.add(deviceId);
   }
 
-  /// Обработка ошибки сокета
+  /// Обработка ошибки
   void _handleError(dynamic error) {
-    debugPrint('❌ Ошибка сокета: $error');
+    debugPrint('❌ Ошибка WebSocket: $error');
     _updateState(SignalingState.error);
-    _errorController.add('Ошибка сокета: $error');
+    _errorController.add('Ошибка WebSocket: $error');
     _scheduleReconnect();
   }
 
@@ -260,11 +338,10 @@ class SignalingClient {
 
   /// Отправка сообщения
   void _send(Map<String, dynamic> message) {
-    if (_socket == null) return;
+    if (_channel == null) return;
 
     try {
-      final data = utf8.encode(jsonEncode(message));
-      _socket!.add(data);
+      _channel!.sink.add(jsonEncode(message));
     } catch (e) {
       debugPrint('❌ Ошибка отправки: $e');
     }
@@ -273,22 +350,33 @@ class SignalingClient {
   /// Запуск heartbeat
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _heartbeatTimer = Timer.periodic(config.heartbeatInterval, (_) {
       if (isConnected) {
-        _send({
-          'type': 'heartbeat',
-          'deviceId': deviceId,
-        });
+        _send({'type': 'heartbeat'});
       }
     });
   }
 
-  /// Планирование переподключения
+  /// Планирование переподключения с exponential backoff
   void _scheduleReconnect() {
+    if (_reconnectAttempts >= config.maxReconnectAttempts) {
+      debugPrint('❌ Достигнут лимит попыток переподключения');
+      return;
+    }
+
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 5), () {
+
+    // Exponential backoff: 3s, 6s, 12s, 24s, 48s
+    final delay = Duration(
+      milliseconds: config.reconnectDelay.inMilliseconds *
+          (1 << _reconnectAttempts.clamp(0, 5)),
+    );
+
+    _reconnectAttempts++;
+
+    _reconnectTimer = Timer(delay, () {
       if (_state != SignalingState.connected) {
-        debugPrint('🔄 Попытка переподключения...');
+        debugPrint('🔄 Попытка переподключения ($_reconnectAttempts/${config.maxReconnectAttempts})...');
         connect();
       }
     });
@@ -310,5 +398,6 @@ class SignalingClient {
     _peerJoinedController.close();
     _peerLeftController.close();
     _errorController.close();
+    _signalController.close();
   }
 }

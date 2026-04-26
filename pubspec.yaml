@@ -48,6 +48,7 @@ dependencies:
   crypto: ^3.0.3
   http: ^1.1.0
   image: ^4.1.0  # Для анализа цветов пикселей на тайлах карты
+  web_socket_channel: ^3.0.1  # WebSocket для signaling
   
   # Сжатие фото в WebP (нативное)
   flutter_image_compress: ^2.3.0

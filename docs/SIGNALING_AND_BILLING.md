@@ -1,321 +1,369 @@
-# Анализ архитектуры: Сигнальный сервер и Платежи для Progulkin
+# CM Server: Signaling и Billing
 
-**Дата:** 2026-04-05
+**Дата обновления:** 2026-04-26
 
-## Текущая инфраструктура
-
-### mindvector (существующий)
-- **Стек:** FastAPI + Gunicorn + PostgreSQL
-- **Порт:** 8001 (через nginx прокси)
-- **Платежи:** YooKassa (Invoices)
-- **Аутентификация:** JWT с user_id из БД
-- **База данных:** PostgreSQL с таблицами Users, Transactions, UserBalance
-
-### progulkin (текущий)
-- **Сигнальный сервер:** Dart TCP на порту 9000
-- **Клиенты:** Flutter мобильные приложения
-- **Аутентификация:** Device ID (UUID, без серверной БД)
-
----
-
-## Сравнение вариантов
-
-### Вариант 1: Разместить в mindvector
+## Архитектура
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      NGINX (443/80)                         │
 ├─────────────────────────────────────────────────────────────┤
 │                         │                                   │
-│    /mv/* ◄──────────────┼──────────────► /pg/*              │
+│    /mv/* ◄──────────────┼──────────────► /cm/*              │
 │         │               │                   │               │
 │         ▼               │                   ▼               │
 │  ┌──────────────┐       │          ┌──────────────┐         │
-│  │  mindvector  │       │          │ progulkin    │         │
-│  │  :8001       │       │          │ endpoints    │         │
-│  │              │       │          │ (новые)      │         │
-│  │ - billing    │       │          │              │         │
-│  │ - users      │       │          │ - /pg/billing│         │
-│  │ - concepts   │       │          │ - /pg/status │         │
-│  └──────────────┘       │          └──────────────┘         │
-│         │               │               │                   │
-│         ▼               │               ▼                   │
-│  ┌──────────────────────────────────────────────┐          │
-│  │              PostgreSQL                      │          │
-│  │  (users, transactions для mindvector)        │          │
-│  └──────────────────────────────────────────────┘          │
-│                                                             │
-│  ┌──────────────────────────────────────────────┐          │
-│  │        Signaling Server (Dart :9000)         │          │
-│  │        TCP socket, stateless                 │          │
-│  └──────────────────────────────────────────────┘          │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Плюсы:**
-- ✅ Единая кодовая база для платежей
-- ✅ Переиспользование YooKassa интеграции
-- ✅ Меньше серверов для мониторинга
-- ✅ Общая конфигурация nginx
-
-**Минусы:**
-- ❌ Смешивание доменов (mindvector ≠ progulkin)
-- ❌ Зависимость от PostgreSQL (для транзакций)
-- ❌ Риск повлиять на работающий mindvector
-- ❌ Сложнее масштабировать независимо
-
-**Требуемые изменения в mindvector:**
-```python
-# Новый роутер app/api/v1/progulkin.py
-router = APIRouter(prefix="/pg", tags=["progulkin"])
-
-@router.post("/billing/create")
-async def create_payment(device_id: str, amount: float):
-    # Создаём invoice без записи в БД
-    # Возвращаем payment_url и invoice_id
-    pass
-
-@router.get("/billing/status/{invoice_id}")
-async def check_payment(invoice_id: str):
-    # Проверяем статус через YooKassa API
-    # НЕ обновляем БД (stateless)
-    pass
-```
-
----
-
-### Вариант 2: Отдельный сервер (Рекомендуется)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      NGINX (443/80)                         │
-├─────────────────────────────────────────────────────────────┤
-│                         │                                   │
-│    /mv/* ◄──────────────┼──────────────► /pg/*              │
-│         │               │                   │               │
-│         ▼               │                   ▼               │
-│  ┌──────────────┐       │          ┌──────────────┐         │
-│  │  mindvector  │       │          │ progulkin    │         │
-│  │  :8001       │       │          │ :8002        │         │
+│  │  mindvector  │       │          │  CM Server   │         │
+│  │  :8001       │       │          │  :8002       │         │
 │  │              │       │          │              │         │
 │  │ - billing    │       │          │ - billing    │         │
-│  │ - users      │       │          │ - signaling  │         │
+│  │ - users      │       │          │ - signaling  │◄── WebSocket
+│  │ - concepts   │       │          │   (WS)       │    через 443
 │  └──────────────┘       │          └──────────────┘         │
 │         │               │               │                   │
 │         ▼               │               ▼                   │
 │  ┌──────────────┐       │          ┌──────────────┐         │
 │  │  PostgreSQL  │       │          │   Redis      │         │
-│  │  (mindvector)│       │          │ (кэш статусов│         │
-│  └──────────────┘       │          │  платежей)   │         │
-│                         │          └──────────────┘         │
-│                         │                                   │
-│                         │          ┌──────────────┐         │
-│                         │          │ Signaling    │         │
-│                         │          │ :9000 (TCP)  │         │
+│  │  (mindvector)│       │          │ (сессии,     │         │
+│  └──────────────┘       │          │  pub/sub)    │         │
 │                         │          └──────────────┘         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Плюсы:**
-- ✅ Полная изоляция проектов
-- ✅ Независимое масштабирование
-- ✅ Нет риска сломать mindvector
-- ✅ Можно использовать общую YooKassa конфигурацию
-- ✅ Stateless архитектура для progulkin
+## Ключевые особенности
 
-**Минусы:**
-- ❌ Дублирование кода YooKassa интеграции
-- ❌ Ещё один сервис для мониторинга
-- ❌ Дополнительная конфигурация nginx
+- **Всё через HTTPS 443** - WebSocket signaling работает через тот же порт
+- **Не нужно открывать дополнительные порты** на роутере
+- **Stateless архитектура** - YooKassa хранит историю платежей
+- **Multi-app поддержка** - один сервер для нескольких приложений
 
-**Структура проекта progulkin-server:**
+---
+
+## Signaling Server
+
+### WebSocket Endpoint
+
 ```
-progulkin-server/
-├── app/
-│   ├── main.py              # FastAPI приложение
-│   ├── config.py            # Настройки (YooKassa, порты)
-│   ├── api/
-│   │   ├── billing.py       # Stateless платежи
-│   │   └── health.py        # Health check
-│   └── services/
-│       └── yookassa.py      # YooKassa клиент
-├── signaling/
-│   └── server.py            # TCP сигнальный сервер
-├── gunicorn_conf.py
-├── requirements.txt
-└── Dockerfile
+wss://kreagenium.ru/cm/ws/signaling
+```
+
+### Протокол сообщений
+
+#### Client → Server
+
+**Регистрация:**
+```json
+{
+  "type": "register",
+  "deviceId": "uuid-device-id",
+  "app": "progulkin",
+  "zone": "geo-zone-name",
+  "port": 9001
+}
+```
+
+**Отправка сигнала (WebRTC):**
+```json
+{
+  "type": "signal",
+  "to": "target-device-id",
+  "signalType": "offer",
+  "data": { ... webrtc offer ... }
+}
+```
+
+**Heartbeat:**
+```json
+{
+  "type": "heartbeat"
+}
+```
+
+**Запрос списка пиров:**
+```json
+{
+  "type": "get_peers"
+}
+```
+
+#### Server → Client
+
+**Подтверждение регистрации:**
+```json
+{
+  "type": "registered",
+  "deviceId": "your-device-id",
+  "peers": [
+    {"deviceId": "peer-1", "zone": "zone-name", "ip": "1.2.3.4", "port": 9001}
+  ]
+}
+```
+
+**Входящий сигнал:**
+```json
+{
+  "type": "signal",
+  "from": "source-device-id",
+  "signalType": "offer|answer|ice-candidate",
+  "data": { ... }
+}
+```
+
+**Новый пир в зоне:**
+```json
+{
+  "type": "peer_joined",
+  "peer": {"deviceId": "new-peer", "zone": "zone-name", "ip": "5.6.7.8", "port": 9001}
+}
+```
+
+**Пир отключился:**
+```json
+{
+  "type": "peer_left",
+  "deviceId": "disconnected-peer-id"
+}
+```
+
+**Ошибка:**
+```json
+{
+  "type": "error",
+  "message": "Error description"
+}
 ```
 
 ---
 
-## Рекомендация: Вариант 2 (Отдельный сервер)
+## Billing API
 
-### Обоснование:
+### Base URL
+```
+https://kreagenium.ru/cm
+```
 
-1. **Изоляция ответственности**
-   - mindvector = образовательная платформа с AI
-   - progulkin = трекинг прогулок с P2P
-   - Разные домены, разные требования
+### Endpoints
 
-2. **Stateless vs Stateful**
-   - progulkin не требует хранения истории платежей
-   - YooKassa сама хранит историю, можно запрашивать по invoice_id
-   - Это упрощает архитектуру
+#### Создать платёж
+```
+POST /billing/create
+Content-Type: application/json
 
-3. **Масштабируемость**
-   - Сигнальный сервер может потребовать масштабирования отдельно
-   - Платежи - лёгкие запросы, не нагружают БД
+{
+  "device_id": "uuid",
+  "amount": 149,
+  "app": "progulkin"
+}
+```
 
-4. **Безопасность**
-   - Ошибка в progulkin не повлияет на mindvector
-   - Разные JWT секреты, разные домены
+Response:
+```json
+{
+  "payment_id": "payment-uuid",
+  "payment_url": "https://yookassa.ru/...",
+  "amount": 149
+}
+```
+
+#### Создать платёж для приложения
+```
+POST /billing/create/starflow
+Content-Type: application/json
+
+{
+  "device_id": "uuid",
+  "amount": 79
+}
+```
+
+#### Проверить статус платежа
+```
+GET /billing/status/{payment_id}
+```
+
+Response:
+```json
+{
+  "payment_id": "...",
+  "status": "succeeded",
+  "amount": 149,
+  "currency": "RUB",
+  "is_paid": true,
+  "device_id": "...",
+  "app": "progulkin"
+}
+```
+
+#### Быстрая проверка оплаты
+```
+GET /billing/check/{payment_id}
+```
+
+Response:
+```json
+{
+  "payment_id": "...",
+  "is_paid": true
+}
+```
+
+#### Список приложений и продуктов
+```
+GET /billing/apps
+```
+
+#### Цены
+```
+GET /billing/prices
+```
 
 ---
 
-## План реализации (Вариант 2)
+## Поддерживаемые приложения
 
-### Фаза 1: Базовая структура (1 день)
+| App | Продукты |
+|-----|----------|
+| progulkin | 149₽ - Premium (no_ads, unlimited_walks, stats) |
+| starflow | 10₽ - Разведчик (10 energy), 25₽ - Командир (30 energy), 79₽ - Адмирал (100 energy) |
 
-```bash
-mkdir -p /home/z/my-project/progulkin-server
-cd /home/z/my-project/progulkin-server
+---
+
+## Flutter интеграция
+
+### Зависимости
+
+```yaml
+dependencies:
+  web_socket_channel: ^3.0.1
 ```
 
-**requirements.txt:**
-```
-fastapi>=0.100.0
-uvicorn>=0.23.0
-yookassa>=3.0.0
-pydantic>=2.0.0
-python-dotenv>=1.0.0
-redis>=4.0.0  # опционально для кэша
-```
-
-**app/main.py:**
-```python
-from fastapi import FastAPI
-from app.api import billing, health
-
-app = FastAPI(
-    title="Progulkin Server",
-    description="Payments and Signaling for Progulkin app",
-    version="1.0.0",
-)
-
-app.include_router(billing.router, prefix="/pg", tags=["billing"])
-app.include_router(health.router, tags=["health"])
-```
-
-### Фаза 2: Stateless Billing (1 день)
-
-```python
-# app/api/billing.py
-from fastapi import APIRouter, HTTPException
-from app.services.yookassa import create_invoice, get_invoice_status
-
-router = APIRouter()
-
-@router.post("/billing/create")
-async def create_payment(device_id: str, amount: float):
-    """
-    Создаёт счёт для оплаты.
-    НЕ сохраняет в БД - YooKassa хранит историю.
-    """
-    if amount < 10:
-        raise HTTPException(400, "Минимальная сумма 10₽")
-    
-    description = f"Progulkin Premium для {device_id[:8]}"
-    invoice_id, payment_url = create_invoice(amount, description)
-    
-    return {
-        "invoice_id": invoice_id,
-        "payment_url": payment_url,
-        "amount": amount,
-    }
-
-@router.get("/billing/status/{invoice_id}")
-async def check_payment(invoice_id: str):
-    """
-    Проверяет статус оплаты.
-    Stateless - запрашивает напрямую у YooKassa.
-    """
-    status = get_invoice_status(invoice_id)
-    return status
-```
-
-### Фаза 3: Интеграция с Flutter (1 день)
+### Signaling клиент
 
 ```dart
-// lib/services/payment_service.dart
-class PaymentService {
-  final String baseUrl = 'https://api.progulkin.ru/pg';
-  
-  Future<PaymentResult> createPayment(double amount) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/billing/create'),
-      body: {
-        'device_id': await _getDeviceId(),
-        'amount': amount.toString(),
-      },
-    );
-    // ...
-  }
-  
-  Future<PaymentStatus> checkPayment(String invoiceId) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/billing/status/$invoiceId'),
-    );
-    // ...
-  }
-}
+import 'package:progulkin/services/p2p/signaling_client.dart';
+
+final client = SignalingClient(
+  config: SignalingConfig(
+    serverUrl: 'wss://kreagenium.ru/cm/ws/signaling',
+    deviceId: 'your-device-uuid',
+    app: 'progulkin',
+    zone: 'geo-zone-name',
+  ),
+);
+
+// Подключение
+await client.connect();
+
+// Слушать события
+client.peerJoinedStream.listen((peer) {
+  print('New peer: ${peer.deviceId}');
+});
+
+client.signalStream.listen((signal) {
+  // Обработка WebRTC сигналов
+});
+
+// Отправить сигнал
+client.sendSignal(targetDeviceId, 'offer', webrtcOffer);
 ```
 
-### Фаза 4: Nginx конфигурация (0.5 дня)
+### P2P сервис
+
+```dart
+import 'package:progulkin/services/p2p/p2p_service.dart';
+
+final p2p = P2PService();
+
+await p2p.start(P2PConfig(
+  signalingServerUrl: 'wss://kreagenium.ru/cm/ws/signaling',
+  deviceId: 'device-uuid',
+  app: 'progulkin',
+  zone: 'geo-zone',
+));
+```
+
+---
+
+## Nginx конфигурация
 
 ```nginx
-# /etc/nginx/sites-available/progulkin
-server {
-    listen 443 ssl;
-    server_name api.progulkin.ru;
+location /cm {
+    proxy_pass http://127.0.0.1:8002;
+    proxy_http_version 1.1;
 
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
 
-    # API сервер
-    location /pg/ {
-        proxy_pass http://127.0.0.1:8002/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
+    # WebSocket support
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
 
-    # Signaling WebSocket (если понадобится)
-    location /signaling/ {
-        proxy_pass http://127.0.0.1:9000/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
+    # Для long polling и streaming
+    proxy_buffering off;
+    proxy_read_timeout 86400s;  # 24 часа для WebSocket
 }
 ```
 
 ---
 
-## Итоговая стоимость
+## Деплой
 
-| Компонент | Вариант 1 | Вариант 2 |
-|-----------|-----------|-----------|
-| Разработка | 1-2 дня | 2-3 дня |
-| Риск для mindvector | Высокий | Нет |
-| Сложность поддержки | Средняя | Низкая |
-| Масштабируемость | Ограничена | Гибкая |
-| **Рекомендация** | ❌ | ✅ |
+```bash
+cd /path/to/cm-server
+./scripts/deploy.sh
+```
+
+Скрипт:
+1. Подтягивает изменения из Git
+2. Обновляет venv
+3. Перезапускает Gunicorn
 
 ---
 
-## Следующие шаги
+## Мониторинг
 
-1. Создать репозиторий `progulkin-server`
-2. Реализовать базовый FastAPI сервер с billing
-3. Настроить nginx для `api.progulkin.ru`
-4. Интегрировать с Flutter приложением
-5. Добавить вебхук от YooKassa для уведомлений об оплате
+### Health check
+```
+GET /cm/health
+```
+
+### Signaling stats
+```
+GET /cm/signaling/stats
+```
+
+Response:
+```json
+{
+  "total_connections": 5,
+  "total_zones": 2,
+  "zones": {"zone-a": 3, "zone-b": 2}
+}
+```
+
+### Онлайн устройства
+```
+GET /cm/signaling/online/progulkin
+```
+
+---
+
+## Изменения от 2026-04-26
+
+1. **WebSocket signaling** вместо TCP на порту 9000
+   - Работает через HTTPS 443
+   - Не нужно открывать дополнительные порты
+
+2. **Удалён устаревший Dart signaling server** (bin/signaling_server.dart)
+   - Был на порту 9000
+   - Заменён на WebSocket в CM Server
+
+3. **Обновлён Flutter клиент**
+   - signalling_client.dart теперь использует WebSocket
+   - Обратная совместимость через SignalingConfig
+
+4. **Multi-app архитектура**
+   - Поддержка progulkin, starflow и будущих приложений
+   - Разделение по app в метаданных

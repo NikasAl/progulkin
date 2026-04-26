@@ -9,23 +9,52 @@ import '../../di/service_locator.dart';
 
 /// Конфигурация P2P
 class P2PConfig {
-  final String signalingServer;
-  final int signalingPort;
+  final String signalingServerUrl;  // WebSocket URL: wss://kreagenium.ru/cm/ws/signaling
   final String zone;
   final String deviceId;
+  final String app;
   final Duration syncInterval;
   final int listenPort;
   final ConflictResolution conflictResolution;
 
   const P2PConfig({
-    required this.signalingServer,
-    this.signalingPort = 9000,
+    required this.signalingServerUrl,
     required this.zone,
     required this.deviceId,
+    this.app = 'progulkin',
     this.syncInterval = const Duration(seconds: 30),
     this.listenPort = 9001,
     this.conflictResolution = ConflictResolution.lastWriteWins,
   });
+
+  /// Legacy конструктор для совместимости
+  factory P2PConfig.legacy({
+    required String signalingServer,
+    int signalingPort = 9000,
+    required String zone,
+    required String deviceId,
+    String app = 'progulkin',
+    Duration syncInterval = const Duration(seconds: 30),
+    int listenPort = 9001,
+    ConflictResolution conflictResolution = ConflictResolution.lastWriteWins,
+  }) {
+    // Если указан порт 9000, это старый TCP сервер - игнорируем
+    // Используем WSS через 443
+    final useWss = signalingPort == 443 || signalingPort == 9000;
+    final protocol = useWss ? 'wss' : 'ws';
+    final port = (signalingPort == 9000) ? '' : ':$signalingPort';
+    final url = '$protocol://$signalingServer$port/cm/ws/signaling';
+    
+    return P2PConfig(
+      signalingServerUrl: url,
+      zone: zone,
+      deviceId: deviceId,
+      app: app,
+      syncInterval: syncInterval,
+      listenPort: listenPort,
+      conflictResolution: conflictResolution,
+    );
+  }
 }
 
 /// Информация о пире
@@ -129,11 +158,13 @@ class P2PService {
 
       // 3. Подключаемся к сигнальному серверу
       _signalingClient = SignalingClient(
-        serverHost: config.signalingServer,
-        serverPort: config.signalingPort,
-        deviceId: config.deviceId,
-        zone: config.zone,
-        listenPort: config.listenPort,
+        config: SignalingConfig(
+          serverUrl: config.signalingServerUrl,
+          deviceId: config.deviceId,
+          app: config.app,
+          zone: config.zone,
+          listenPort: config.listenPort,
+        ),
       );
 
       // Подписываемся на события сигнального сервера
@@ -143,6 +174,8 @@ class P2PService {
       _signalingClient!.errorStream.listen((error) {
         _errorController.add(error);
       });
+      // Подписываемся на входящие сигналы
+      _signalingClient!.signalStream.listen(_handleSignal);
 
       final connected = await _signalingClient!.connect();
 
@@ -162,6 +195,7 @@ class P2PService {
 
       _stateController.add(P2PState.running);
       debugPrint('🚀 P2P сервис запущен');
+      debugPrint('   URL: ${config.signalingServerUrl}');
       debugPrint('   Зона: ${config.zone}');
       debugPrint('   Устройство: ${config.deviceId}');
       debugPrint('   Порт: ${config.listenPort}');
@@ -238,6 +272,34 @@ class P2PService {
     for (final peer in peers) {
       // Подключаемся к каждому пиру
       await _handlePeerJoined(peer);
+    }
+  }
+
+  /// Обработка входящего signaling сообщения (WebRTC)
+  void _handleSignal(Map<String, dynamic> signal) {
+    final from = signal['from'] as String?;
+    final signalType = signal['signalType'] as String?;
+    final data = signal['data'] as Map<String, dynamic>?;
+
+    if (from == null || signalType == null) return;
+
+    debugPrint('📡 Сигнал от $from: $signalType');
+
+    // TODO: Интеграция с WebRTC для P2P соединений
+    // Сейчас просто логируем, WebRTC будет добавлен позже
+    switch (signalType) {
+      case 'offer':
+        debugPrint('   Получен offer от $from');
+        // WebRTC: создать answer
+        break;
+      case 'answer':
+        debugPrint('   Получен answer от $from');
+        // WebRTC: установить remote description
+        break;
+      case 'ice-candidate':
+        debugPrint('   Получен ICE candidate от $from');
+        // WebRTC: добавить ICE candidate
+        break;
     }
   }
 
