@@ -35,15 +35,20 @@ class Settings(BaseSettings):
     REDIS_PREFIX: str = "cm:"
 
     # ========================================================================
-    # SIGNALING SERVER
+    # SIGNALING SERVER (WebSocket Security)
     # ========================================================================
     SIGNALING_PORT: int = 9001
     SIGNALING_HOST: str = "0.0.0.0"
+    SIGNALING_AUTH_SECRET: Optional[str] = None  # HMAC secret для аутентификации
+    SIGNALING_AUTH_REQUIRED: bool = True  # Требовать аутентификацию
+    SIGNALING_MAX_MESSAGE_SIZE: int = 64 * 1024  # 64KB
+    SIGNALING_RATE_LIMIT: int = 10  # сообщений в секунду
 
     # ========================================================================
     # БАЗОВЫЕ ЦЕНЫ
     # ========================================================================
     MIN_PAYMENT_AMOUNT: float = 10.0
+    MAX_PAYMENT_AMOUNT: float = 100000.0
 
     # ========================================================================
     # APP DEEP LINKS (для return_url в YooKassa)

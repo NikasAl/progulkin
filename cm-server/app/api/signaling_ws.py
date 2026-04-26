@@ -2,16 +2,21 @@
 WebSocket Signaling Server для CM Server.
 Real-time сигнализация через WebSocket (работает через HTTPS 443).
 
-Поддерживает:
-- Регистрация устройства в зоне
-- Обмен WebRTC signaling сообщениями (offer, answer, ice-candidate)
-- Heartbeat для поддержания соединения
-- Список пиров в зоне
+Безопасность:
+- HMAC-аутентификация при регистрации
+- Rate limiting на уровне соединения
+- Валидация всех входных данных
+- Ограничение размера сообщений
 """
 import logging
 import json
+import hmac
+import hashlib
+import re
+import time
 from typing import Dict, Set, Optional, Any
 from datetime import datetime
+from collections import defaultdict
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -21,6 +26,107 @@ from app.services.redis_service import redis_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ============================================================================
+# SECURITY UTILITIES
+# ============================================================================
+
+def validate_device_id(device_id: str) -> bool:
+    """Валидация device_id (UUID формат)"""
+    if not device_id or len(device_id) > 128:
+        return False
+    # UUID v4 формат: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    uuid_pattern = r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
+    return bool(re.match(uuid_pattern, device_id.lower()))
+
+
+def validate_zone(zone: str) -> bool:
+    """Валидация имени зоны"""
+    if not zone or len(zone) > 64:
+        return False
+    # Только безопасные символы
+    return bool(re.match(r'^[a-zA-Z0-9_-]+$', zone))
+
+
+def validate_app(app: str) -> bool:
+    """Валидация имени приложения"""
+    if not app or len(app) > 32:
+        return False
+    return bool(re.match(r'^[a-z][a-z0-9_]*$', app))
+
+
+def verify_auth_token(device_id: str, timestamp: str, signature: str) -> bool:
+    """
+    Проверка HMAC-подписи регистрации.
+
+    Формула: signature = HMAC-SHA256(secret, device_id:timestamp)
+    """
+    if not settings.SIGNALING_AUTH_SECRET:
+        # Если секрет не задан, в dev режиме разрешаем
+        if settings.is_development():
+            logger.warning("AUTH_SECRET not set, allowing unauthenticated connection (dev mode)")
+            return True
+        return False
+
+    try:
+        ts = int(timestamp)
+        # Проверяем, что timestamp не старше 5 минут
+        if abs(time.time() - ts) > 300:
+            logger.warning(f"Auth timestamp expired for {device_id}")
+            return False
+    except (ValueError, TypeError):
+        return False
+
+    # Вычисляем ожидаемую подпись
+    message = f"{device_id}:{timestamp}"
+    expected = hmac.new(
+        settings.SIGNALING_AUTH_SECRET.encode(),
+        message.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    # Constant-time comparison
+    return hmac.compare_digest(signature, expected)
+
+
+def log_security_event(event_type: str, details: dict, ip: str = ""):
+    """Логирование событий безопасности"""
+    logger.warning(f"SECURITY [{event_type}] ip={ip} - {details}")
+
+
+# ============================================================================
+# RATE LIMITER
+# ============================================================================
+
+class RateLimiter:
+    """Простой rate limiter на уровне соединения"""
+
+    def __init__(self, max_per_second: int = 10):
+        self.max_per_second = max_per_second
+        self._requests: Dict[str, list] = defaultdict(list)
+
+    def check(self, client_id: str) -> bool:
+        """Проверить, разрешён ли запрос"""
+        now = time.time()
+        requests = self._requests[client_id]
+
+        # Удаляем старые запросы (старше 1 секунды)
+        requests[:] = [t for t in requests if now - t < 1.0]
+
+        if len(requests) >= self.max_per_second:
+            return False
+
+        requests.append(now)
+        return True
+
+    def cleanup(self, client_id: str):
+        """Очистить счётчик при отключении"""
+        self._requests.pop(client_id, None)
+
+
+# Глобальный rate limiter
+rate_limiter = RateLimiter(max_per_second=settings.SIGNALING_RATE_LIMIT)
 
 
 # ============================================================================
@@ -36,7 +142,7 @@ class ConnectionManager:
     def __init__(self):
         # device_id -> WebSocket
         self._connections: Dict[str, WebSocket] = {}
-        # device_id -> {app, zone, listen_port, ip, last_seen}
+        # device_id -> {app, zone, listen_port, ip, last_seen, hide_ip}
         self._metadata: Dict[str, Dict[str, Any]] = {}
         # zone -> set of device_ids
         self._zones: Dict[str, Set[str]] = {}
@@ -66,6 +172,9 @@ class ConnectionManager:
                 import asyncio
                 asyncio.create_task(self._cleanup_redis(app, device_id))
 
+        # Очищаем rate limiter
+        rate_limiter.cleanup(device_id)
+
         logger.debug(f"WebSocket disconnected: {device_id}")
 
     async def _cleanup_redis(self, app: str, device_id: str):
@@ -77,7 +186,8 @@ class ConnectionManager:
             logger.warning(f"Redis cleanup error for {device_id}: {e}")
 
     def register(self, device_id: str, app: str, zone: str,
-                 listen_port: int = 9001, ip: str = "") -> Dict[str, Any]:
+                 listen_port: int = 9001, ip: str = "",
+                 hide_ip: bool = True) -> Dict[str, Any]:
         """
         Зарегистрировать устройство с метаданными.
         Возвращает список пиров в зоне.
@@ -87,6 +197,7 @@ class ConnectionManager:
             "zone": zone,
             "listen_port": listen_port,
             "ip": ip,
+            "hide_ip": hide_ip,  # Скрывать IP от других
             "last_seen": datetime.utcnow().isoformat(),
         }
 
@@ -98,7 +209,7 @@ class ConnectionManager:
         logger.info(f"Device registered: {device_id} in zone '{zone}' (app={app})")
 
         # Возвращаем список пиров в этой зоне
-        return self.get_peers_in_zone(zone, exclude=device_id)
+        return self.get_peers_in_zone(zone, exclude=device_id, for_device=device_id)
 
     def update_heartbeat(self, device_id: str) -> bool:
         """Обновить время последней активности"""
@@ -107,10 +218,19 @@ class ConnectionManager:
             return True
         return False
 
-    def get_peers_in_zone(self, zone: str, exclude: str = None) -> list:
-        """Получить список пиров в зоне"""
+    def get_peers_in_zone(self, zone: str, exclude: str = None,
+                          for_device: str = None) -> list:
+        """
+        Получить список пиров в зоне.
+
+        Если hide_ip=True у пира, IP не раскрывается.
+        """
         if zone not in self._zones:
             return []
+
+        # Проверяем, хочет ли запрашивающий скрыть свой IP
+        requester_meta = self._metadata.get(for_device, {})
+        requester_hide_ip = requester_meta.get("hide_ip", True)
 
         peers = []
         for device_id in self._zones[zone]:
@@ -118,12 +238,19 @@ class ConnectionManager:
                 continue
             meta = self._metadata.get(device_id)
             if meta and device_id in self._connections:
-                peers.append({
+                peer_info = {
                     "deviceId": device_id,
                     "zone": zone,
-                    "ip": meta.get("ip", ""),
-                    "port": meta.get("listen_port", 9001),
-                })
+                }
+
+                # Раскрываем IP только если оба пользователя согласны
+                # (пока скрываем IP по умолчанию для всех)
+                # В будущем можно добавить настройку приватности
+                # if not meta.get("hide_ip", True) and not requester_hide_ip:
+                #     peer_info["ip"] = meta.get("ip", "")
+                #     peer_info["port"] = meta.get("listen_port", 9001)
+
+                peers.append(peer_info)
         return peers
 
     async def send_to_device(self, device_id: str, message: dict) -> bool:
@@ -170,10 +297,17 @@ async def signaling_websocket(websocket: WebSocket):
     """
     WebSocket endpoint для signaling.
 
+    Безопасность:
+    - HMAC-аутентификация при регистрации
+    - Rate limiting: 10 msg/sec
+    - Максимальный размер сообщения: 64KB
+    - Валидация всех полей
+
     Протокол сообщений (JSON):
 
     Client -> Server:
-    - {"type": "register", "deviceId": "...", "app": "...", "zone": "...", "port": 9001}
+    - {"type": "register", "deviceId": "...", "app": "...", "zone": "...",
+       "timestamp": 1234567890, "signature": "hmac-sha256-hex"}
     - {"type": "signal", "to": "target_device_id", "signalType": "offer|answer|ice-candidate", "data": {...}}
     - {"type": "heartbeat"}
     - {"type": "get_peers"}
@@ -188,10 +322,15 @@ async def signaling_websocket(websocket: WebSocket):
     - {"type": "error", "message": "..."}
     """
     device_id = None
+    client_ip = ""
 
     try:
+        # Получаем IP клиента
+        client_host = websocket.client.host if websocket.client else ""
+        forwarded = websocket.headers.get("x-forwarded-for", "")
+        client_ip = forwarded.split(",")[0].strip() if forwarded else client_host
+
         # Принимаем соединение (device_id получим при регистрации)
-        # Временный ID до регистрации
         import uuid
         temp_id = str(uuid.uuid4())[:8]
         await manager.connect(websocket, temp_id)
@@ -199,12 +338,40 @@ async def signaling_websocket(websocket: WebSocket):
         while True:
             # Получаем сообщение
             try:
-                data = await websocket.receive_json()
+                raw_data = await websocket.receive_text()
             except Exception as e:
-                logger.warning(f"Invalid JSON received: {e}")
+                logger.warning(f"Invalid WebSocket frame: {e}")
+                break
+
+            # Проверяем размер сообщения
+            if len(raw_data) > settings.SIGNALING_MAX_MESSAGE_SIZE:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Message too large"
+                })
+                log_security_event("OVERSIZE_MESSAGE", {"size": len(raw_data)}, client_ip)
+                continue
+
+            # Парсим JSON
+            try:
+                data = json.loads(raw_data)
+            except json.JSONDecodeError as e:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Invalid JSON"
+                })
                 continue
 
             msg_type = data.get("type")
+
+            # Rate limiting (после регистрации)
+            if device_id and not rate_limiter.check(device_id):
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Rate limit exceeded"
+                })
+                log_security_event("RATE_LIMIT", {"device_id": device_id}, client_ip)
+                continue
 
             if msg_type == "register":
                 # Регистрация устройства
@@ -212,26 +379,54 @@ async def signaling_websocket(websocket: WebSocket):
                 app = data.get("app", "progulkin")
                 zone = data.get("zone", "default")
                 listen_port = data.get("port", 9001)
+                timestamp = data.get("timestamp", "")
+                signature = data.get("signature", "")
 
-                if not device_id:
+                # Валидация
+                if not validate_device_id(device_id):
                     await websocket.send_json({
                         "type": "error",
-                        "message": "deviceId is required for registration"
+                        "message": "Invalid deviceId format"
+                    })
+                    log_security_event("INVALID_DEVICE_ID", {"device_id": str(device_id)[:32]}, client_ip)
+                    continue
+
+                if not validate_app(app):
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Invalid app name"
                     })
                     continue
 
-                # Получаем IP клиента (из заголовков или x-forwarded-for)
-                client_host = websocket.client.host if websocket.client else ""
-                forwarded = websocket.headers.get("x-forwarded-for", "")
-                ip = forwarded.split(",")[0].strip() if forwarded else client_host
+                if not validate_zone(zone):
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Invalid zone name"
+                    })
+                    log_security_event("INVALID_ZONE", {"zone": str(zone)[:32]}, client_ip)
+                    continue
+
+                if not isinstance(listen_port, int) or listen_port < 1 or listen_port > 65535:
+                    listen_port = 9001
+
+                # Аутентификация
+                if settings.SIGNALING_AUTH_REQUIRED:
+                    if not verify_auth_token(device_id, timestamp, signature):
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": "Authentication failed"
+                        })
+                        log_security_event("AUTH_FAILED", {"device_id": device_id}, client_ip)
+                        await websocket.close(code=4001, reason="Authentication failed")
+                        return
 
                 # Перемещаем соединение с temp_id на реальный device_id
                 if temp_id in manager._connections:
                     del manager._connections[temp_id]
                 manager._connections[device_id] = websocket
 
-                # Регистрируем
-                peers = manager.register(device_id, app, zone, listen_port, ip)
+                # Регистрируем (IP скрыт по умолчанию)
+                peers = manager.register(device_id, app, zone, listen_port, client_ip, hide_ip=True)
 
                 # Сохраняем в Redis
                 try:
@@ -243,11 +438,10 @@ async def signaling_websocket(websocket: WebSocket):
                     logger.warning(f"Redis session error: {e}")
 
                 # Оповещаем других в зоне о новом пире
+                # IP не раскрываем
                 peer_info = {
                     "deviceId": device_id,
                     "zone": zone,
-                    "ip": ip,
-                    "port": listen_port,
                 }
                 await manager.broadcast_to_zone(zone, {
                     "type": "peer_joined",
@@ -280,6 +474,15 @@ async def signaling_websocket(websocket: WebSocket):
                     await websocket.send_json({
                         "type": "error",
                         "message": "target 'to' device is required"
+                    })
+                    continue
+
+                # Валидация signalType
+                valid_signal_types = {"offer", "answer", "ice-candidate"}
+                if signal_type not in valid_signal_types:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": f"Invalid signalType. Must be one of: {valid_signal_types}"
                     })
                     continue
 
@@ -325,7 +528,7 @@ async def signaling_websocket(websocket: WebSocket):
                 meta = manager._metadata.get(device_id)
                 if meta:
                     zone = meta.get("zone")
-                    peers = manager.get_peers_in_zone(zone, exclude=device_id)
+                    peers = manager.get_peers_in_zone(zone, exclude=device_id, for_device=device_id)
                     await websocket.send_json({
                         "type": "peers",
                         "peers": peers,
@@ -370,9 +573,13 @@ async def get_signaling_stats():
 @router.get("/signaling/online/{app}")
 async def get_online_devices(app: str):
     """Список онлайн устройств для приложения"""
+    if not validate_app(app):
+        return {"error": "Invalid app name"}
+
     try:
         users = await redis_service.get_online_users(app)
-        return {"app": app, "online_count": len(users), "devices": users}
+        # Возвращаем только количество, не раскрываем ID
+        return {"app": app, "online_count": len(users)}
     except Exception as e:
         logger.error(f"Failed to get online users: {e}")
-        return {"app": app, "online_count": 0, "devices": []}
+        return {"app": app, "online_count": 0}
