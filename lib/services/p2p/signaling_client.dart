@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:crypto/crypto.dart';
 
 /// Состояние подключения к сигнальному серверу
 enum SignalingState {
   disconnected,
   connecting,
   connected,
+  authenticating,
   error,
 }
 
@@ -15,27 +17,27 @@ enum SignalingState {
 class PeerInfo {
   final String deviceId;
   final String zone;
-  final String ip;
-  final int port;
+  final String? ip;
+  final int? port;
 
   PeerInfo({
     required this.deviceId,
     required this.zone,
-    required this.ip,
-    required this.port,
+    this.ip,
+    this.port,
   });
 
   factory PeerInfo.fromJson(Map<String, dynamic> json) {
     return PeerInfo(
       deviceId: json['deviceId'] as String,
       zone: json['zone'] as String,
-      ip: json['ip'] as String? ?? '',
-      port: json['port'] as int? ?? 9001,
+      ip: json['ip'] as String?,
+      port: json['port'] as int?,
     );
   }
 
   @override
-  String toString() => 'Peer($deviceId at $ip:$port, zone=$zone)';
+  String toString() => 'Peer($deviceId, zone=$zone)';
 }
 
 /// Конфигурация WebSocket signaling клиента
@@ -45,6 +47,7 @@ class SignalingConfig {
   final String app;
   final String zone;
   final int listenPort;
+  final String? authSecret;    // HMAC secret для аутентификации
   final Duration heartbeatInterval;
   final int maxReconnectAttempts;
   final Duration reconnectDelay;
@@ -55,6 +58,7 @@ class SignalingConfig {
     this.app = 'progulkin',
     required this.zone,
     this.listenPort = 9001,
+    this.authSecret,
     this.heartbeatInterval = const Duration(seconds: 30),
     this.maxReconnectAttempts = 5,
     this.reconnectDelay = const Duration(seconds: 3),
@@ -121,12 +125,11 @@ class SignalingClient {
     int listenPort = 9001,
     String app = 'progulkin',
     bool useWss = true,
+    String? authSecret,
   }) {
     final protocol = useWss ? 'wss' : 'ws';
-    final url = '$protocol://$serverPort/cm/ws/signaling';
-    // Если порт 443 или 80, не включаем его в URL
     final defaultPort = useWss ? 443 : 80;
-    final urlWithPort = serverPort == defaultPort
+    final urlWithPort = serverPort == defaultPort || serverPort == 9000
         ? '$protocol://$serverHost/cm/ws/signaling'
         : '$protocol://$serverHost:$serverPort/cm/ws/signaling';
 
@@ -137,6 +140,7 @@ class SignalingClient {
         app: app,
         zone: zone,
         listenPort: listenPort,
+        authSecret: authSecret,
       ),
     );
   }
@@ -168,6 +172,7 @@ class SignalingClient {
       );
 
       // Регистрируемся на сервере
+      _updateState(SignalingState.authenticating);
       await _register();
 
       // Запускаем heartbeat
@@ -226,15 +231,42 @@ class SignalingClient {
     });
   }
 
+  /// Генерация HMAC подписи
+  String _generateSignature(String timestamp) {
+    if (config.authSecret == null) return '';
+
+    final message = '${config.deviceId}:$timestamp';
+    final key = utf8.encode(config.authSecret!);
+    final bytes = utf8.encode(message);
+
+    final hmacSha256 = Hmac(sha256, key);
+    final digest = hmacSha256.convert(bytes);
+
+    return digest.toString();
+  }
+
   /// Регистрация на сервере
   Future<void> _register() async {
-    _send({
+    final timestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+
+    Map<String, dynamic> message = {
       'type': 'register',
       'deviceId': config.deviceId,
       'app': config.app,
       'zone': config.zone,
       'port': config.listenPort,
-    });
+      'timestamp': timestamp,
+    };
+
+    // Добавляем подпись если есть секрет
+    if (config.authSecret != null) {
+      message['signature'] = _generateSignature(timestamp);
+    }
+
+    _send(message);
+
+    // Ждем подтверждения регистрации (registered message)
+    // Это обрабатывается в _handleMessage
   }
 
   /// Обработка входящих данных

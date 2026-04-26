@@ -13,6 +13,7 @@ class P2PConfig {
   final String zone;
   final String deviceId;
   final String app;
+  final String? authSecret;  // HMAC secret для аутентификации (получить с сервера)
   final Duration syncInterval;
   final int listenPort;
   final ConflictResolution conflictResolution;
@@ -22,6 +23,7 @@ class P2PConfig {
     required this.zone,
     required this.deviceId,
     this.app = 'progulkin',
+    this.authSecret,
     this.syncInterval = const Duration(seconds: 30),
     this.listenPort = 9001,
     this.conflictResolution = ConflictResolution.lastWriteWins,
@@ -34,6 +36,7 @@ class P2PConfig {
     required String zone,
     required String deviceId,
     String app = 'progulkin',
+    String? authSecret,
     Duration syncInterval = const Duration(seconds: 30),
     int listenPort = 9001,
     ConflictResolution conflictResolution = ConflictResolution.lastWriteWins,
@@ -50,6 +53,7 @@ class P2PConfig {
       zone: zone,
       deviceId: deviceId,
       app: app,
+      authSecret: authSecret,
       syncInterval: syncInterval,
       listenPort: listenPort,
       conflictResolution: conflictResolution,
@@ -164,6 +168,7 @@ class P2PService {
           app: config.app,
           zone: config.zone,
           listenPort: config.listenPort,
+          authSecret: config.authSecret,
         ),
       );
 
