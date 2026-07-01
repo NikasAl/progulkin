@@ -248,7 +248,7 @@ class _HabitatDebugScreenState extends State<HabitatDebugScreen> {
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.progulkin',
+                  userAgentPackageName: 'ru.kreagenium.progulkin',
                   maxZoom: 19,
                 ),
                 // Маркеры habitats

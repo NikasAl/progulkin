@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/planned_route.dart';
 import '../providers/route_provider.dart';
 import '../services/location_service.dart';
+import '../services/tile_cache_service.dart';
 import '../di/service_locator.dart';
 import '../utils/snackbar_helper.dart';
 
@@ -20,6 +21,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final MapController _mapController = MapController();
   final LocationService _locationService = getIt<LocationService>();
+  final TileCacheService _tileCacheService = getIt<TileCacheService>();
 
   // Временные точки для нового маршрута
   final List<LatLng> _currentWaypoints = [];
@@ -30,6 +32,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   PlannedRoute? _editingRoute;
 
   bool _isLoading = true;
+  bool _cacheReady = false;
 
   @override
   void initState() {
@@ -39,6 +42,13 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
 
   Future<void> _initScreen() async {
     try {
+      // Инициализируем кэш тайлов (для оффлайн работы)
+      try {
+        await _tileCacheService.init();
+      } catch (e) {
+        debugPrint('Ошибка инициализации кэша тайлов: $e');
+      }
+
       final position = await _locationService.getCurrentPosition();
       if (position != null) {
         _currentPosition = LatLng(position.latitude, position.longitude);
@@ -47,9 +57,12 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       debugPrint('Ошибка получения позиции: $e');
     }
 
-    setState(() {
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _cacheReady = _tileCacheService.isInitialized;
+      });
+    }
   }
 
   void _onMapTap(TapPosition tapPosition, LatLng point) {
@@ -296,6 +309,9 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'ru.kreagenium.progulkin',
                 maxZoom: 19,
+                tileProvider: _tileCacheService.isInitialized
+                    ? _tileCacheService.getTileProvider()
+                    : null,
               ),
               // Текущий редактируемый маршрут
               if (_currentWaypoints.length >= 2)

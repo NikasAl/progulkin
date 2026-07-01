@@ -70,7 +70,7 @@ class _WalkDetailScreenState extends State<WalkDetailScreen> {
                       children: [
                         TileLayer(
                           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.example.progulkin',
+                          userAgentPackageName: 'ru.kreagenium.progulkin',
                           maxZoom: 19,
                           // Используем кэшированные тайлы если доступны
                           tileProvider: _tileCacheService.isInitialized 

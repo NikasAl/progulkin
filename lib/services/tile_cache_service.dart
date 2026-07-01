@@ -178,14 +178,14 @@ class TileCacheService {
           maxZoom: zoom,
           options: TileLayer(
             urlTemplate: _tileUrl,
-            userAgentPackageName: 'com.example.progulkin',
+            userAgentPackageName: 'ru.kreagenium.progulkin',
           ),
         );
-        
+
         // Получаем количество тайлов для этого региона
         final tileCount = await store.download.check(downloadable);
         _totalTiles += tileCount;
-        
+
         // Запускаем загрузку
         try {
           final download = store.download.startForeground(
@@ -193,13 +193,13 @@ class TileCacheService {
             parallelThreads: 4,
             skipExistingTiles: true,
           );
-          
+
           await for (final progress in download) {
             _downloadedTiles = progress.cachedTiles;
             _downloadProgress = progress.percentageProgress / 100.0;
-            
+
             onProgress?.call(_downloadProgress, _downloadedTiles, _totalTiles);
-            
+
             if (progress.isComplete) {
               totalDownloaded += progress.cachedTiles;
               debugPrint('TileCacheService: Zoom $zoom завершён, загружено ${progress.cachedTiles} тайлов');
@@ -269,16 +269,16 @@ class TileCacheService {
       
       for (final zoom in zoomLevels) {
         final region = RectangleRegion(bounds);
-        
+
         final downloadable = region.toDownloadable(
           minZoom: zoom,
           maxZoom: zoom,
           options: TileLayer(
             urlTemplate: _tileUrl,
-            userAgentPackageName: 'com.example.progulkin',
+            userAgentPackageName: 'ru.kreagenium.progulkin',
           ),
         );
-        
+
         _totalTiles += await store.download.check(downloadable);
         
         try {

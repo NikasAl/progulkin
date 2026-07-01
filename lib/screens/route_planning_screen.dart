@@ -445,8 +445,11 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
               // Слой тайлов
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.progulkin',
+                userAgentPackageName: 'ru.kreagenium.progulkin',
                 maxZoom: 19,
+                tileProvider: _tileCacheService.isInitialized
+                    ? _tileCacheService.getTileProvider()
+                    : null,
               ),
               // Слой маршрута
               if (_waypoints.length >= 2)

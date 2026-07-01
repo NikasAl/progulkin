@@ -262,6 +262,9 @@ class _CacheMapsScreenState extends State<CacheMapsScreen> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'ru.kreagenium.progulkin',
                 maxZoom: 19,
+                tileProvider: _tileCacheService.isInitialized
+                    ? _tileCacheService.getTileProvider()
+                    : null,
               ),
               // Маркер текущей позиции
               if (_currentPosition != null)
