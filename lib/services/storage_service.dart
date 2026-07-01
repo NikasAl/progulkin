@@ -2,66 +2,303 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/walk.dart';
+import '../models/walk_point.dart';
+
+/// Лёгкие метаданные прогулки (без точек трека) - для списков
+class WalkMetadata {
+  final String id;
+  final DateTime startTime;
+  final DateTime? endTime;
+  final int steps;
+  final String? name;
+  final String? notes;
+  final DistanceSource distanceSource;
+  final double stepLength;
+  final Duration totalPauseDuration;
+  final WalkObjectStats objectStats;
+  /// Кешированное расстояние (для быстрого отображения)
+  final double cachedDistance;
+
+  const WalkMetadata({
+    required this.id,
+    required this.startTime,
+    this.endTime,
+    this.steps = 0,
+    this.name,
+    this.notes,
+    this.distanceSource = DistanceSource.pedometer,
+    this.stepLength = 0.75,
+    this.totalPauseDuration = Duration.zero,
+    this.objectStats = const WalkObjectStats(),
+    this.cachedDistance = 0,
+  });
+
+  /// Создание из Walk (без точек)
+  factory WalkMetadata.fromWalk(Walk walk) {
+    return WalkMetadata(
+      id: walk.id,
+      startTime: walk.startTime,
+      endTime: walk.endTime,
+      steps: walk.steps,
+      name: walk.name,
+      notes: walk.notes,
+      distanceSource: walk.distanceSource,
+      stepLength: walk.stepLength,
+      totalPauseDuration: walk.totalPauseDuration,
+      objectStats: walk.objectStats,
+      cachedDistance: walk.totalDistance,
+    );
+  }
+
+  /// Продолжительность
+  Duration get duration {
+    final total = endTime != null
+        ? endTime!.difference(startTime)
+        : DateTime.now().difference(startTime);
+    return total - totalPauseDuration;
+  }
+
+  String get formattedDuration {
+    final d = duration;
+    final hours = d.inHours;
+    final minutes = d.inMinutes.remainder(60);
+    final seconds = d.inSeconds.remainder(60);
+    if (hours > 0) return '$hoursч $minutesмин';
+    if (minutes > 0) return '$minutesмин $secondsсек';
+    return '$secondsсек';
+  }
+
+  String get formattedDistance {
+    if (cachedDistance >= 1000) {
+      return '${(cachedDistance / 1000).toStringAsFixed(2)} км';
+    }
+    return '${cachedDistance.toStringAsFixed(0)} м';
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'startTime': startTime.toIso8601String(),
+    'endTime': endTime?.toIso8601String(),
+    'steps': steps,
+    'name': name,
+    'notes': notes,
+    'distanceSource': distanceSource.index,
+    'stepLength': stepLength,
+    'totalPauseDuration': totalPauseDuration.inSeconds,
+    'objectStats': objectStats.toMap(),
+    'cachedDistance': cachedDistance,
+  };
+
+  factory WalkMetadata.fromMap(Map<String, dynamic> map) {
+    return WalkMetadata(
+      id: map['id'] as String,
+      startTime: DateTime.parse(map['startTime'] as String),
+      endTime: map['endTime'] != null
+          ? DateTime.parse(map['endTime'] as String)
+          : null,
+      steps: map['steps'] as int? ?? 0,
+      name: map['name'] as String?,
+      notes: map['notes'] as String?,
+      distanceSource: DistanceSource.values[map['distanceSource'] as int? ?? 1],
+      stepLength: (map['stepLength'] as num?)?.toDouble() ?? 0.75,
+      totalPauseDuration: Duration(seconds: map['totalPauseDuration'] as int? ?? 0),
+      objectStats: map['objectStats'] != null
+          ? WalkObjectStats.fromMap(map['objectStats'] as Map<String, dynamic>)
+          : null,
+      cachedDistance: (map['cachedDistance'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
 
 /// Сервис для хранения данных прогулок
+/// 
+/// Использует разделённое хранение:
+/// - `walks_meta` - список метаданных (быстро, мало данных)
+/// - `walk_points_{id}` - точки трека каждой прогулки отдельно
+/// 
+/// Это позволяет быстро загружать список прогулок без тяжёлых точек.
 class StorageService {
-  static const String _walksKey = 'saved_walks';
+  static const String _walksMetaKey = 'walks_meta';
+  static const String _walkPointsPrefix = 'walk_points_';
+  static const String _legacyWalksKey = 'saved_walks';  // Старый формат
   static const String _settingsKey = 'app_settings';
-  
+  static const String _migrationDoneKey = 'walks_migration_done';
+
   SharedPreferences? _prefs;
+
+  /// Кэш метаданных в памяти (быстрый доступ)
+  List<WalkMetadata>? _metaCache;
 
   /// Инициализация
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    await _migrateIfNeeded();
   }
 
-  /// Сохранение прогулки
-  Future<bool> saveWalk(Walk walk) async {
+  /// Миграция со старого формата (один JSON blob) на новый (meta + points)
+  Future<void> _migrateIfNeeded() async {
+    final migrated = _prefs?.getBool(_migrationDoneKey) ?? false;
+    if (migrated) return;
+
+    final legacyJson = _prefs?.getString(_legacyWalksKey);
+    if (legacyJson == null || legacyJson.isEmpty) {
+      await _prefs?.setBool(_migrationDoneKey, true);
+      return;
+    }
+
     try {
-      final walks = await getAllWalks();
-      
-      // Обновляем или добавляем прогулку
-      final index = walks.indexWhere((w) => w.id == walk.id);
-      if (index >= 0) {
-        walks[index] = walk;
-      } else {
-        walks.insert(0, walk);
+      final List<dynamic> walksJson = jsonDecode(legacyJson);
+      final metas = <WalkMetadata>[];
+
+      for (final json in walksJson) {
+        final walk = Walk.fromMap(json as Map<String, dynamic>);
+        final meta = WalkMetadata.fromWalk(walk);
+        metas.add(meta);
+
+        // Сохраняем точки отдельно
+        final pointsJson = walk.points.map((p) => p.toMap()).toList();
+        await _prefs?.setString(
+          '$_walkPointsPrefix${walk.id}',
+          jsonEncode(pointsJson),
+        );
       }
 
-      // Сериализуем в JSON
-      final walksJson = walks.map((w) => w.toMap()).toList();
-      final jsonString = jsonEncode(walksJson);
+      // Сохраняем метаданные
+      final metasJson = metas.map((m) => m.toMap()).toList();
+      await _prefs?.setString(_walksMetaKey, jsonEncode(metasJson));
+
+      // Удаляем старый ключ
+      await _prefs?.remove(_legacyWalksKey);
+      await _prefs?.setBool(_migrationDoneKey, true);
+
+      debugPrint('StorageService: Миграция завершена, ${metas.length} прогулок');
+    } catch (e) {
+      debugPrint('StorageService: Ошибка миграции: $e');
+      // Помечаем как выполненную, чтобы не повторять
+      await _prefs?.setBool(_migrationDoneKey, true);
+    }
+  }
+
+  /// Сохранение прогулки (метаданные + точки)
+  Future<bool> saveWalk(Walk walk) async {
+    try {
+      final metas = await _getMetasInternal();
       
-      return await _prefs!.setString(_walksKey, jsonString);
+      final meta = WalkMetadata.fromWalk(walk);
+      final index = metas.indexWhere((m) => m.id == walk.id);
+      if (index >= 0) {
+        metas[index] = meta;
+      } else {
+        metas.insert(0, meta);
+      }
+
+      // Сохраняем метаданные
+      final metasJson = metas.map((m) => m.toMap()).toList();
+      await _prefs!.setString(_walksMetaKey, jsonEncode(metasJson));
+
+      // Сохраняем точки отдельно
+      final pointsJson = walk.points.map((p) => p.toMap()).toList();
+      await _prefs!.setString(
+        '$_walkPointsPrefix${walk.id}',
+        jsonEncode(pointsJson),
+      );
+
+      // Инвалидируем кэш
+      _metaCache = null;
+
+      return true;
     } catch (e) {
       debugPrint('Ошибка сохранения прогулки: $e');
       return false;
     }
   }
 
-  /// Получение всех прогулок
-  Future<List<Walk>> getAllWalks() async {
+  /// Получить ВСЕ метаданные прогулок (быстро, без точек)
+  Future<List<WalkMetadata>> getAllWalksMetadata() async {
+    return _getMetasInternal();
+  }
+
+  /// Внутренний метод получения метаданных с кэшированием
+  Future<List<WalkMetadata>> _getMetasInternal() async {
+    if (_metaCache != null) return _metaCache!;
+
     try {
-      final jsonString = _prefs?.getString(_walksKey);
+      final jsonString = _prefs?.getString(_walksMetaKey);
       if (jsonString == null || jsonString.isEmpty) {
-        return [];
+        _metaCache = [];
+        return _metaCache!;
       }
 
-      final List<dynamic> walksJson = jsonDecode(jsonString);
-      return walksJson
-          .map((json) => Walk.fromMap(json as Map<String, dynamic>))
+      final List<dynamic> metasJson = jsonDecode(jsonString);
+      _metaCache = metasJson
+          .map((json) => WalkMetadata.fromMap(json as Map<String, dynamic>))
           .toList();
+      return _metaCache!;
     } catch (e) {
-      debugPrint('Ошибка загрузки прогулок: $e');
-      return [];
+      debugPrint('Ошибка загрузки метаданных: $e');
+      _metaCache = [];
+      return _metaCache!;
     }
   }
 
-  /// Получение прогулки по ID
+  /// Получить метаданные с пагинацией
+  /// 
+  /// [limit] - количество записей
+  /// [offset] - смещение (для пагинации)
+  Future<List<WalkMetadata>> getWalksMetadataPaginated({
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final metas = await _getMetasInternal();
+    if (offset >= metas.length) return [];
+    final end = (offset + limit > metas.length) ? metas.length : offset + limit;
+    return metas.sublist(offset, end);
+  }
+
+  /// Количество прогулок
+  Future<int> getWalksCount() async {
+    final metas = await _getMetasInternal();
+    return metas.length;
+  }
+
+  /// Получить полный Walk (с точками) по ID
   Future<Walk?> getWalkById(String id) async {
-    final walks = await getAllWalks();
     try {
-      return walks.firstWhere((w) => w.id == id);
+      final metas = await _getMetasInternal();
+      final meta = metas.firstWhere((m) => m.id == id);
+
+      final pointsJson = _prefs?.getString('$_walkPointsPrefix$id');
+      List<WalkPoint> points = [];
+      if (pointsJson != null && pointsJson.isNotEmpty) {
+        final List<dynamic> pointsList = jsonDecode(pointsJson);
+        points = pointsList
+            .map((p) => WalkPoint.fromMap(p as Map<String, dynamic>))
+            .toList();
+      }
+
+      return Walk(
+        id: meta.id,
+        startTime: meta.startTime,
+        endTime: meta.endTime,
+        points: points,
+        steps: meta.steps,
+        name: meta.name,
+        notes: meta.notes,
+        distanceSource: meta.distanceSource,
+        stepLength: meta.stepLength,
+        totalPauseDuration: meta.totalPauseDuration,
+        objectStats: meta.objectStats,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Получить метаданные прогулки по ID (быстро, без точек)
+  Future<WalkMetadata?> getWalkMetadataById(String id) async {
+    final metas = await _getMetasInternal();
+    try {
+      return metas.firstWhere((m) => m.id == id);
     } catch (_) {
       return null;
     }
@@ -70,13 +307,17 @@ class StorageService {
   /// Удаление прогулки
   Future<bool> deleteWalk(String id) async {
     try {
-      final walks = await getAllWalks();
-      walks.removeWhere((w) => w.id == id);
-      
-      final walksJson = walks.map((w) => w.toMap()).toList();
-      final jsonString = jsonEncode(walksJson);
-      
-      return await _prefs!.setString(_walksKey, jsonString);
+      final metas = await _getMetasInternal();
+      metas.removeWhere((m) => m.id == id);
+
+      final metasJson = metas.map((m) => m.toMap()).toList();
+      await _prefs!.setString(_walksMetaKey, jsonEncode(metasJson));
+
+      // Удаляем точки
+      await _prefs!.remove('$_walkPointsPrefix$id');
+
+      _metaCache = null;
+      return true;
     } catch (e) {
       debugPrint('Ошибка удаления прогулки: $e');
       return false;
@@ -85,7 +326,21 @@ class StorageService {
 
   /// Удаление всех прогулок
   Future<bool> deleteAllWalks() async {
-    return await _prefs!.remove(_walksKey);
+    try {
+      final metas = await _getMetasInternal();
+
+      // Удаляем все точки
+      for (final meta in metas) {
+        await _prefs!.remove('$_walkPointsPrefix${meta.id}');
+      }
+
+      await _prefs!.remove(_walksMetaKey);
+      _metaCache = null;
+      return true;
+    } catch (e) {
+      debugPrint('Ошибка удаления всех прогулок: $e');
+      return false;
+    }
   }
 
   /// Сохранение настроек
@@ -117,36 +372,34 @@ class StorageService {
     return {
       'autoPause': true,
       'voiceAnnouncements': false,
-      'units': 'metric', // metric / imperial
-      'mapType': 'standard', // standard / satellite / hybrid
+      'units': 'metric',
+      'mapType': 'standard',
     };
   }
 
-  /// Статистика
+  /// Статистика (использует метаданные - быстро)
   Future<Map<String, dynamic>> getStatistics() async {
-    final walks = await getAllWalks();
-    
+    final metas = await _getMetasInternal();
+
     double totalDistance = 0;
     int totalSteps = 0;
     Duration totalDuration = Duration.zero;
-    
-    for (final walk in walks) {
-      totalDistance += walk.totalDistance;
-      totalSteps += walk.steps;
-      totalDuration += walk.duration;
+
+    for (final meta in metas) {
+      totalDistance += meta.cachedDistance;
+      totalSteps += meta.steps;
+      totalDuration += meta.duration;
     }
 
-    // Недельная статистика
     final weekStats = await getWeekStatistics();
 
     return {
-      'totalWalks': walks.length,
+      'totalWalks': metas.length,
       'totalDistance': totalDistance,
       'totalSteps': totalSteps,
       'totalDuration': totalDuration,
-      'averageDistance': walks.isNotEmpty ? totalDistance / walks.length : 0,
-      'averageSteps': walks.isNotEmpty ? totalSteps / walks.length : 0,
-      // Недельная статистика
+      'averageDistance': metas.isNotEmpty ? totalDistance / metas.length : 0,
+      'averageSteps': metas.isNotEmpty ? totalSteps / metas.length : 0,
       'weekWalks': weekStats['walks'],
       'weekDistance': weekStats['distance'],
       'weekSteps': weekStats['steps'],
@@ -160,16 +413,15 @@ class StorageService {
     final now = DateTime.now();
     final startDate = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
     final endDate = startDate.add(const Duration(days: 7));
-    
-    final walks = await getWalksByDateRange(startDate, endDate);
-    
+
+    final metas = await getWalksMetadataByDateRange(startDate, endDate);
+
     double totalDistance = 0;
     int totalSteps = 0;
     Duration totalDuration = Duration.zero;
-    
-    // Группируем по дням
+
     final dailyStats = <DateTime, Map<String, dynamic>>{};
-    
+
     for (int i = 0; i < 7; i++) {
       final day = startDate.add(Duration(days: i));
       dailyStats[day] = {
@@ -179,23 +431,22 @@ class StorageService {
         'walks': 0,
       };
     }
-    
-    for (final walk in walks) {
-      totalDistance += walk.totalDistance;
-      totalSteps += walk.steps;
-      totalDuration += walk.duration;
-      
-      // Находим день прогулки
-      final walkDay = DateTime(walk.startTime.year, walk.startTime.month, walk.startTime.day);
+
+    for (final meta in metas) {
+      totalDistance += meta.cachedDistance;
+      totalSteps += meta.steps;
+      totalDuration += meta.duration;
+
+      final walkDay = DateTime(meta.startTime.year, meta.startTime.month, meta.startTime.day);
       if (dailyStats.containsKey(walkDay)) {
-        dailyStats[walkDay]!['distance'] = (dailyStats[walkDay]!['distance'] as double) + walk.totalDistance;
-        dailyStats[walkDay]!['steps'] = (dailyStats[walkDay]!['steps'] as int) + walk.steps;
+        dailyStats[walkDay]!['distance'] = (dailyStats[walkDay]!['distance'] as double) + meta.cachedDistance;
+        dailyStats[walkDay]!['steps'] = (dailyStats[walkDay]!['steps'] as int) + meta.steps;
         dailyStats[walkDay]!['walks'] = (dailyStats[walkDay]!['walks'] as int) + 1;
       }
     }
-    
+
     return {
-      'walks': walks.length,
+      'walks': metas.length,
       'distance': totalDistance,
       'steps': totalSteps,
       'duration': totalDuration,
@@ -203,42 +454,14 @@ class StorageService {
     };
   }
 
-  /// Получение прогулок за период
-  Future<List<Walk>> getWalksByDateRange(
+  /// Получение метаданных за период
+  Future<List<WalkMetadata>> getWalksMetadataByDateRange(
     DateTime start,
     DateTime end,
   ) async {
-    final walks = await getAllWalks();
-    return walks.where((w) {
-      return w.startTime.isAfter(start) && w.startTime.isBefore(end);
+    final metas = await _getMetasInternal();
+    return metas.where((m) {
+      return m.startTime.isAfter(start) && m.startTime.isBefore(end);
     }).toList();
-  }
-
-  /// Получение прогулок за сегодня
-  Future<List<Walk>> getTodayWalks() async {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
-    
-    return getWalksByDateRange(startOfDay, endOfDay);
-  }
-
-  /// Получение прогулок за неделю
-  Future<List<Walk>> getWeekWalks() async {
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-    final end = start.add(const Duration(days: 7));
-    
-    return getWalksByDateRange(start, end);
-  }
-
-  /// Получение прогулок за месяц
-  Future<List<Walk>> getMonthWalks() async {
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    final endOfMonth = DateTime(now.year, now.month + 1, 0);
-    
-    return getWalksByDateRange(startOfMonth, endOfMonth);
   }
 }

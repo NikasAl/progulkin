@@ -3,12 +3,51 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/walk_provider.dart';
 import '../models/walk.dart';
+import '../services/storage_service.dart';
 import '../widgets/stats_widget.dart';
 import 'walk_detail_screen.dart';
 
-/// Экран истории прогулок
-class HistoryScreen extends StatelessWidget {
+/// Экран истории прогулок с пагинацией
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
+
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  final ScrollController _scrollController = ScrollController();
+  Future<Map<String, dynamic>>? _statsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    // Кэшируем Future чтобы getStatistics вызывался один раз
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final walkProvider = context.read<WalkProvider>();
+      _statsFuture = walkProvider.getStatistics();
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Обработчик прокрутки для пагинации
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      final walkProvider = context.read<WalkProvider>();
+      if (walkProvider.hasMore && !walkProvider.isLoadingMore) {
+        walkProvider.loadMoreWalks();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,50 +74,70 @@ class HistoryScreen extends StatelessWidget {
             return _buildEmptyState(context);
           }
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                // Расширенная статистика
-                _buildExtendedStatisticsCard(context, walkProvider),
-                
-                // График по дням
-                _buildWeeklyChart(context, walkProvider),
-                
-                // Список прогулок
+          return ListView(
+            controller: _scrollController,
+            padding: const EdgeInsets.only(bottom: 80),
+            children: [
+              // Расширенная статистика
+              if (_statsFuture != null)
+                _buildExtendedStatisticsCard(context, _statsFuture!),
+
+              // График по дням
+              if (_statsFuture != null)
+                _buildWeeklyChart(context, _statsFuture!),
+
+              // Заголовок списка прогулок
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Text(
+                      'Прогулки',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${walkProvider.totalCount} записей',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Список прогулок (пагинированный)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: List.generate(walks.length, (index) {
+                    return _buildWalkCard(context, walks[index], walkProvider);
+                  }),
+                ),
+              ),
+
+              // Индикатор загрузки следующей страницы
+              if (walkProvider.isLoadingMore)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+
+              // Индикатор "загружено всё"
+              if (!walkProvider.hasMore && walks.length > 5)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Прогулки',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${walks.length} записей',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: Text(
+                      'Все прогулки загружены',
+                      style: TextStyle(color: Colors.grey[500]),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                
-                // Список прогулок (ограниченная высота для прокрутки)
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  itemCount: walks.length,
-                  itemBuilder: (context, index) {
-                    return _buildWalkCard(context, walks[index], walkProvider);
-                  },
-                ),
-              ],
-            ),
+            ],
           );
         },
       ),
@@ -116,12 +175,15 @@ class HistoryScreen extends StatelessWidget {
   }
 
   /// Расширенная карточка статистики
-  Widget _buildExtendedStatisticsCard(BuildContext context, WalkProvider walkProvider) {
+  Widget _buildExtendedStatisticsCard(
+    BuildContext context,
+    Future<Map<String, dynamic>> statsFuture,
+  ) {
     return FutureBuilder<Map<String, dynamic>>(
-      future: walkProvider.getStatistics(),
+      future: statsFuture,
       builder: (context, snapshot) {
         final stats = snapshot.data ?? {};
-        
+
         return Container(
           margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -159,7 +221,7 @@ class HistoryScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Два ряда: неделя и всего
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -193,7 +255,7 @@ class HistoryScreen extends StatelessWidget {
       },
     );
   }
-  
+
   /// Ряд статистики
   Widget _buildStatsRow(
     BuildContext context, {
@@ -262,28 +324,31 @@ class HistoryScreen extends StatelessWidget {
   }
 
   /// График по дням за неделю
-  Widget _buildWeeklyChart(BuildContext context, WalkProvider walkProvider) {
+  Widget _buildWeeklyChart(
+    BuildContext context,
+    Future<Map<String, dynamic>> statsFuture,
+  ) {
     return FutureBuilder<Map<String, dynamic>>(
-      future: walkProvider.getStatistics(),
+      future: statsFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const SizedBox.shrink();
         }
-        
+
         final dailyStats = snapshot.data!['dailyStats'] as List<dynamic>? ?? [];
         if (dailyStats.isEmpty) {
           return const SizedBox.shrink();
         }
-        
+
         return _WeeklyChartContainer(dailyStats: dailyStats);
       },
     );
   }
 
-  /// Карточка прогулки
+  /// Карточка прогулки (использует метаданные - быстро)
   Widget _buildWalkCard(
     BuildContext context,
-    Walk walk,
+    WalkMetadata walk,
     WalkProvider walkProvider,
   ) {
     final dateFormat = DateFormat('dd MMM yyyy', 'ru_RU');
@@ -295,7 +360,7 @@ class HistoryScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: InkWell(
-        onTap: () => _openWalkDetail(context, walk),
+        onTap: () => _openWalkDetail(context, walk.id),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -331,7 +396,7 @@ class HistoryScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Статистика прогулки
               Row(
                 children: [
@@ -361,7 +426,7 @@ class HistoryScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              
+
               // Кнопка удаления
               Align(
                 alignment: Alignment.centerRight,
@@ -430,14 +495,36 @@ class HistoryScreen extends StatelessWidget {
     return '$number';
   }
 
-  /// Открыть детали прогулки
-  void _openWalkDetail(BuildContext context, Walk walk) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => WalkDetailScreen(walk: walk),
-      ),
+  /// Открыть детали прогулки (загружает полный Walk с точками)
+  Future<void> _openWalkDetail(BuildContext context, String walkId) async {
+    final walkProvider = context.read<WalkProvider>();
+
+    // Показываем индикатор загрузки
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
+
+    // Загружаем полный Walk (с точками) из кэша или хранилища
+    final walk = await walkProvider.getWalkDetails(walkId);
+
+    if (!mounted) return;
+    Navigator.pop(context); // Закрываем индикатор
+
+    if (walk != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => WalkDetailScreen(walk: walk),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось загрузить прогулку')),
+      );
+    }
   }
 
   /// Подтверждение удаления
@@ -482,9 +569,14 @@ class HistoryScreen extends StatelessWidget {
             child: const Text('Отмена'),
           ),
           TextButton(
-            onPressed: () {
-              // TODO: Implement clear all
+            onPressed: () async {
+              await context.read<WalkProvider>().clearAllWalks();
+              if (!mounted) return;
               Navigator.pop(context);
+              // Обновляем статистику
+              setState(() {
+                _statsFuture = context.read<WalkProvider>().getStatistics();
+              });
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Очистить'),
@@ -498,9 +590,9 @@ class HistoryScreen extends StatelessWidget {
 /// Контейнер графика с переключателем
 class _WeeklyChartContainer extends StatefulWidget {
   final List<dynamic> dailyStats;
-  
+
   const _WeeklyChartContainer({required this.dailyStats});
-  
+
   @override
   State<_WeeklyChartContainer> createState() => _WeeklyChartContainerState();
 }
@@ -509,7 +601,7 @@ class _WeeklyChartContainerState extends State<_WeeklyChartContainer> {
   /// true = показывать шаги, false = показывать расстояние
   bool _showSteps = false;
   static const Color _weeklyAccentColor = Colors.green;
-  
+
   @override
   Widget build(BuildContext context) {
     // Находим максимальные значения для масштабирования
@@ -521,9 +613,9 @@ class _WeeklyChartContainerState extends State<_WeeklyChartContainer> {
       if (dist > maxDistance) maxDistance = dist;
       if (steps > maxSteps) maxSteps = steps;
     }
-    
+
     final maxStepsDouble = maxSteps.toDouble();
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -553,7 +645,7 @@ class _WeeklyChartContainerState extends State<_WeeklyChartContainer> {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Переключатель
           Container(
             decoration: BoxDecoration(
@@ -577,7 +669,7 @@ class _WeeklyChartContainerState extends State<_WeeklyChartContainer> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // График
           SizedBox(
             height: 150,
@@ -591,7 +683,7 @@ class _WeeklyChartContainerState extends State<_WeeklyChartContainer> {
       ),
     );
   }
-  
+
   Widget _buildToggleButton({
     required String label,
     required bool isSelected,
@@ -623,19 +715,19 @@ class _WeeklyChart extends StatelessWidget {
   final List<dynamic> dailyStats;
   final double maxValue;
   final bool showSteps;
-  
+
   const _WeeklyChart({
     required this.dailyStats,
     required this.maxValue,
     required this.showSteps,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final weekdayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
-    
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -644,30 +736,30 @@ class _WeeklyChart extends StatelessWidget {
         final distance = (day['distance'] as num?)?.toDouble() ?? 0;
         final steps = (day['steps'] as int?) ?? 0;
         final date = day['date'] as DateTime?;
-        
+
         // Определяем название дня
         String dayName = '';
         if (date != null) {
           final weekday = date.weekday; // 1 = понедельник
           dayName = weekdayNames[weekday - 1];
         }
-        
+
         // Проверяем, является ли этот день сегодняшним
-        final isToday = date != null && 
-            date.year == todayDate.year && 
-            date.month == todayDate.month && 
+        final isToday = date != null &&
+            date.year == todayDate.year &&
+            date.month == todayDate.month &&
             date.day == todayDate.day;
-        
+
         // Значение для отображения
         final value = showSteps ? steps.toDouble() : distance;
         final displayMaxValue = showSteps ? maxValue : (maxValue / 1000);
         final normalizedValue = showSteps ? value : (value / 1000);
-        
+
         // Высота столбца
-        final barHeight = displayMaxValue > 0 
-            ? (normalizedValue / displayMaxValue * 100).clamp(4.0, 100.0) 
+        final barHeight = displayMaxValue > 0
+            ? (normalizedValue / displayMaxValue * 100).clamp(4.0, 100.0)
             : 4.0;
-        
+
         return _DayColumn(
           dayName: dayName,
           value: value,
@@ -688,7 +780,7 @@ class _DayColumn extends StatelessWidget {
   final bool isToday;
   final bool showSteps;
   static const Color _weeklyAccentColor = Colors.green;
-  
+
   const _DayColumn({
     required this.dayName,
     required this.value,
@@ -696,7 +788,7 @@ class _DayColumn extends StatelessWidget {
     required this.isToday,
     required this.showSteps,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     // Форматируем значение для отображения
@@ -720,7 +812,7 @@ class _DayColumn extends StatelessWidget {
         displayValue = '';
       }
     }
-    
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -736,9 +828,9 @@ class _DayColumn extends StatelessWidget {
           )
         else
           const SizedBox(height: 12),
-        
+
         const SizedBox(height: 4),
-        
+
         // Столбец
         Container(
           width: 28,
@@ -758,9 +850,9 @@ class _DayColumn extends StatelessWidget {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
           ),
         ),
-        
+
         const SizedBox(height: 4),
-        
+
         // Название дня
         Text(
           dayName,

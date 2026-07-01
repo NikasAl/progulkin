@@ -126,6 +126,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     try {
       await _tileCacheService.init();
+      // Перерисовываем карту после инициализации кэша
+      // (иначе при запуске без интернета карта может остаться пустой)
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       debugPrint('Ошибка инициализации кэша тайлов: $e');
     }
@@ -563,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.progulkin',
+          userAgentPackageName: 'ru.kreagenium.progulkin',
           maxZoom: 19,
           tileProvider: _tileCacheService.isInitialized
               ? _tileCacheService.getTileProvider()
@@ -805,15 +810,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             action: SnackBarAction(
               label: 'Открыть',
               textColor: Colors.white,
-              onPressed: () {
+              onPressed: () async {
                 if (walkProvider.walksHistory.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          WalkDetailScreen(walk: walkProvider.walksHistory.first),
-                    ),
+                  final meta = walkProvider.walksHistory.first;
+                  // Показываем индикатор загрузки
+                  if (!mounted) return;
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(child: CircularProgressIndicator()),
                   );
+                  final walk = await walkProvider.getWalkDetails(meta.id);
+                  if (!mounted) return;
+                  Navigator.pop(context); // Закрываем индикатор
+                  if (walk != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => WalkDetailScreen(walk: walk),
+                      ),
+                    );
+                  }
                 }
               },
             ),

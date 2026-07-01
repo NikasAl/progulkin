@@ -23,11 +23,24 @@ class WalkProvider extends ChangeNotifier {
         _pedometerService = pedometerService;
 
   Walk? _currentWalk;
-  List<Walk> _walksHistory = [];
+  
+  /// Список метаданных прогулок (без точек - для быстрого отображения)
+  List<WalkMetadata> _walksHistory = [];
+  
+  /// Кэш полных прогулок (с точками) - загружается по требованию
+  final Map<String, Walk> _walksCache = {};
+  
   bool _isTracking = false;
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   String? _error;
   StreamSubscription<WalkPoint>? _positionSubscription;
+  
+  /// Пагинация
+  static const int _pageSize = 20;
+  int _currentPage = 0;
+  bool _hasMore = true;
+  int _totalCount = 0;
   
   // Время паузы для корректного отображения duration
   DateTime? _pauseStartTime;
@@ -39,9 +52,12 @@ class WalkProvider extends ChangeNotifier {
 
   // Геттеры
   Walk? get currentWalk => _currentWalk;
-  List<Walk> get walksHistory => _walksHistory;
+  List<WalkMetadata> get walksHistory => _walksHistory;
   bool get isTracking => _isTracking;
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
+  bool get hasMore => _hasMore;
+  int get totalCount => _totalCount;
   String? get error => _error;
   bool get hasActiveWalk => _currentWalk != null && _currentWalk!.isActive;
   DistanceSource get distanceSource => _distanceSource;
@@ -86,14 +102,23 @@ class WalkProvider extends ChangeNotifier {
     return '$secondsсек';
   }
 
-  /// Инициализация
+  /// Инициализация - загружает только первую страницу метаданных (быстро)
   Future<void> init() async {
     _isLoading = true;
     notifyListeners();
 
     try {
       await _storageService.init();
-      _walksHistory = await _storageService.getAllWalks();
+      
+      // Загружаем только первую страницу (быстро, без точек)
+      _currentPage = 0;
+      _hasMore = true;
+      _walksHistory = await _storageService.getWalksMetadataPaginated(
+        limit: _pageSize,
+        offset: 0,
+      );
+      _totalCount = await _storageService.getWalksCount();
+      _hasMore = _walksHistory.length < _totalCount;
       
       // Загружаем настройки
       await _loadSettings();
@@ -105,6 +130,65 @@ class WalkProvider extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  /// Загрузить следующую страницу прогулок (пагинация)
+  Future<void> loadMoreWalks() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      final nextOffset = (_currentPage + 1) * _pageSize;
+      final moreWalks = await _storageService.getWalksMetadataPaginated(
+        limit: _pageSize,
+        offset: nextOffset,
+      );
+
+      if (moreWalks.isNotEmpty) {
+        _walksHistory.addAll(moreWalks);
+        _currentPage++;
+      }
+      _hasMore = moreWalks.length == _pageSize;
+    } catch (e) {
+      _error = 'Ошибка загрузки прогулок: $e';
+    }
+
+    _isLoadingMore = false;
+    notifyListeners();
+  }
+
+  /// Получить полный Walk (с точками) по ID - с кэшированием
+  Future<Walk?> getWalkDetails(String id) async {
+    // Проверяем кэш
+    if (_walksCache.containsKey(id)) {
+      return _walksCache[id];
+    }
+
+    try {
+      final walk = await _storageService.getWalkById(id);
+      if (walk != null) {
+        _walksCache[id] = walk;
+        // Ограничиваем размер кэша
+        if (_walksCache.length > 5) {
+          _walksCache.remove(_walksCache.keys.first);
+        }
+      }
+      return walk;
+    } catch (e) {
+      debugPrint('Ошибка загрузки деталей прогулки $id: $e');
+      return null;
+    }
+  }
+
+  /// Получить метаданные прогулки по ID (быстро, из памяти)
+  WalkMetadata? getWalkMetadataById(String id) {
+    try {
+      return _walksHistory.firstWhere((m) => m.id == id);
+    } catch (_) {
+      return null;
+    }
   }
   
   /// Загрузка настроек
@@ -208,8 +292,13 @@ class WalkProvider extends ChangeNotifier {
       // Сохраняем прогулку
       await _storageService.saveWalk(_currentWalk!);
 
-      // Добавляем в историю
-      _walksHistory.insert(0, _currentWalk!);
+      // Добавляем метаданные в начало списка
+      _walksHistory.insert(0, WalkMetadata.fromWalk(_currentWalk!));
+      _totalCount++;
+      
+      // Инвалидируем кэш деталей
+      _walksCache.remove(_currentWalk!.id);
+      
       _currentWalk = null;
       _pauseStartTime = null;
       _totalPauseDuration = Duration.zero; // Сбрасываем время пауз
@@ -345,7 +434,9 @@ class WalkProvider extends ChangeNotifier {
   Future<bool> deleteWalk(String walkId) async {
     try {
       await _storageService.deleteWalk(walkId);
-      _walksHistory.removeWhere((w) => w.id == walkId);
+      _walksHistory.removeWhere((m) => m.id == walkId);
+      _walksCache.remove(walkId);
+      _totalCount = (_totalCount - 1).clamp(0, _totalCount);
       notifyListeners();
       return true;
     } catch (e) {
@@ -355,12 +446,20 @@ class WalkProvider extends ChangeNotifier {
     }
   }
 
-  /// Получить прогулку по ID
-  Walk? getWalkById(String id) {
+  /// Очистить всю историю прогулок
+  Future<bool> clearAllWalks() async {
     try {
-      return _walksHistory.firstWhere((w) => w.id == id);
-    } catch (_) {
-      return null;
+      await _storageService.deleteAllWalks();
+      _walksHistory.clear();
+      _walksCache.clear();
+      _totalCount = 0;
+      _hasMore = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Ошибка очистки истории: $e';
+      notifyListeners();
+      return false;
     }
   }
 
