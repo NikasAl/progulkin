@@ -104,7 +104,7 @@ class WalkMetadata {
       totalPauseDuration: Duration(seconds: map['totalPauseDuration'] as int? ?? 0),
       objectStats: map['objectStats'] != null
           ? WalkObjectStats.fromMap(map['objectStats'] as Map<String, dynamic>)
-          : null,
+          : const WalkObjectStats(),
       cachedDistance: (map['cachedDistance'] as num?)?.toDouble() ?? 0,
     );
   }

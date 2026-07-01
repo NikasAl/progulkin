@@ -65,7 +65,7 @@ class P2PProvider extends ChangeNotifier {
     try {
       final zone = MapObject.encodeGeohash(userLat, userLng, 6);
 
-      final config = P2PConfig(
+      final config = P2PConfig.legacy(
         signalingServer: signalingServer,
         signalingPort: signalingPort,
         zone: zone,

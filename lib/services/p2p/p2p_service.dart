@@ -238,11 +238,23 @@ class P2PService {
   Future<void> _handlePeerJoined(PeerInfo peerInfo) async {
     debugPrint('👋 Новый пир: ${peerInfo.deviceId}');
 
+    // IP и порт могут быть null (сервер скрывает их для приватности)
+    // В этом случае P2P-подключение невозможно - нужен relay или WebRTC
+    if (peerInfo.ip == null || peerInfo.port == null) {
+      debugPrint('⚠️ У пира ${peerInfo.deviceId} нет публичного IP:port - подключение невозможно без relay');
+      _peerController.add(Peer(
+        id: peerInfo.deviceId,
+        zone: peerInfo.zone,
+        isOnline: true,
+      ));
+      return;
+    }
+
     // Пытаемся подключиться к пиру
     final conn = await _connectionManager?.connectToPeer(
       peerInfo.deviceId,
-      peerInfo.ip,
-      peerInfo.port,
+      peerInfo.ip!,
+      peerInfo.port!,
     );
 
     if (conn != null) {
